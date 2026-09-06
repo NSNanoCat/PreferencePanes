@@ -1,0 +1,55 @@
+{
+  "name": "@nsnanocat/settings",
+  "version": "0.1.0",
+  "description": "Shared settings API runtime for JavaScript proxy modules",
+  "author": "VirgilClyne <Virgil@nanocat.me>",
+  "homepage": "https://NSNanoCat.github.io/settings",
+  "keywords": [
+    "loon",
+    "quantumult",
+    "surge",
+    "shadowrocket",
+    "stash",
+    "egern",
+    "settings"
+  ],
+  "license": "Apache-2.0",
+  "bugs": "https://github.com/NSNanoCat/Settings/issues",
+  "type": "module",
+  "main": "index.mjs",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./index.mjs"
+    }
+  },
+  "types": "types/index.d.ts",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "check": "npm run lint && npm run typecheck && npm test",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "typecheck": "tsc --noEmit",
+    "build": "node --check index.mjs && node --check lib/settings-handler.mjs",
+    "prepack": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NSNanoCat/Settings.git"
+  },
+  "files": [
+    "index.mjs",
+    "lib",
+    "types"
+  ],
+  "dependencies": {
+    "@nsnanocat/util": "^2.7.4"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "typescript": "^5.9.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,46 @@
+name: Release Node.js Package to NPM Registry
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: BellCubeDev/update-package-version-by-release-tag@v2
+        with: { version: "${{ github.ref_name }}", keep-v: "false", ignore-semver-check: "false" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "24" }
+      - run: npm ci --registry=https://registry.npmjs.org/ --@nsnanocat:registry=https://registry.npmjs.org/
+      - run: npm run build
+      - run: npm run check
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions: { id-token: write, contents: read }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: BellCubeDev/update-package-version-by-release-tag@v2
+        with: { version: "${{ github.ref_name }}", keep-v: "false", ignore-semver-check: "false" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "24", registry-url: "https://registry.npmjs.org" }
+      - run: npm ci --registry=https://registry.npmjs.org/ --@nsnanocat:registry=https://registry.npmjs.org/
+      - run: npm run build
+      - run: npm run check
+      - name: Resolve npm dist-tag
+        id: npm_tag
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [[ "$VERSION" == *-* ]]; then
+            PRERELEASE=${VERSION#*-}
+            echo "tag=${PRERELEASE%%.*}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+      - run: npm publish --registry=https://registry.npmjs.org/ --access public --tag "${{ steps.npm_tag.outputs.tag }}"
