@@ -1,0 +1,25 @@
+{
+  "name": "GitHub - PreferencePanes",
+  "sourceType": "app",
+  "originType": "GIT",
+  "gitConnectionId": 2231,
+  "gitConfigs": {
+    "repoName": "NSNanoCat/PreferencePanes",
+    "branch": "dev",
+    "filePath": "apifox/preference-panes.apifox.json"
+  },
+  "moduleId": 8522462,
+  "targetBranchId": 8595006,
+  "interval": 30,
+  "enable": true,
+  "runOn": "APP",
+  "apiFolderId": 0,
+  "schemaFolderId": 0,
+  "apiOverwriteMode": "BOTH",
+  "schemaOverwriteMode": "BOTH",
+  "docOverwriteMode": "BOTH",
+  "syncApiFolder": true,
+  "deleteUnmatchedResources": false,
+  "importBasePath": false,
+  "options": {}
+}
