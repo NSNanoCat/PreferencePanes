@@ -1,4 +1,4 @@
-import { createSettingsHandler, type SettingsField } from "@nsnanocat/settings";
+import { createSettingsHandler, type SettingsField } from "@nsnanocat/preference-panes";
 
 const fields: SettingsField[] = [{ key: "mode", name: "Mode", type: "number", defaultValue: 1, options: [{ key: 1, label: "One" }] }];
 const handler = createSettingsHandler({

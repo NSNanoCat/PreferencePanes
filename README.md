@@ -1,6 +1,6 @@
-# @nsnanocat/settings
+# @nsnanocat/preference-panes
 
-待评审的代理脚本设置 API 运行时，尚未发布。当前只创建本地 `NSNanoCat/Settings` 仓库；仓库名、包名及 API 在发布前可调整。
+待评审的代理脚本设置 API 运行时，尚未发布。当前只创建本地 `NSNanoCat/PreferencePanes` 仓库；仓库名、包名及 API 在发布前可调整。
 
 ## 职责
 
@@ -13,7 +13,7 @@
 纯 ESM 导出 `createSettingsHandler`，附带 TypeScript 声明。可直接使用字段定义的 `key/name/type/defaultValue/description/options`；传入可序列化数据，不能传整个 arguments-builder 的 output 配置。
 
 ```js
-import { createSettingsHandler } from "@nsnanocat/settings";
+import { createSettingsHandler } from "@nsnanocat/preference-panes";
 
 const handleSettings = createSettingsHandler({
   module: "Weather",
@@ -79,6 +79,8 @@ const handler = createSettingsHandler({
 
 `getStorage` 本身具有项目存储契约，只有已使用该契约的项目才需要此 resolver；其他项目直接使用持久化值即可。POST 不持久化 resolver 派生值或字段默认值，只存储显式提交的变更。
 
+具体例子：本地存储 `enabled=false`，但模块参数 `enabled=true` 且 argument 优先，插件实际执行的是 true。不传 `resolveSettings`，GET 会展示存储中的 false；传入返回 `getStorage(...).Settings` 的函数后，GET 才展示实际生效的 true。它不是另一套存储，不负责写入，也不能让网页保存值自动越过模块参数优先级。函数接收当前持久化对象，仅在 GET 时调用；HEAD 和 POST 不调用它。
+
 ## 环境与打包
 
 沿用 FlatBufferRoot 的 ESM 包模式，`files` 只包含入口、lib、类型，以及 npm 自动包含的 README/LICENSE/package.json。没有 CommonJS 兼容层。Node.js 通过 util 的 Storage 条件导出使用文件后端；代理脚本请用 Rollup 等工具打包，并选择默认/import 导出条件，不能将 Node 存储后端打进 JavaScriptCore。Quantumult X 的 `$done` 响应形状与 Surge 不同，继续复用项目已有的 util `done` 调用方式。
@@ -98,6 +100,6 @@ npm pack --dry-run
 
 两端显式指定发布 registry，package.json 只设置 access 而不固定 registry，避免 GitHub Packages 被误投到 npm。npm 使用 OIDC（需 npm >=11.5.1 和 Node >=22.14），GitHub Packages 只在发布步传 GITHUB_TOKEN。现阶段没有远端仓库、tag、release、trusted publisher、token 或包发布操作。
 
-评审通过后需先建立 NSNanoCat/Settings 远端并确定 visibility；配置 npm trusted publisher 的组织、仓库和 workflow 文件名。新包首次发布可能需要先创建包/完成首次发布，再在 npm 包设置中建立信任关系，不能假设新包已有 OIDC 权限。GitHub Packages 的初始可见性需要发布后单独核对。所有这些外部操作留待用户确认。
+暂不创建 NSNanoCat/PreferencePanes 远端。评审通过后再建立仓库并确定 visibility。npm Trusted Publisher 配置入口位于具体包的 Settings，通常要先完成新包的首次发布，使包存在，再绑定组织、仓库和 workflow；不是注册 npm 账号后就自动获得发布信任。GitHub Packages 不同：仓库 workflow 的 `packages: write` 和 `GITHUB_TOKEN` 可以预先配置并用于首次发布，包创建后再核对包可见性和继承权限。所有这些外部操作留待用户确认。
 
 参考：[npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/)、[GitHub npm registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-npm-registry)。

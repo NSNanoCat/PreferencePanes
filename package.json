@@ -1,9 +1,9 @@
 {
-  "name": "@nsnanocat/settings",
+  "name": "@nsnanocat/preference-panes",
   "version": "0.1.0",
   "description": "Shared settings API runtime for JavaScript proxy modules",
   "author": "VirgilClyne <Virgil@nanocat.me>",
-  "homepage": "https://NSNanoCat.github.io/settings",
+  "homepage": "https://NSNanoCat.github.io/preference-panes",
   "keywords": [
     "loon",
     "quantumult",
@@ -14,7 +14,7 @@
     "settings"
   ],
   "license": "Apache-2.0",
-  "bugs": "https://github.com/NSNanoCat/Settings/issues",
+  "bugs": "https://github.com/NSNanoCat/PreferencePanes/issues",
   "type": "module",
   "main": "index.mjs",
   "exports": {
@@ -35,7 +35,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/NSNanoCat/Settings.git"
+    "url": "git+https://github.com/NSNanoCat/PreferencePanes.git"
   },
   "files": [
     "index.mjs",
