@@ -1,6 +1,12 @@
 # @nsnanocat/preference-panes
 
-待评审的代理脚本设置 API 运行时，尚未发布。当前只创建本地 `NSNanoCat/PreferencePanes` 仓库；仓库名、包名及 API 在发布前可调整。
+待评审的代理脚本设置 API 运行时，尚未发布 npm/GitHub Packages。代码仓库为 [NSNanoCat/PreferencePanes](https://github.com/NSNanoCat/PreferencePanes)。
+
+## Apifox 文档
+
+团队 NSNanoCat，项目 [Preference Panes](https://app.apifox.com/project/8803052)，目标分支 main。通俗说明见 [配置与读写流程](apifox/guide.md)，原生文档数据为 [preference-panes.apifox.json](apifox/preference-panes.apifox.json)。在 GET 接口描述中也嵌入了完整说明，包括 endpoint、storageKey、requestHeader 和 resolveSettings。
+
+运行 `npm run apifox:generate` 更新原生 JSON，运行 `node scripts/generate-apifox.mjs --check` 检查生成文件一致性。文档源位于 GitHub dev，计划单向 Git -> Apifox 同步；不启用反向自动备份。绑定与导入当前状态见 [同步记录](apifox/sync.md)。
 
 ## 职责
 
@@ -98,8 +104,8 @@ npm pack --dry-run
 
 与 util 一样使用两个 `v*` tag workflow：`release-package-to-npm.yml` 和 `release-package-to-github.yml`。分支 push 和 PR 只运行 CI，不发布。两条发布链均把版本从 tag 同步至 package.json，然后安装依赖、构建、lint/typecheck/test。稳定版使用 latest，预发布使用 beta/alpha 等首段 dist-tag。
 
-两端显式指定发布 registry，package.json 只设置 access 而不固定 registry，避免 GitHub Packages 被误投到 npm。npm 使用 OIDC（需 npm >=11.5.1 和 Node >=22.14），GitHub Packages 只在发布步传 GITHUB_TOKEN。现阶段没有远端仓库、tag、release、trusted publisher、token 或包发布操作。
+两端显式指定发布 registry，package.json 只设置 access 而不固定 registry，避免 GitHub Packages 被误投到 npm。npm 使用 OIDC（需 npm >=11.5.1 和 Node >=22.14），GitHub Packages 只在发布步传 GITHUB_TOKEN。现阶段已建立代码仓库，但没有 tag、release、trusted publisher、token 或包发布操作。
 
-暂不创建 NSNanoCat/PreferencePanes 远端。评审通过后再建立仓库并确定 visibility。npm Trusted Publisher 配置入口位于具体包的 Settings，通常要先完成新包的首次发布，使包存在，再绑定组织、仓库和 workflow；不是注册 npm 账号后就自动获得发布信任。GitHub Packages 不同：仓库 workflow 的 `packages: write` 和 `GITHUB_TOKEN` 可以预先配置并用于首次发布，包创建后再核对包可见性和继承权限。所有这些外部操作留待用户确认。
+NSNanoCat/PreferencePanes 远端已按用户要求创建为 public。包发布仍待评审确认。npm Trusted Publisher 配置入口位于具体包的 Settings，通常要先完成新包的首次发布，使包存在，再绑定组织、仓库和 workflow；不是注册 npm 账号后就自动获得发布信任。GitHub Packages 不同：仓库 workflow 的 `packages: write` 和 `GITHUB_TOKEN` 可以预先配置并用于首次发布，包创建后再核对包可见性和继承权限。
 
 参考：[npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/)、[GitHub npm registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-npm-registry)。

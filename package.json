@@ -31,7 +31,8 @@
     "format": "biome check --write .",
     "typecheck": "tsc --noEmit",
     "build": "node --check index.mjs && node --check lib/settings-handler.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "apifox:generate": "node scripts/generate-apifox.mjs"
   },
   "repository": {
     "type": "git",
