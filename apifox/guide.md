@@ -4,13 +4,16 @@
 
 ## 在 Apifox 看什么
 
-左侧三个 HTTP 接口使用同一个示例地址 `https://example.org/settings/api/Weather`：
+左侧四个 HTTP 接口使用同一个示例地址 `https://example.org/settings/api/Weather`：
 
 | 操作 | 你可以理解为 | 实际效果 |
 | --- | --- | --- |
 | HEAD 设置健康探测 | 插件在不在 | 返回 200 和空正文；不读写存储 |
 | GET 读取设置字段和值 | 打开设置页 | 返回模块名、字段说明、选项和当前值 |
 | POST 保存设置补丁 | 点击保存 | 校验你提交的字段后写入本地存储 |
+| DELETE 删除单个设置键 | 恢复某项的默认行为 | 请求体 `{"key":"alerts.enabled"}`，删除本地保存值，保留其他键 |
+
+DELETE 只允许删除 fields 中声明的完整 key。键不存在仍返回 `200 {"deleted":true}`；不会清空模块，不清理空父对象，也不代表关闭该功能。下一次 GET 仍按字段默认值或 resolveSettings 规则显示。必须携带与 POST 相同的 JSON Content-Type 和专用请求头。
 
 `example.org` 是文档占位域名，没有部署这个服务。Apifox 的请求示例用于说明契约，不应误认为点击“发送”即可访问公网 PreferencePanes 服务。要调试真实请求，先在你的代理脚本中实例化处理器，并把示例域名和路径改为对应的真实拦截地址。
 
@@ -53,7 +56,7 @@ const handle = createSettingsHandler({
 - 不传 resolveSettings：GET 展示本地存储的 false。
 - 传入返回有效配置的函数：GET 展示真正生效的 true。
 
-它只影响 GET 展示值，不写入、不切换优先级、不把网页保存值变成最高优先级。HEAD 和 POST 不调用这个函数。没有多来源配置合并需求时，不传即可。
+它只影响 GET 展示值，不写入、不切换优先级、不把网页保存值变成最高优先级。HEAD、POST 和 DELETE 不调用这个函数。没有多来源配置合并需求时，不传即可。
 
 ```js
 import getStorage from "@nsnanocat/util/getStorage.mjs";

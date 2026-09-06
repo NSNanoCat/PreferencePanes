@@ -71,7 +71,7 @@
             ],
             "operationId": "preference_panes_head",
             "sourceUrl": "https://github.com/NSNanoCat/PreferencePanes/blob/dev/lib/settings-handler.mjs",
-            "description": "这是 @nsnanocat/preference-panes 的实例化 HTTP 契约，不是已部署的公网服务。默认服务示例为 https://example.org；请配置实际 endpoint 后调试。{module} 是文档模板，一个处理器实例仅精确匹配配置的 origin/pathname。路径不匹配返回 undefined，不是由本包生成 404。非 HEAD/GET/POST 方法返回 405，Allow: HEAD, GET, POST。\n\n成功返回 HTTP 200 和空正文，不调用 Storage 或 resolveSettings。请求头检查仍生效，未携带标记或 Origin 不符返回 403，HEAD 错误也没有正文。",
+            "description": "这是 @nsnanocat/preference-panes 的实例化 HTTP 契约，不是已部署的公网服务。默认服务示例为 https://example.org；请配置实际 endpoint 后调试。{module} 是文档模板，一个处理器实例仅精确匹配配置的 origin/pathname。路径不匹配返回 undefined，不是由本包生成 404。非 HEAD/GET/POST/DELETE 方法返回 405，Allow: HEAD, GET, POST, DELETE。\n\n成功返回 HTTP 200 和空正文，不调用 Storage 或 resolveSettings。请求头检查仍生效，未携带标记或 Origin 不符返回 403，HEAD 错误也没有正文。",
             "parameters": {
               "path": [
                 {
@@ -249,7 +249,7 @@
             ],
             "operationId": "preference_panes_get",
             "sourceUrl": "https://github.com/NSNanoCat/PreferencePanes/blob/dev/lib/settings-handler.mjs",
-            "description": "这是 @nsnanocat/preference-panes 的实例化 HTTP 契约，不是已部署的公网服务。默认服务示例为 https://example.org；请配置实际 endpoint 后调试。{module} 是文档模板，一个处理器实例仅精确匹配配置的 origin/pathname。路径不匹配返回 undefined，不是由本包生成 404。非 HEAD/GET/POST 方法返回 405，Allow: HEAD, GET, POST。\n\n每次 GET 通过 util Storage.getItem(storageKey) 读取；若配置了 resolveSettings，使用其同步返回的有效配置，否则使用已存值。Lodash.get 读取每个字段，缺省值由 defaultValue 提供。\n\n完整配置参数与读写流程如下。\n\n# PreferencePanes：先看这份说明\n\n这是一个尚未发布的 JavaScript 工具包，不是已经运行在公网的设置服务器。它把代理插件的设置“读、写、检测”统一成一个处理器。页面继续由 argument 配置生成，不需要给每个选项分别写读写函数。\n\n## 在 Apifox 看什么\n\n左侧三个 HTTP 接口使用同一个示例地址 `https://example.org/settings/api/Weather`：\n\n| 操作 | 你可以理解为 | 实际效果 |\n| --- | --- | --- |\n| HEAD 设置健康探测 | 插件在不在 | 返回 200 和空正文；不读写存储 |\n| GET 读取设置字段和值 | 打开设置页 | 返回模块名、字段说明、选项和当前值 |\n| POST 保存设置补丁 | 点击保存 | 校验你提交的字段后写入本地存储 |\n\n`example.org` 是文档占位域名，没有部署这个服务。Apifox 的请求示例用于说明契约，不应误认为点击“发送”即可访问公网 PreferencePanes 服务。要调试真实请求，先在你的代理脚本中实例化处理器，并把示例域名和路径改为对应的真实拦截地址。\n\n## 包的 JavaScript API\n\n`createSettingsHandler(options)` 在脚本内部调用，它不是 HTTP 接口，所以没有伪造一个“创建处理器” POST 接口。\n\n```js\nimport { createSettingsHandler } from \"@nsnanocat/preference-panes\";\n\nconst handle = createSettingsHandler({\n  module: \"Weather\",\n  endpoint: \"https://example.org/settings/api/Weather\",\n  storageKey: \"@ExampleOrg.Weather.Settings\",\n  fields: [\n    { key: \"alerts.enabled\", name: \"天气预警\", type: \"boolean\", defaultValue: true },\n    { key: \"language\", name: \"语言\", type: \"string\", defaultValue: \"zh\", options: [\n      { key: \"zh\", label: \"中文\" },\n      { key: \"en\", label: \"English\" }\n    ] }\n  ]\n});\n```\n\n| 配置项 | 必填 | 直观解释 | 示例 |\n| --- | --- | --- | --- |\n| module | 是 | 页面上这个模块叫什么；不是存储路径 | Weather |\n| endpoint | 是 | 代理脚本要接管哪个 HTTPS 接口 | https://example.org/settings/api/Weather |\n| storageKey | 是 | util 把设置放在哪里 | @ExampleOrg.Weather.Settings |\n| fields | 是 | 页面有哪些选项、类型和默认值 | 从 argument config 整理出的字段数组 |\n| requestHeader | 否 | 设置页携带的专用标记，默认 X-Settings-Client，值为 1 | X-Settings-Client: 1 |\n| resolveSettings | 否 | GET 时告诉页面“最终真正生效”的设置是什么 | 返回现有 getStorage(...).Settings |\n\n**endpoint 是一个具体地址，不是路由模板。** 文档里的 `{module}` 只是展示不同模块的方式。一个处理器实例只处理自己的 origin/pathname，另一个模块地址直接返回 undefined，让外层逻辑继续处理；不存在自动代理所有模块的逻辑。\n\n## resolveSettings 到底干什么\n\n例如你在本地保存了 `alerts.enabled=false`，但代理模块 argument 仍是 `true`，且该模块让 argument 优先。插件实际上按 `true` 工作。\n\n- 不传 resolveSettings：GET 展示本地存储的 false。\n- 传入返回有效配置的函数：GET 展示真正生效的 true。\n\n它只影响 GET 展示值，不写入、不切换优先级、不把网页保存值变成最高优先级。HEAD 和 POST 不调用这个函数。没有多来源配置合并需求时，不传即可。\n\n```js\nimport getStorage from \"@nsnanocat/util/getStorage.mjs\";\n// options 是上面的配置对象，database 是现有插件的默认配置。\nconst handle = createSettingsHandler({\n  ...options,\n  resolveSettings: () => getStorage(\"ExampleOrg\", \"Weather\", database).Settings\n});\n```\n\n## 从页面到 util 的数据流\n\n```text\nargument config 的字段定义\n  -> fields\n  -> GET 返回字段和值\n  -> 页面按类型统一绘制\n  -> POST {values:{\"alerts.enabled\":false}}\n  -> 完整校验后 Lodash.set + Storage.setItem\n  -> 对应模块下一次读取该存储键\n```\n\nHTTP values 使用扁平的字段 key，例如 `alerts.enabled`。util 的存储对象中是嵌套的 `alerts: { enabled: false }`。POST 只更新提交的字段，保留隐藏字段、其他模块和缓存；不会擅自存储 GET 的默认值或 resolver 派生值。false、0、空字符串和空数组不会被当作“没填”。\n\n## 字段约束与错误\n\n- 支持 boolean、number、string、array；数组元素仅支持字符串、有限数值和布尔值。\n- 配置字段 key 必须是安全点路径；不允许重复 key、父子重叠 key 或 __proto__/constructor/prototype 路径。\n- POST 只接受已声明的 key，检查类型、options 与数组去重后再一次写入。\n- 字符串最多 2048 个 UTF-16 code units；整个 JSON 请求正文最多 65536 个 UTF-16 code units，**不是字节数**。\n- 工厂配置错误、resolver 异常或存储后端抛错会直接抛给调用方，不能把它们描述为已由包转换好的 HTTP 500。只有 Storage 返回 false 时包生成 500。\n\n专用请求头不是登录凭据，也不是秘密。Origin 存在且不同源时拒绝；本包不开放 CORS，也不放行 OPTIONS 预检。宿主负责 $done 适配和 HTTPS MITM。\n\n## 当前状态与文档同步\n\n代码仓库：NSNanoCat/PreferencePanes，开发分支 dev；npm 和 GitHub Packages 尚未发布，当前不创建版本 tag。\n\n原生文档 JSON 保存在同一仓库 `apifox/preference-panes.apifox.json`。Git -> Apifox 单向同步，Apifox 是阅读与调试入口；不配置 Apifox -> Git 自动备份。文档示例和错误说明以当前源码 `lib/settings-handler.mjs` 及测试为依据。\n",
+            "description": "这是 @nsnanocat/preference-panes 的实例化 HTTP 契约，不是已部署的公网服务。默认服务示例为 https://example.org；请配置实际 endpoint 后调试。{module} 是文档模板，一个处理器实例仅精确匹配配置的 origin/pathname。路径不匹配返回 undefined，不是由本包生成 404。非 HEAD/GET/POST/DELETE 方法返回 405，Allow: HEAD, GET, POST, DELETE。\n\n每次 GET 通过 util Storage.getItem(storageKey) 读取；若配置了 resolveSettings，使用其同步返回的有效配置，否则使用已存值。Lodash.get 读取每个字段，缺省值由 defaultValue 提供。\n\n完整配置参数与读写流程如下。\n\n# PreferencePanes：先看这份说明\n\n这是一个尚未发布的 JavaScript 工具包，不是已经运行在公网的设置服务器。它把代理插件的设置“读、写、检测”统一成一个处理器。页面继续由 argument 配置生成，不需要给每个选项分别写读写函数。\n\n## 在 Apifox 看什么\n\n左侧四个 HTTP 接口使用同一个示例地址 `https://example.org/settings/api/Weather`：\n\n| 操作 | 你可以理解为 | 实际效果 |\n| --- | --- | --- |\n| HEAD 设置健康探测 | 插件在不在 | 返回 200 和空正文；不读写存储 |\n| GET 读取设置字段和值 | 打开设置页 | 返回模块名、字段说明、选项和当前值 |\n| POST 保存设置补丁 | 点击保存 | 校验你提交的字段后写入本地存储 |\n| DELETE 删除单个设置键 | 恢复某项的默认行为 | 请求体 `{\"key\":\"alerts.enabled\"}`，删除本地保存值，保留其他键 |\n\nDELETE 只允许删除 fields 中声明的完整 key。键不存在仍返回 `200 {\"deleted\":true}`；不会清空模块，不清理空父对象，也不代表关闭该功能。下一次 GET 仍按字段默认值或 resolveSettings 规则显示。必须携带与 POST 相同的 JSON Content-Type 和专用请求头。\n\n`example.org` 是文档占位域名，没有部署这个服务。Apifox 的请求示例用于说明契约，不应误认为点击“发送”即可访问公网 PreferencePanes 服务。要调试真实请求，先在你的代理脚本中实例化处理器，并把示例域名和路径改为对应的真实拦截地址。\n\n## 包的 JavaScript API\n\n`createSettingsHandler(options)` 在脚本内部调用，它不是 HTTP 接口，所以没有伪造一个“创建处理器” POST 接口。\n\n```js\nimport { createSettingsHandler } from \"@nsnanocat/preference-panes\";\n\nconst handle = createSettingsHandler({\n  module: \"Weather\",\n  endpoint: \"https://example.org/settings/api/Weather\",\n  storageKey: \"@ExampleOrg.Weather.Settings\",\n  fields: [\n    { key: \"alerts.enabled\", name: \"天气预警\", type: \"boolean\", defaultValue: true },\n    { key: \"language\", name: \"语言\", type: \"string\", defaultValue: \"zh\", options: [\n      { key: \"zh\", label: \"中文\" },\n      { key: \"en\", label: \"English\" }\n    ] }\n  ]\n});\n```\n\n| 配置项 | 必填 | 直观解释 | 示例 |\n| --- | --- | --- | --- |\n| module | 是 | 页面上这个模块叫什么；不是存储路径 | Weather |\n| endpoint | 是 | 代理脚本要接管哪个 HTTPS 接口 | https://example.org/settings/api/Weather |\n| storageKey | 是 | util 把设置放在哪里 | @ExampleOrg.Weather.Settings |\n| fields | 是 | 页面有哪些选项、类型和默认值 | 从 argument config 整理出的字段数组 |\n| requestHeader | 否 | 设置页携带的专用标记，默认 X-Settings-Client，值为 1 | X-Settings-Client: 1 |\n| resolveSettings | 否 | GET 时告诉页面“最终真正生效”的设置是什么 | 返回现有 getStorage(...).Settings |\n\n**endpoint 是一个具体地址，不是路由模板。** 文档里的 `{module}` 只是展示不同模块的方式。一个处理器实例只处理自己的 origin/pathname，另一个模块地址直接返回 undefined，让外层逻辑继续处理；不存在自动代理所有模块的逻辑。\n\n## resolveSettings 到底干什么\n\n例如你在本地保存了 `alerts.enabled=false`，但代理模块 argument 仍是 `true`，且该模块让 argument 优先。插件实际上按 `true` 工作。\n\n- 不传 resolveSettings：GET 展示本地存储的 false。\n- 传入返回有效配置的函数：GET 展示真正生效的 true。\n\n它只影响 GET 展示值，不写入、不切换优先级、不把网页保存值变成最高优先级。HEAD、POST 和 DELETE 不调用这个函数。没有多来源配置合并需求时，不传即可。\n\n```js\nimport getStorage from \"@nsnanocat/util/getStorage.mjs\";\n// options 是上面的配置对象，database 是现有插件的默认配置。\nconst handle = createSettingsHandler({\n  ...options,\n  resolveSettings: () => getStorage(\"ExampleOrg\", \"Weather\", database).Settings\n});\n```\n\n## 从页面到 util 的数据流\n\n```text\nargument config 的字段定义\n  -> fields\n  -> GET 返回字段和值\n  -> 页面按类型统一绘制\n  -> POST {values:{\"alerts.enabled\":false}}\n  -> 完整校验后 Lodash.set + Storage.setItem\n  -> 对应模块下一次读取该存储键\n```\n\nHTTP values 使用扁平的字段 key，例如 `alerts.enabled`。util 的存储对象中是嵌套的 `alerts: { enabled: false }`。POST 只更新提交的字段，保留隐藏字段、其他模块和缓存；不会擅自存储 GET 的默认值或 resolver 派生值。false、0、空字符串和空数组不会被当作“没填”。\n\n## 字段约束与错误\n\n- 支持 boolean、number、string、array；数组元素仅支持字符串、有限数值和布尔值。\n- 配置字段 key 必须是安全点路径；不允许重复 key、父子重叠 key 或 __proto__/constructor/prototype 路径。\n- POST 只接受已声明的 key，检查类型、options 与数组去重后再一次写入。\n- 字符串最多 2048 个 UTF-16 code units；整个 JSON 请求正文最多 65536 个 UTF-16 code units，**不是字节数**。\n- 工厂配置错误、resolver 异常或存储后端抛错会直接抛给调用方，不能把它们描述为已由包转换好的 HTTP 500。只有 Storage 返回 false 时包生成 500。\n\n专用请求头不是登录凭据，也不是秘密。Origin 存在且不同源时拒绝；本包不开放 CORS，也不放行 OPTIONS 预检。宿主负责 $done 适配和 HTTPS MITM。\n\n## 当前状态与文档同步\n\n代码仓库：NSNanoCat/PreferencePanes，开发分支 dev；npm 和 GitHub Packages 尚未发布，当前不创建版本 tag。\n\n原生文档 JSON 保存在同一仓库 `apifox/preference-panes.apifox.json`。Git -> Apifox 单向同步，Apifox 是阅读与调试入口；不配置 Apifox -> Git 自动备份。文档示例和错误说明以当前源码 `lib/settings-handler.mjs` 及测试为依据。\n",
             "parameters": {
               "path": [
                 {
@@ -595,7 +595,7 @@
             ],
             "operationId": "preference_panes_post",
             "sourceUrl": "https://github.com/NSNanoCat/PreferencePanes/blob/dev/lib/settings-handler.mjs",
-            "description": "这是 @nsnanocat/preference-panes 的实例化 HTTP 契约，不是已部署的公网服务。默认服务示例为 https://example.org；请配置实际 endpoint 后调试。{module} 是文档模板，一个处理器实例仅精确匹配配置的 origin/pathname。路径不匹配返回 undefined，不是由本包生成 404。非 HEAD/GET/POST 方法返回 405，Allow: HEAD, GET, POST。\n\n请求体为 {values:{...}}，values 至少一个字段。先完整校验所有字段后才读取并写入目标存储键。只更新本次提交的路径，保留隐藏字段与其他模块配置。不调用 resolveSettings，不自动切换 argument/PersistentStore 优先级。Storage.setItem 返回 false 才转换成 500；存储后端抛错由外层处理。",
+            "description": "这是 @nsnanocat/preference-panes 的实例化 HTTP 契约，不是已部署的公网服务。默认服务示例为 https://example.org；请配置实际 endpoint 后调试。{module} 是文档模板，一个处理器实例仅精确匹配配置的 origin/pathname。路径不匹配返回 undefined，不是由本包生成 404。非 HEAD/GET/POST/DELETE 方法返回 405，Allow: HEAD, GET, POST, DELETE。\n\n请求体为 {values:{...}}，values 至少一个字段。先完整校验所有字段后才读取并写入目标存储键。只更新本次提交的路径，保留隐藏字段与其他模块配置。不调用 resolveSettings，不自动切换 argument/PersistentStore 优先级。Storage.setItem 返回 false 才转换成 500；存储后端抛错由外层处理。",
             "parameters": {
               "path": [
                 {
@@ -751,7 +751,7 @@
               },
               {
                 "id": "pp-post-400",
-                "name": "无效 JSON / 空 values / 未声明 key / 类型或 options 不符 / 重复数组项",
+                "name": "无效 JSON / 空 values / 缺失或未声明 key / 类型或 options 不符 / 重复数组项",
                 "code": 400,
                 "headers": [
                   {
@@ -804,7 +804,7 @@
                     }
                   }
                 },
-                "description": "无效 JSON / 空 values / 未声明 key / 类型或 options 不符 / 重复数组项"
+                "description": "无效 JSON / 空 values / 缺失或未声明 key / 类型或 options 不符 / 重复数组项"
               },
               {
                 "id": "pp-post-403",
@@ -1045,6 +1045,456 @@
                 "name": "未知字段示例",
                 "responseId": "pp-post-400",
                 "data": "{\"error\":\"Unknown setting: unknown\"}"
+              }
+            ],
+            "auth": {},
+            "securityScheme": {},
+            "commonParameters": {},
+            "preProcessors": [],
+            "postProcessors": [],
+            "inheritPreProcessors": {},
+            "inheritPostProcessors": {},
+            "cases": [],
+            "mocks": [],
+            "customApiFields": "{}",
+            "advancedSettings": {
+              "disabledSystemHeaders": {}
+            },
+            "oasExtensions": "{}"
+          }
+        },
+        {
+          "name": "删除单个设置键",
+          "api": {
+            "id": "pp-delete",
+            "name": "删除单个设置键",
+            "method": "delete",
+            "path": "/settings/api/{module}",
+            "type": "http",
+            "moduleId": 8522462,
+            "serverId": "default",
+            "visibility": "SHARED",
+            "status": "testing",
+            "tags": [
+              "设置读写"
+            ],
+            "operationId": "preference_panes_delete",
+            "sourceUrl": "https://github.com/NSNanoCat/PreferencePanes/blob/dev/lib/settings-handler.mjs",
+            "description": "这是 @nsnanocat/preference-panes 的实例化 HTTP 契约，不是已部署的公网服务。默认服务示例为 https://example.org；请配置实际 endpoint 后调试。{module} 是文档模板，一个处理器实例仅精确匹配配置的 origin/pathname。路径不匹配返回 undefined，不是由本包生成 404。非 HEAD/GET/POST/DELETE 方法返回 405，Allow: HEAD, GET, POST, DELETE。\n\nJSON 请求体 {key:\"alerts.enabled\"}，key 必须是 fields 中声明的完整路径。通过 util Lodash.unset 删除该键后 Storage.setItem 写回，保留其他键、缓存和模块。键不存在仍返回 200（幂等），不递归清理空父对象。不调用 resolveSettings；下次 GET 按原有默认值或 resolver 规则读取。删除本地值不保证关闭功能，也不改变 argument 优先级。",
+            "parameters": {
+              "path": [
+                {
+                  "id": "module#0",
+                  "name": "module",
+                  "type": "string",
+                  "schema": {
+                    "type": "string"
+                  },
+                  "required": true,
+                  "enable": true,
+                  "example": "Weather",
+                  "description": "示例模块；实际 endpoint 已在实例化时确定。"
+                }
+              ],
+              "query": [],
+              "cookie": [],
+              "header": [
+                {
+                  "id": "X-Settings-Client#0",
+                  "name": "X-Settings-Client",
+                  "type": "string",
+                  "schema": {
+                    "type": "string"
+                  },
+                  "required": true,
+                  "enable": true,
+                  "example": "1",
+                  "description": "默认页面专用标记；如果实例配置了 requestHeader，需替换此名称。不是登录鉴权。"
+                },
+                {
+                  "id": "Origin#0",
+                  "name": "Origin",
+                  "type": "string",
+                  "schema": {
+                    "type": "string"
+                  },
+                  "required": false,
+                  "enable": true,
+                  "example": "https://example.org",
+                  "description": "可省略；存在时必须与 endpoint 的 origin 完全相同。"
+                }
+              ]
+            },
+            "requestBody": {
+              "type": "application/json",
+              "required": true,
+              "parameters": [],
+              "jsonSchema": {
+                "type": "object",
+                "required": [
+                  "key"
+                ],
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "description": "要删除的已声明字段完整 key。",
+                    "examples": [
+                      "alerts.enabled"
+                    ]
+                  }
+                }
+              },
+              "data": "{\"key\":\"alerts.enabled\"}"
+            },
+            "responses": [
+              {
+                "id": "pp-delete-200",
+                "name": "成功",
+                "code": 200,
+                "headers": [
+                  {
+                    "id": "Content-Type#0",
+                    "name": "Content-Type",
+                    "type": "string",
+                    "schema": {
+                      "type": "string"
+                    },
+                    "required": false,
+                    "enable": true,
+                    "example": "application/json; charset=utf-8",
+                    "description": "响应类型"
+                  },
+                  {
+                    "id": "Cache-Control#0",
+                    "name": "Cache-Control",
+                    "type": "string",
+                    "schema": {
+                      "type": "string"
+                    },
+                    "required": false,
+                    "enable": true,
+                    "example": "no-store",
+                    "description": "配置响应不缓存"
+                  },
+                  {
+                    "id": "X-Content-Type-Options#0",
+                    "name": "X-Content-Type-Options",
+                    "type": "string",
+                    "schema": {
+                      "type": "string"
+                    },
+                    "required": false,
+                    "enable": true,
+                    "example": "nosniff",
+                    "description": "禁止类型嗅探"
+                  }
+                ],
+                "contentType": "json",
+                "jsonSchema": {
+                  "type": "object",
+                  "required": [
+                    "deleted"
+                  ],
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  }
+                },
+                "description": "成功响应"
+              },
+              {
+                "id": "pp-delete-400",
+                "name": "无效 JSON / 空 values / 缺失或未声明 key / 类型或 options 不符 / 重复数组项",
+                "code": 400,
+                "headers": [
+                  {
+                    "id": "Content-Type#0",
+                    "name": "Content-Type",
+                    "type": "string",
+                    "schema": {
+                      "type": "string"
+                    },
+                    "required": false,
+                    "enable": true,
+                    "example": "application/json; charset=utf-8",
+                    "description": "响应类型"
+                  },
+                  {
+                    "id": "Cache-Control#0",
+                    "name": "Cache-Control",
+                    "type": "string",
+                    "schema": {
+                      "type": "string"
+                    },
+                    "required": false,
+                    "enable": true,
+                    "example": "no-store",
+                    "description": "配置响应不缓存"
+                  },
+                  {
+                    "id": "X-Content-Type-Options#0",
+                    "name": "X-Content-Type-Options",
+                    "type": "string",
+                    "schema": {
+                      "type": "string"
+                    },
+                    "required": false,
+                    "enable": true,
+                    "example": "nosniff",
+                    "description": "禁止类型嗅探"
+                  }
+                ],
+                "contentType": "json",
+                "jsonSchema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "英文错误说明；页面可自行本地化。"
+                    }
+                  }
+                },
+                "description": "无效 JSON / 空 values / 缺失或未声明 key / 类型或 options 不符 / 重复数组项"
+              },
+              {
+                "id": "pp-delete-403",
+                "name": "缺少页面标记或 Origin 不符",
+                "code": 403,
+                "headers": [
+                  {
+                    "id": "Content-Type#0",
+                    "name": "Content-Type",
+                    "type": "string",
+                    "schema": {
+                      "type": "string"
+                    },
+                    "required": false,
+                    "enable": true,
+                    "example": "application/json; charset=utf-8",
+                    "description": "响应类型"
+                  },
+                  {
+                    "id": "Cache-Control#0",
+                    "name": "Cache-Control",
+                    "type": "string",
+                    "schema": {
+                      "type": "string"
+                    },
+                    "required": false,
+                    "enable": true,
+                    "example": "no-store",
+                    "description": "配置响应不缓存"
+                  },
+                  {
+                    "id": "X-Content-Type-Options#0",
+                    "name": "X-Content-Type-Options",
+                    "type": "string",
+                    "schema": {
+                      "type": "string"
+                    },
+                    "required": false,
+                    "enable": true,
+                    "example": "nosniff",
+                    "description": "禁止类型嗅探"
+                  }
+                ],
+                "contentType": "json",
+                "jsonSchema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "英文错误说明；页面可自行本地化。"
+                    }
+                  }
+                },
+                "description": "缺少页面标记或 Origin 不符"
+              },
+              {
+                "id": "pp-delete-413",
+                "name": "正文超过 65536 个 UTF-16 code units（不是字节数）",
+                "code": 413,
+                "headers": [
+                  {
+                    "id": "Content-Type#0",
+                    "name": "Content-Type",
+                    "type": "string",
+                    "schema": {
+                      "type": "string"
+                    },
+                    "required": false,
+                    "enable": true,
+                    "example": "application/json; charset=utf-8",
+                    "description": "响应类型"
+                  },
+                  {
+                    "id": "Cache-Control#0",
+                    "name": "Cache-Control",
+                    "type": "string",
+                    "schema": {
+                      "type": "string"
+                    },
+                    "required": false,
+                    "enable": true,
+                    "example": "no-store",
+                    "description": "配置响应不缓存"
+                  },
+                  {
+                    "id": "X-Content-Type-Options#0",
+                    "name": "X-Content-Type-Options",
+                    "type": "string",
+                    "schema": {
+                      "type": "string"
+                    },
+                    "required": false,
+                    "enable": true,
+                    "example": "nosniff",
+                    "description": "禁止类型嗅探"
+                  }
+                ],
+                "contentType": "json",
+                "jsonSchema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "英文错误说明；页面可自行本地化。"
+                    }
+                  }
+                },
+                "description": "正文超过 65536 个 UTF-16 code units（不是字节数）"
+              },
+              {
+                "id": "pp-delete-415",
+                "name": "Content-Type 不是 application/json",
+                "code": 415,
+                "headers": [
+                  {
+                    "id": "Content-Type#0",
+                    "name": "Content-Type",
+                    "type": "string",
+                    "schema": {
+                      "type": "string"
+                    },
+                    "required": false,
+                    "enable": true,
+                    "example": "application/json; charset=utf-8",
+                    "description": "响应类型"
+                  },
+                  {
+                    "id": "Cache-Control#0",
+                    "name": "Cache-Control",
+                    "type": "string",
+                    "schema": {
+                      "type": "string"
+                    },
+                    "required": false,
+                    "enable": true,
+                    "example": "no-store",
+                    "description": "配置响应不缓存"
+                  },
+                  {
+                    "id": "X-Content-Type-Options#0",
+                    "name": "X-Content-Type-Options",
+                    "type": "string",
+                    "schema": {
+                      "type": "string"
+                    },
+                    "required": false,
+                    "enable": true,
+                    "example": "nosniff",
+                    "description": "禁止类型嗅探"
+                  }
+                ],
+                "contentType": "json",
+                "jsonSchema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "英文错误说明；页面可自行本地化。"
+                    }
+                  }
+                },
+                "description": "Content-Type 不是 application/json"
+              },
+              {
+                "id": "pp-delete-500",
+                "name": "Storage.setItem 返回 false，写入失败",
+                "code": 500,
+                "headers": [
+                  {
+                    "id": "Content-Type#0",
+                    "name": "Content-Type",
+                    "type": "string",
+                    "schema": {
+                      "type": "string"
+                    },
+                    "required": false,
+                    "enable": true,
+                    "example": "application/json; charset=utf-8",
+                    "description": "响应类型"
+                  },
+                  {
+                    "id": "Cache-Control#0",
+                    "name": "Cache-Control",
+                    "type": "string",
+                    "schema": {
+                      "type": "string"
+                    },
+                    "required": false,
+                    "enable": true,
+                    "example": "no-store",
+                    "description": "配置响应不缓存"
+                  },
+                  {
+                    "id": "X-Content-Type-Options#0",
+                    "name": "X-Content-Type-Options",
+                    "type": "string",
+                    "schema": {
+                      "type": "string"
+                    },
+                    "required": false,
+                    "enable": true,
+                    "example": "nosniff",
+                    "description": "禁止类型嗅探"
+                  }
+                ],
+                "contentType": "json",
+                "jsonSchema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "英文错误说明；页面可自行本地化。"
+                    }
+                  }
+                },
+                "description": "Storage.setItem 返回 false，写入失败"
+              }
+            ],
+            "responseExamples": [
+              {
+                "name": "调用方 Weather 实例的示例",
+                "responseId": "pp-delete-200",
+                "data": "{\n  \"deleted\": true\n}"
               }
             ],
             "auth": {},

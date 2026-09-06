@@ -64,9 +64,15 @@ if (!result.ok) throw new Error((await result.json()).error);
 
 HEAD 返回 200 和空正文，不读写存储。GET 返回 `{ module, fields, values }`，其中 values 用字段 key 作为扁平键；未配置且未声明 defaultValue 的字段不会出现在 JSON values 中。POST 接受部分字段，完整校验后只写一次，返回 `{ saved: true }`。写入前重新读取存储，保留未展示字段、其他模块及缓存；并发请求之间的原子性由 util 后端决定，本包不保证跨脚本事务。
 
-状态码：403（缺少页面标记或异源）、400（非法 JSON、未知字段/值）、413（超过 65536 个 UTF-16 code units）、415（非 JSON）、405（非 HEAD/GET/POST）、500（Storage 返回写入失败）。标量字符串最多 2048 code units；数组为不重复的字符串、有限数值或布尔值，可由 options 进一步约束。错误消息为英文，UI 可自行本地化。
+状态码：403（缺少页面标记或异源）、400（非法 JSON、未知字段/值）、413（超过 65536 个 UTF-16 code units）、415（非 JSON）、405（非 HEAD/GET/POST/DELETE）、500（Storage 返回写入失败）。标量字符串最多 2048 code units；数组为不重复的字符串、有限数值或布尔值，可由 options 进一步约束。错误消息为英文，UI 可自行本地化。
 
 这不是通用公开网络服务：仅用于同源静态页面访问本机代理 Mock API。自定义 header 是请求来源约束，不是用户认证，也不是秘密；不会添加跨域许可，不提供 OPTIONS 预检放行，不暴露凭据。宿主正常拦截/缓存/MITM 配置由调用方负责。
+
+## 删除单个键
+
+向同一个 endpoint 发送 `DELETE`，请求体为 `{"key":"alerts.enabled"}`，Content-Type 为 application/json，仍携带专用请求头。处理器通过 util `Lodash.unset` 删除已声明的键，再用 `Storage.setItem` 写回，成功返回 `{"deleted":true}`。
+
+键不存在时也成功，操作幂等；保留其他字段、空父对象、缓存和同级模块。不调用 resolveSettings。删除的是持久化覆盖值，后续 GET 可以再次显示该字段默认值或 argument 派生值，不能把删除等同于将开关关闭。
 
 ## 参数优先级
 
@@ -85,7 +91,7 @@ const handler = createSettingsHandler({
 
 `getStorage` 本身具有项目存储契约，只有已使用该契约的项目才需要此 resolver；其他项目直接使用持久化值即可。POST 不持久化 resolver 派生值或字段默认值，只存储显式提交的变更。
 
-具体例子：本地存储 `enabled=false`，但模块参数 `enabled=true` 且 argument 优先，插件实际执行的是 true。不传 `resolveSettings`，GET 会展示存储中的 false；传入返回 `getStorage(...).Settings` 的函数后，GET 才展示实际生效的 true。它不是另一套存储，不负责写入，也不能让网页保存值自动越过模块参数优先级。函数接收当前持久化对象，仅在 GET 时调用；HEAD 和 POST 不调用它。
+具体例子：本地存储 `enabled=false`，但模块参数 `enabled=true` 且 argument 优先，插件实际执行的是 true。不传 `resolveSettings`，GET 会展示存储中的 false；传入返回 `getStorage(...).Settings` 的函数后，GET 才展示实际生效的 true。它不是另一套存储，不负责写入，也不能让网页保存值自动越过模块参数优先级。函数接收当前持久化对象，仅在 GET 时调用；HEAD、POST 和 DELETE 不调用它。
 
 ## 环境与打包
 

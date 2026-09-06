@@ -80,8 +80,13 @@ const apiSchema = {
     },
   },
   post: { type: "object", required: ["saved"], properties: { saved: { type: "boolean", const: true } } },
+  delete: { type: "object", required: ["deleted"], properties: { deleted: { type: "boolean", const: true } } },
 };
 const details = {
+  delete: [
+    "删除单个设置键",
+    'JSON 请求体 {key:"alerts.enabled"}，key 必须是 fields 中声明的完整路径。通过 util Lodash.unset 删除该键后 Storage.setItem 写回，保留其他键、缓存和模块。键不存在仍返回 200（幂等），不递归清理空父对象。不调用 resolveSettings；下次 GET 按原有默认值或 resolver 规则读取。删除本地值不保证关闭功能，也不改变 argument 优先级。',
+  ],
   head: [
     "设置健康探测",
     "成功返回 HTTP 200 和空正文，不调用 Storage 或 resolveSettings。请求头检查仍生效，未携带标记或 Origin 不符返回 403，HEAD 错误也没有正文。",
@@ -97,7 +102,7 @@ const details = {
   ],
 };
 const descriptions = {
-  400: "无效 JSON / 空 values / 未声明 key / 类型或 options 不符 / 重复数组项",
+  400: "无效 JSON / 空 values / 缺失或未声明 key / 类型或 options 不符 / 重复数组项",
   403: "缺少页面标记或 Origin 不符",
   413: "正文超过 65536 个 UTF-16 code units（不是字节数）",
   415: "Content-Type 不是 application/json",
@@ -106,8 +111,9 @@ const descriptions = {
 const examples = {
   get: { module: "Weather", fields: exampleFields, values: { "alerts.enabled": true, language: "zh" } },
   post: { saved: true },
+  delete: { deleted: true },
 };
-const apis = ["head", "get", "post"].map((method) => {
+const apis = ["head", "get", "post", "delete"].map((method) => {
   const codes = method === "head" || method === "get" ? [200, 403] : [200, 400, 403, 413, 415, 500];
   const responses = codes.map((code) => ({
     id: `pp-${method}-${code}`,
@@ -132,7 +138,7 @@ const apis = ["head", "get", "post"].map((method) => {
     operationId: `preference_panes_${method}`,
     sourceUrl: "https://github.com/NSNanoCat/PreferencePanes/blob/dev/lib/settings-handler.mjs",
     description:
-      "这是 @nsnanocat/preference-panes 的实例化 HTTP 契约，不是已部署的公网服务。默认服务示例为 https://example.org；请配置实际 endpoint 后调试。{module} 是文档模板，一个处理器实例仅精确匹配配置的 origin/pathname。路径不匹配返回 undefined，不是由本包生成 404。非 HEAD/GET/POST 方法返回 405，Allow: HEAD, GET, POST。\n\n" +
+      "这是 @nsnanocat/preference-panes 的实例化 HTTP 契约，不是已部署的公网服务。默认服务示例为 https://example.org；请配置实际 endpoint 后调试。{module} 是文档模板，一个处理器实例仅精确匹配配置的 origin/pathname。路径不匹配返回 undefined，不是由本包生成 404。非 HEAD/GET/POST/DELETE 方法返回 405，Allow: HEAD, GET, POST, DELETE。\n\n" +
       details[method][1],
     parameters: {
       path: [
@@ -152,26 +158,38 @@ const apis = ["head", "get", "post"].map((method) => {
       header: commonHeaders,
     },
     requestBody:
-      method === "post"
+      method === "delete"
         ? {
             type: "application/json",
             required: true,
             parameters: [],
             jsonSchema: {
               type: "object",
-              required: ["values"],
-              properties: {
-                values: {
-                  type: "object",
-                  minProperties: 1,
-                  additionalProperties: value,
-                  description: "只接受 fields 声明的 key；嵌套路径用 alerts.enabled 等扁平键。",
+              required: ["key"],
+              properties: { key: { type: "string", description: "要删除的已声明字段完整 key。", examples: ["alerts.enabled"] } },
+            },
+            data: '{"key":"alerts.enabled"}',
+          }
+        : method === "post"
+          ? {
+              type: "application/json",
+              required: true,
+              parameters: [],
+              jsonSchema: {
+                type: "object",
+                required: ["values"],
+                properties: {
+                  values: {
+                    type: "object",
+                    minProperties: 1,
+                    additionalProperties: value,
+                    description: "只接受 fields 声明的 key；嵌套路径用 alerts.enabled 等扁平键。",
+                  },
                 },
               },
-            },
-            data: JSON.stringify({ values: { "alerts.enabled": false } }, null, 2),
-          }
-        : { type: "none", parameters: [], required: false },
+              data: JSON.stringify({ values: { "alerts.enabled": false } }, null, 2),
+            }
+          : { type: "none", parameters: [], required: false },
     responses,
     responseExamples:
       method === "head"
@@ -269,8 +287,8 @@ console.log(
     output,
     operations: apis.length,
     paths: 1,
-    writeOperations: 1,
-    withBody: 1,
+    writeOperations: 2,
+    withBody: 2,
     emptyObjectBodies: 0,
     responseDefinitions: apis.reduce((n, api) => n + api.responses.length, 0),
   }),

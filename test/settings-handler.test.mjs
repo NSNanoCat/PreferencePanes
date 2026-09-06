@@ -159,7 +159,7 @@ test("header/origin boundary and method/content-type/body errors are explicit", 
   assert.equal(handler(request("POST", { count: 2 }, { Origin: "https://other.org" })).status, 403);
   assert.equal(handler({ ...request("HEAD"), headers: {} }).body, "");
   assert.equal(handler(request("OPTIONS")).status, 405);
-  assert.equal(handler(request("DELETE")).headers.Allow, "HEAD, GET, POST");
+  assert.equal(handler(request("OPTIONS")).headers.Allow, "HEAD, GET, POST, DELETE");
   assert.equal(handler(request("POST", { count: 2 }, { "Content-Type": "text/plain" })).status, 415);
   assert.equal(handler({ ...request("POST"), body: "{" }).status, 400);
   assert.equal(handler({ ...request("POST"), body: "x".repeat(65537) }).status, 413);
@@ -183,6 +183,44 @@ test("failed writes report failure; resolver and backend errors are not swallowe
   );
   store.set("ExampleOrg", JSON.stringify({ Example: { Settings: "invalid stored content" } }));
   assert.throws(() => createSettingsHandler(options)(request()), /resolved settings/);
+});
+
+test("DELETE removes one declared path, preserves siblings and restores field defaults", () => {
+  store.set(
+    "ExampleOrg",
+    JSON.stringify({
+      Example: { Settings: JSON.stringify({ feature: { enabled: false, hidden: 7 }, mode: "b" }), Caches: { marker: 1 } },
+      Other: { Settings: { enabled: false } },
+    }),
+  );
+  const handler = createSettingsHandler(options);
+  const deletion = { ...request("DELETE"), body: JSON.stringify({ key: "feature.enabled" }) };
+  assert.deepEqual(JSON.parse(handler(deletion).body), { deleted: true });
+  const root = JSON.parse(store.get("ExampleOrg"));
+  assert.deepEqual(JSON.parse(root.Example.Settings), { feature: { hidden: 7 }, mode: "b" });
+  assert.equal(root.Example.Caches.marker, 1);
+  assert.deepEqual(root.Other, { Settings: { enabled: false } });
+  assert.equal(JSON.parse(handler(request()).body).values["feature.enabled"], true);
+  assert.equal(handler(deletion).status, 200);
+  store.clear();
+  assert.equal(handler(deletion).status, 200, "missing parent path is an idempotent deletion");
+});
+
+test("DELETE validates key, origin and write failure without invoking resolver", () => {
+  const handler = createSettingsHandler({
+    ...options,
+    resolveSettings() {
+      throw new Error("must not resolve on delete");
+    },
+  });
+  for (const key of [undefined, null, 1, "unknown", "feature", "__proto__", "constructor.prototype"]) {
+    assert.equal(handler({ ...request("DELETE"), body: JSON.stringify({ key }) }).status, 400);
+  }
+  const deletion = { ...request("DELETE"), body: '{"key":"mode"}' };
+  assert.equal(handler({ ...deletion, headers: { ...deletion.headers, Origin: "https://other.org" } }).status, 403);
+  assert.equal(writes, 0);
+  writable = false;
+  assert.equal(handler(deletion).status, 500);
 });
 
 test("factory rejects ambiguous or unsafe schemas and snapshots field definitions", () => {

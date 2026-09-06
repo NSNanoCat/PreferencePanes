@@ -21,6 +21,7 @@ export interface SettingsRequest {
   url: string;
   method: string;
   headers?: Record<string, string | undefined>;
+  /** POST: JSON {values:{...}}；DELETE: JSON {key:"path"} / Serialized update or deletion body. */
   body?: string;
 }
 export interface SettingsResponse {
