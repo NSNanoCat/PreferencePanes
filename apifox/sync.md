@@ -7,7 +7,7 @@
 - 计划方向：Git -> Apifox；不删除未匹配资源、不设置 Apifox -> Git 自动备份。
 - 包发布：未执行；普通分支推送只触发 CI。
 
-截至 2026-09-07，本地 JSON 包含 1 个示例路径、3 个 HTTP 操作（HEAD/GET/POST）、10 个响应定义。POST 带非空 values schema，GET 包含完整字段 schema 和配置说明；HEAD 无正文。example.org 为文档占位，不是已部署的服务。
+截至 2026-09-07，本地 JSON 包含 1 个示例路径、4 个 HTTP 操作（HEAD/GET/POST/DELETE）、16 个响应定义。POST 带非空 values schema，GET 包含完整字段 schema 和配置说明；HEAD 无正文。example.org 为文档占位，不是已部署的服务。
 
 当前阻碍：
 
