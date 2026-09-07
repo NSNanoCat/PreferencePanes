@@ -7,6 +7,36 @@ const guide = await readFile(path.join(root, "apifox/guide.md"), "utf8");
 const scalar = { oneOf: [{ type: "string", maxLength: 2048 }, { type: "number" }, { type: "boolean" }] };
 const value = { oneOf: [...scalar.oneOf, { type: "array", items: scalar, uniqueItems: true }] };
 const errorSchema = { type: "object", required: ["error"], properties: { error: { type: "string" } } };
+const settings = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    Home: { type: "object", additionalProperties: false, properties: { Top_left: { type: "string", enum: ["mine", "videoshortcut"] } } },
+    enabled: { type: "boolean" },
+  },
+};
+const boxjsFields = {
+  type: "array",
+  items: {
+    type: "object",
+    required: ["id", "name", "type"],
+    properties: {
+      id: { type: "string", description: "@存储根.模块.子路径.键" },
+      name: { type: "string" },
+      desc: { type: "string" },
+      type: { type: "string", enum: ["boolean", "selects", "checkboxes", "text", "textarea", "number"] },
+      val: value,
+      items: {
+        type: "array",
+        items: { type: "object", required: ["key", "label"], properties: { key: scalar, label: { type: "string" } } },
+      },
+    },
+  },
+};
+const boxjsApp = { type: "object", required: ["settings"], properties: { settings: boxjsFields } };
+const boxjs = {
+  oneOf: [boxjsFields, boxjsApp, { type: "object", required: ["apps"], properties: { apps: { type: "array", items: boxjsApp } } }],
+};
 const header = (name, example, description, required = false) => ({
   id: `${name}#0`,
   name,
@@ -24,54 +54,140 @@ const headers = [
 const descriptions = {
   400: "非法路径或 JSON 值",
   403: "缺标记或异源",
-  404: "未知字段或无值",
+  404: "未知字段、无覆盖值或模块未启用",
+  405: "不支持的操作",
   413: "正文过长",
   415: "非 JSON 正文",
-  500: "存储写入失败",
+  500: "存储写入或执行失败",
+  502: "BoxJS 配置加载或解析失败",
 };
-const names = { head: "探测指定配置键", get: "读取指定配置键", post: "写入或修改指定配置键", delete: "删除指定配置键" };
-const ids = { head: 511372916, get: 511372917, post: 511372918, delete: 511372919 };
-const apis = Object.keys(names).map((method) => {
-  const success = method === "post" || method === "delete" ? 204 : 200;
-  const codes = [success, 400, 403, 404, ...(method === "post" ? [413, 415, 500] : method === "delete" ? [500] : [])];
+const leaf = "/api/Enhanced/Settings/Home/Top_left";
+const declarations = [
+  {
+    id: "pp-config-head",
+    method: "head",
+    path: "/api/Enhanced/",
+    name: "探测模块配置 Mock",
+    group: "模块配置",
+    mock: true,
+    schema: {},
+    example: undefined,
+    description: "主菜单并发探测。模块的原生 BoxJS Mock 返回 200 才启用入口，不读取持久化设置。该路径没有线上静态文件。",
+  },
+  {
+    id: "pp-config-get",
+    method: "get",
+    path: "/api/Enhanced/",
+    name: "获取模块 BoxJS 配置",
+    group: "模块配置",
+    mock: true,
+    schema: boxjs,
+    example: [
+      {
+        id: "@BiliBili.Enhanced.Settings.Home.Top_left",
+        name: "顶栏左侧",
+        type: "selects",
+        val: "mine",
+        items: [
+          { key: "mine", label: "我的" },
+          { key: "videoshortcut", label: "短视频" },
+        ],
+      },
+      { id: "@BiliBili.Enhanced.Settings.enabled", name: "启用", type: "boolean", val: true },
+    ],
+    description: "每次进入或刷新模块页先取一次配置，实时生成控件。从 ID 提取 storageKey，不使用浏览器传来的存储根键。",
+  },
+  {
+    id: "pp-subtree-get",
+    method: "get",
+    path: "/api/Enhanced/Settings/",
+    name: "读取模块设置子树",
+    group: "页面初次读取",
+    schema: settings,
+    example: { Home: { Top_left: "videoshortcut" } },
+    description: "进入模块后只读一次已声明字段的持久化覆盖值；无覆盖值返回空对象。具体公共子树由 BoxJS 路径自动计算。",
+  },
+  {
+    id: "511372916",
+    method: "head",
+    path: leaf,
+    name: "探测指定配置键",
+    group: "配置键值",
+    schema: {},
+    description: "读取配置确认字段已声明，不读写存储。主菜单使用模块根探测。",
+  },
+  {
+    id: "511372917",
+    method: "get",
+    path: leaf,
+    name: "读取指定配置键",
+    group: "配置键值",
+    schema: { type: "string", enum: ["mine", "videoshortcut"] },
+    example: "mine",
+    description: "直接返回键值；无持久化值且未提供 resolver 时返回 404，不返回 BoxJS 默认值。",
+  },
+  {
+    id: "511372918",
+    method: "post",
+    path: leaf,
+    name: "写入或修改指定配置键",
+    group: "配置键值",
+    schema: { type: "object", required: ["saved"], properties: { saved: { type: "boolean", enum: [true] } } },
+    example: { saved: true },
+    description: '正文直接是 JSON 字符串 "mine"。成功返回 200 和 saved=true；客户端只更新该键缓存并显示通知，不追加 GET。',
+  },
+  {
+    id: "511372919",
+    method: "delete",
+    path: leaf,
+    name: "删除指定配置键",
+    group: "配置键值",
+    schema: { type: "object", required: ["deleted"], properties: { deleted: { type: "boolean", enum: [true] } } },
+    example: { deleted: true },
+    description: "无正文，删除该持久化覆盖值。成功 200，重复删除幂等；客户端显示 BoxJS 默认值，不追加 GET。",
+  },
+];
+const apis = declarations.map((entry) => {
+  const { method, id } = entry;
+  const codes = entry.mock
+    ? [200, 404]
+    : [200, 400, 403, 404, 405, 502, ...(method === "post" ? [413, 415, 500] : method === "delete" ? [500] : [])];
   return {
-    id: String(ids[method]),
+    id,
     method,
-    path: "/api/Enhanced/Settings/Home/Top_left",
+    path: entry.path,
     type: "http",
     moduleId,
     serverId: "default",
     visibility: "SHARED",
     status: "testing",
-    tags: ["配置键值"],
-    operationId: `preference_panes_${method}`,
-    sourceUrl: "https://github.com/NSNanoCat/PreferencePanes/blob/dev/lib/settings-handler.mjs",
-    description: `这是一个具体的 database 叶子路径示例，不是唯一固定接口。只有 /api/ 固定，其后映射到 Enhanced.Settings.Home.Top_left。示例 origin=https://example.org、storageKey=BiliBili。未部署公网服务，请先配置代理实例。\n\n${method === "post" ? '正文直接是 JSON 字符串 "mine"，没有 values 包装。成功 204 无正文。' : method === "get" ? '返回键值本身，比如 "mine"；不返回模块或字段列表。' : method === "delete" ? "无需请求体，删除路径对应的持久化覆盖值。成功 204；重复删除幂等。" : "200 表示字段已声明，不读写存储；未知字段404。所有 HEAD 响应无正文。"}\n\n旧 /settings/api/{module} 契约已移除，旧接口资源请在 Apifox 单独检查，不自动删除。\n\n${guide}`,
-    parameters: { path: [], query: [], cookie: [], header: headers },
+    tags: [entry.group],
+    operationId: `preference_panes_${id}`,
+    sourceUrl: "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/guide.md",
+    description: `${entry.description}\n\n${guide}`,
+    parameters: { path: [], query: [], cookie: [], header: entry.mock ? [] : headers },
     requestBody:
       method === "post"
         ? {
             type: "application/json",
             required: true,
             parameters: [],
-            jsonSchema: {
-              type: "string",
-              enum: ["mine", "videoshortcut"],
-              description: "本例 Top_left 的值。通用处理器支持其他类型，具体由 fields 声明。",
-            },
+            jsonSchema: { type: "string", enum: ["mine", "videoshortcut"], description: "示例字段的值；实际类型由运行时 BoxJS 决定。" },
             data: '"mine"',
           }
         : { type: "none", required: false, parameters: [] },
     responses: codes.map((code) => ({
-      id: `pp-path-${method}-${code}`,
+      id: `pp-${id}-${code}`,
       code,
-      name: code === success ? "成功" : descriptions[code],
+      name: code === 200 ? "成功" : descriptions[code],
       headers: [],
-      contentType: method === "head" || code === 204 ? "noContent" : "json",
-      jsonSchema: method === "head" || code === 204 ? {} : code === 200 ? value : errorSchema,
-      description: code === 204 ? "操作完成，无正文" : method === "head" ? "无正文" : "JSON 响应",
+      contentType: method === "head" ? "noContent" : entry.mock && code !== 200 ? "html" : "json",
+      jsonSchema: method === "head" || (entry.mock && code !== 200) ? {} : code === 200 ? entry.schema : errorSchema,
+      description:
+        method === "head" ? "无正文" : entry.mock && code !== 200 ? "Mock 不可用时由代理或原站决定响应格式，不保证 JSON。" : "JSON 响应",
     })),
-    responseExamples: method === "get" ? [{ name: "读取 Top_left", responseId: "pp-path-get-200", data: '"mine"' }] : [],
+    responseExamples:
+      entry.example === undefined ? [] : [{ name: entry.name, responseId: `pp-${id}-200`, data: JSON.stringify(entry.example, null, 2) }],
     auth: {},
     securityScheme: {},
     commonParameters: {},
@@ -91,7 +207,7 @@ const document = {
   $schema: { app: "apifox", type: "project", version: "1.2.0" },
   info: {
     name: "Preference Panes",
-    description: "按 database 路径的键值接口（包未发布）",
+    description: "运行时 BoxJS、模块探测、页面初次读取与单键读写（包未发布）",
     mockRule: { rules: [], enableSystemRule: true },
   },
   projectSetting: {
@@ -108,24 +224,24 @@ const document = {
     servers: [{ id: "default", name: "默认服务", moduleId }],
     cloudMock: {},
   },
-  apiCollection: [
-    {
-      id: 95176128,
-      name: "配置键值（database 路径）",
-      moduleId,
-      parentId: 0,
-      serverId: "default",
-      description: "仅固定 /api/，后续每段对应数据对象的键。",
-      visibility: "SHARED",
-      auth: {},
-      securityScheme: {},
-      preProcessors: [],
-      postProcessors: [],
-      inheritPreProcessors: {},
-      inheritPostProcessors: {},
-      items: apis.map((api) => ({ name: names[api.method], api })),
-    },
-  ],
+  apiCollection: ["模块配置", "页面初次读取", "配置键值"].map((group, index) => ({
+    id: index === 2 ? 95176128 : `pp-folder-${index}`,
+    name: group,
+    moduleId,
+    parentId: 0,
+    serverId: "default",
+    description: group,
+    visibility: "SHARED",
+    auth: {},
+    securityScheme: {},
+    preProcessors: [],
+    postProcessors: [],
+    inheritPreProcessors: {},
+    inheritPostProcessors: {},
+    items: apis
+      .filter((api) => api.tags[0] === group)
+      .map((api) => ({ name: declarations.find((entry) => entry.id === api.id).name, api })),
+  })),
   moduleSettings: [{ id: String(moduleId), name: "默认模块", description: "", moduleVariables: [], openApiInfo: {} }],
 };
 for (const collection of [
@@ -161,7 +277,9 @@ if (process.argv.includes("--check")) {
 console.log(
   JSON.stringify({
     operations: apis.length,
-    path: apis[0].path,
+    paths: new Set(apis.map((api) => api.path)).size,
+    writes: apis.filter((api) => api.method === "post").length,
+    withBody: apis.filter((api) => api.requestBody.type === "application/json").length,
     writeBody: '"mine"',
     responseDefinitions: apis.reduce((n, api) => n + api.responses.length, 0),
   }),
