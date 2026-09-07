@@ -1,15 +1,15 @@
 {
-  "name": "GitHub - PreferencePanes - main",
+  "name": "GitHub - PreferencePanes - dev",
   "sourceType": "app",
   "originType": "GIT",
   "gitConnectionId": 2231,
   "gitConfigs": {
     "repoName": "NSNanoCat/PreferencePanes",
-    "branch": "main",
+    "branch": "dev",
     "filePath": "apifox/preference-panes.apifox.json"
   },
   "moduleId": 8522462,
-  "targetBranchId": 8595006,
+  "targetBranchId": 8595065,
   "interval": 30,
   "enable": true,
   "runOn": "APP",
