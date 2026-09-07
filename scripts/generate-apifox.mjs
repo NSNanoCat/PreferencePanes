@@ -9,11 +9,8 @@ const value = { oneOf: [...scalar.oneOf, { type: "array", items: scalar, uniqueI
 const errorSchema = { type: "object", required: ["error"], properties: { error: { type: "string" } } };
 const settings = {
   type: "object",
-  additionalProperties: false,
-  properties: {
-    Home: { type: "object", additionalProperties: false, properties: { Top_left: { type: "string", enum: ["mine", "videoshortcut"] } } },
-    enabled: { type: "boolean" },
-  },
+  additionalProperties: true,
+  description: "动态子树：仅包含 BoxJS 声明且已有持久化值的字段；键名、层级和类型由模块配置决定。",
 };
 const boxjsFields = {
   type: "array",
@@ -61,7 +58,7 @@ const descriptions = {
   500: "存储写入或执行失败",
   502: "BoxJS 配置加载或解析失败",
 };
-const leaf = "/api/Enhanced/Settings/Home/Top_left";
+const leaf = "/api/{module}/{path}";
 const declarations = [
   {
     id: "pp-page-get",
@@ -80,7 +77,7 @@ const declarations = [
   {
     id: "pp-config-head",
     method: "head",
-    path: "/configs/Enhanced",
+    path: "/configs/{module}",
     name: "探测模块配置 Mock",
     group: "模块配置",
     mock: true,
@@ -91,7 +88,7 @@ const declarations = [
   {
     id: "pp-config-get",
     method: "get",
-    path: "/configs/Enhanced",
+    path: "/configs/{module}",
     name: "获取模块 BoxJS 配置",
     group: "模块配置",
     mock: true,
@@ -114,19 +111,29 @@ const declarations = [
   {
     id: "pp-subtree-get",
     method: "get",
-    path: "/api/Enhanced/Settings/",
-    name: "读取模块设置子树",
-    group: "页面初次读取",
+    path: "/api/{module}/",
+    name: "读取模块公开子树",
+    group: "持久化读写",
     schema: settings,
-    example: { Home: { Top_left: "videoshortcut" } },
-    description: "进入模块后只读一次已声明字段的持久化覆盖值；无覆盖值返回空对象。具体公共子树由 BoxJS 路径自动计算。",
+    example: { Settings: { Home: { Top_left: "videoshortcut" } } },
+    description:
+      "读取模块根下已声明字段的持久化覆盖值；无覆盖值返回空对象。页面通常通过 /api/{module}/{path} 读取 BoxJS 计算出的公共子树，不要求子树名为 Settings。",
+  },
+  {
+    id: "pp-module-head",
+    method: "head",
+    path: "/api/{module}/",
+    name: "探测模块读写路由",
+    group: "持久化读写",
+    schema: {},
+    description: "通用脚本加载 BoxJS 确认模块具有声明字段，不读取存储；主菜单仍使用 HEAD /configs/{module} 探测配置 Mock。",
   },
   {
     id: "511372916",
     method: "head",
     path: leaf,
     name: "探测指定配置键",
-    group: "配置键值",
+    group: "持久化读写",
     schema: {},
     description: "读取配置确认字段已声明，不读写存储。主菜单 HEAD 配置 Mock 地址。",
   },
@@ -134,28 +141,30 @@ const declarations = [
     id: "511372917",
     method: "get",
     path: leaf,
-    name: "读取指定配置键",
-    group: "配置键值",
-    schema: { type: "string", enum: ["mine", "videoshortcut"] },
+    name: "读取指定键或子树",
+    group: "持久化读写",
+    schema: { oneOf: [...value.oneOf, settings] },
     example: "mine",
-    description: "直接返回键值；无持久化值且未提供 resolver 时返回 404，不返回 BoxJS 默认值。",
+    description:
+      "path 是模块内以 / 分隔的相对路径。叶子直接返回键值，无持久化值且未提供 resolver 时为 404；父路径返回已声明字段的覆盖值子树，无覆盖值返回 {}。不返回 BoxJS 默认值。",
   },
   {
     id: "511372918",
     method: "post",
     path: leaf,
     name: "写入或修改指定配置键",
-    group: "配置键值",
+    group: "持久化读写",
     schema: { type: "object", required: ["saved"], properties: { saved: { type: "boolean", enum: [true] } } },
     example: { saved: true },
-    description: '正文直接是 JSON 字符串 "mine"。成功返回 200 和 saved=true；客户端只更新该键缓存并显示通知，不追加 GET。',
+    description:
+      '正文直接是符合 BoxJS 字段类型的 JSON 值，例如 "mine"、true、42 或数组；不是补丁对象。仅允许写入完整叶子路径。成功返回 200 和 saved=true；客户端只更新该键缓存并显示通知，不追加 GET。',
   },
   {
     id: "511372919",
     method: "delete",
     path: leaf,
     name: "删除指定配置键",
-    group: "配置键值",
+    group: "持久化读写",
     schema: { type: "object", required: ["deleted"], properties: { deleted: { type: "boolean", enum: [true] } } },
     example: { deleted: true },
     description: "无正文，删除该持久化覆盖值。成功 200，重复删除幂等；客户端显示 BoxJS 默认值，不追加 GET。",
@@ -180,21 +189,34 @@ const apis = declarations.map((entry) => {
     sourceUrl: "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/guide.md",
     description: `${entry.description}\n\n${guide}`,
     parameters: {
-      path: entry.page
-        ? [
-            {
-              id: "module#0",
-              name: "module",
-              type: "string",
-              schema: { type: "string", pattern: "^[a-zA-Z0-9_-]+$", minLength: 1 },
-              required: true,
-              enable: true,
-              example: "Enhanced",
-              description:
-                "配置 Mock 路径为 /configs/Enhanced，字段 ID 匹配 @存储根.Enhanced.…，持久化路径为 /api/Enhanced/…。只允许一个值。",
-            },
-          ]
-        : [],
+      path: [
+        {
+          id: "module#0",
+          name: "module",
+          type: "string",
+          schema: { type: "string", pattern: "^[a-zA-Z0-9_-]+$", minLength: 1 },
+          required: true,
+          enable: true,
+          example: "Enhanced",
+          description:
+            "模块标识：同一值用于 /settings/{module}、/configs/{module}、/api/{module}/…。对应 BoxJS ID 的 @存储根.模块.路径 中的模块段；Enhanced 仅为示例。",
+        },
+        ...(entry.path.includes("{path}")
+          ? [
+              {
+                id: "path#0",
+                name: "path",
+                type: "string",
+                schema: { type: "string", minLength: 1 },
+                required: true,
+                enable: true,
+                example: "Settings/Home/Top_left",
+                description:
+                  "模块内的相对 database 路径，可有多级，用 / 连接各段。逐段编码，不要把分隔斜线编码为 %2F；POST/DELETE 必须指向 BoxJS 声明的叶子，GET/HEAD 也支持父路径。Settings 和 Home 均不是固定层级。",
+              },
+            ]
+          : []),
+      ],
       query: [],
       cookie: [],
       header: entry.mock ? [] : headers,
@@ -205,7 +227,7 @@ const apis = declarations.map((entry) => {
             type: "application/json",
             required: true,
             parameters: [],
-            jsonSchema: { type: "string", enum: ["mine", "videoshortcut"], description: "示例字段的值；实际类型由运行时 BoxJS 决定。" },
+            jsonSchema: { ...value, description: "值的具体类型及可选值由运行时 BoxJS 字段约束；不固定为字符串或某个模块的枚举。" },
             data: '"mine"',
           }
         : { type: "none", required: false, parameters: [] },
@@ -265,24 +287,33 @@ const document = {
     servers: [{ id: "default", name: "默认服务", moduleId }],
     cloudMock: {},
   },
-  apiCollection: ["模块配置", "页面初次读取", "配置键值", "通用设置页面"].map((group, index) => ({
-    id: index === 2 ? 95176128 : `pp-folder-${index}`,
-    name: group,
-    moduleId,
-    parentId: 0,
-    serverId: "default",
-    description: group,
-    visibility: "SHARED",
-    auth: {},
-    securityScheme: {},
-    preProcessors: [],
-    postProcessors: [],
-    inheritPreProcessors: {},
-    inheritPostProcessors: {},
-    items: apis
-      .filter((api) => api.tags[0] === group)
-      .map((api) => ({ name: declarations.find((entry) => entry.id === api.id).name, api })),
-  })),
+  apiCollection: [
+    {
+      id: "pp-root",
+      name: "根目录",
+      moduleId,
+      parentId: 0,
+      serverId: "default",
+      items: ["通用设置页面", "模块配置", "持久化读写"].map((group, index) => ({
+        id: `pp-folder-${index}`,
+        name: group,
+        moduleId,
+        parentId: 0,
+        serverId: "default",
+        description: group,
+        visibility: "SHARED",
+        auth: {},
+        securityScheme: {},
+        preProcessors: [],
+        postProcessors: [],
+        inheritPreProcessors: {},
+        inheritPostProcessors: {},
+        items: apis
+          .filter((api) => api.tags[0] === group)
+          .map((api) => ({ name: declarations.find((entry) => entry.id === api.id).name, api })),
+      })),
+    },
+  ],
   moduleSettings: [{ id: String(moduleId), name: "默认模块", description: "", moduleVariables: [], openApiInfo: {} }],
 };
 for (const collection of [

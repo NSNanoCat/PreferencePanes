@@ -2,6 +2,20 @@
 
 本包尚未发布。下面的 Enhanced 只是路径示例，example.org 没有部署接口；各项目复用相同代码，从自己的 BoxJS JSON 生成设置界面。
 
+## 通用路径契约
+
+| 方法 | 相对路径定义 | 用途 |
+| --- | --- | --- |
+| GET | `/settings/{module}` | 通用 HTML 页面，按路径中的模块生成界面 |
+| HEAD、GET | `/configs/{module}` | 探测配置 Mock、读取 BoxJS JSON |
+| HEAD、GET | `/api/{module}/` | 探测读写路由、读取模块公开子树 |
+| HEAD、GET | `/api/{module}/{path}` | 探测、读取模块内的键或子树 |
+| POST、DELETE | `/api/{module}/{path}` | 修改、删除声明的单个键 |
+
+`module` 是动态模块标识；`path` 是模块内的相对 database 路径，允许多级，用 `/` 分隔。`Settings/Home/Top_left` 只是 path 示例，Settings、Home 和键名都不固定。路径逐段编码，不能把分隔用的 `/` 整体编码为 `%2F`。页面、配置资源、持久化读写使用同一个 module；不是三个各自指定的模块参数，也不使用 query 参数。
+
+例如 module=Enhanced、path=Settings/Home/Top_left 时，实际请求才是 `/api/Enhanced/Settings/Home/Top_left`。以下具体 URL、BoxJS 字段和返回值均为使用示例，不能当作通用接口的固定路径或枚举。
+
 ## 页面通过 module 选择配置
 
 ```http
@@ -14,10 +28,10 @@ module 必须与 BoxJS ID `@BiliBili.Enhanced.Settings.…` 中的 Enhanced 一�
 
 | 请求 | 响应方 | 内容 |
 | --- | --- | --- |
-| GET /settings/Enhanced | 公共 HTML Mock | 同一份通用设置页 |
-| HEAD、GET /configs/Enhanced | Enhanced 的配置 Mock | 配置可用性、BoxJS 静态 JSON |
-| GET /api/Enhanced/ 或 /api/Enhanced/Settings/ | 通用代理读写脚本 | 当前持久化设置的公开子树 |
-| GET、POST、DELETE /api/Enhanced/Settings/Home/Top_left | 同一个通用代理读写脚本 | 单键查询、修改、删除 |
+| GET /settings/{module} | 公共 HTML Mock | 同一份通用设置页 |
+| HEAD、GET /configs/{module} | 对应模块的配置 Mock | 配置可用性、BoxJS 静态 JSON |
+| GET /api/{module}/ 或 /api/{module}/{path} | 通用代理读写脚本 | 当前持久化设置的公开子树或叶子值 |
+| POST、DELETE /api/{module}/{path} | 同一个通用代理读写脚本 | 单键修改、删除 |
 
 配置资源使用 `/configs/`，持久化接口使用 `/api/`，两种模板正则互不重叠，不依赖执行优先级。各业务项目用现有 argument config 生成器生成 BoxJS JSON。模块的 Mock 规则引用生成文件的下载源；通用读写脚本参数 configURL 引用同一版本资源进行校验。configURL 是代理脚本的模板参数，不是页面参数；页面仅用 module 按约定寻找配置 Mock。
 
@@ -132,4 +146,4 @@ resolveSettings 可由模块按已有规则合并 database、argument、持久�
 
 未知键 404；非法路径、类型或 JSON 400；缺标记或异源 403；整树写入及不支持的方法 405；正文过长 413；非 JSON 写入 415；配置源加载/解析失败 502；存储写入失败 500。POST 上限 65536 个 UTF-16 code units，字符串上限 2048。响应 no-store；HEAD 始终无正文。配置资源由原生 Mock 管理，其失败响应格式由代理或原站决定。
 
-GitHub main/dev 分别绑定 Apifox 同名分支，JSON 路径为 apifox/preference-panes.apifox.json。当前修改尚未推送，因此不能把本地文档视为已经同步到 Apifox。npm/GitHub Packages 未发布，Biliverse 消费端本轮未迁移。
+GitHub main/dev 分别绑定 Apifox 同名分支，JSON 路径为 apifox/preference-panes.apifox.json。提交 JSON 后仍需客户端执行数据源导入，并按分支回读确认结果。npm/GitHub Packages 未发布，Biliverse 消费端本轮未迁移。
