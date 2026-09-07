@@ -19,6 +19,8 @@ jobs:
       - run: npm ci --registry=https://registry.npmjs.org/ --@nsnanocat:registry=https://registry.npmjs.org/
       - run: npm run build
       - run: npm run check
+      - run: node scripts/generate-apifox.mjs --check
+      - run: npm pack --dry-run
   publish-gpr:
     needs: build
     runs-on: ubuntu-latest

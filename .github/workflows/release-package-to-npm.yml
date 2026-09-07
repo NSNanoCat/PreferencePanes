@@ -20,6 +20,8 @@ jobs:
       - run: npm ci --registry=https://registry.npmjs.org/ --@nsnanocat:registry=https://registry.npmjs.org/
       - run: npm run build
       - run: npm run check
+      - run: node scripts/generate-apifox.mjs --check
+      - run: npm pack --dry-run
   publish:
     needs: build
     runs-on: ubuntu-latest
@@ -44,3 +46,5 @@ jobs:
             echo "tag=latest" >> "$GITHUB_OUTPUT"
           fi
       - run: npm publish --registry=https://registry.npmjs.org/ --access public --tag "${{ steps.npm_tag.outputs.tag }}"
+        # 首发可使用 NPM_TOKEN；配置 Trusted Publisher 后删除该 secret，使用 OIDC。
+        env: { NODE_AUTH_TOKEN: "${{ secrets.NPM_TOKEN }}" }
