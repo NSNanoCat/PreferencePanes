@@ -62,7 +62,7 @@ for (const platform of ["surge", "quantumult"]) {
       });
     const unwrap = (response) => (platform === "surge" ? response.response : response);
     const status = (response) => (platform === "surge" ? response.status : Number(response.status.split(" ")[1]));
-    assert.deepEqual(JSON.parse(JSON.stringify(await run("HEAD", "/configs/Module.json"))), {});
+    assert.deepEqual(JSON.parse(JSON.stringify(await run("HEAD", "/configs/Module"))), {});
     assert.equal(requests, 0);
     assert.equal(reads, 0);
     let response = unwrap(await run("POST", undefined, "9"));

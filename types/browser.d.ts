@@ -16,8 +16,8 @@ export interface ModuleSnapshot {
   values: Record<string, SettingsScalar | SettingsScalar[]>;
 }
 export interface PreferencesClient {
-  probe(configURL: string): Promise<boolean>;
-  open(module: string, configURL: string): Promise<ModuleSnapshot>;
+  probe(module: string): Promise<boolean>;
+  open(module: string): Promise<ModuleSnapshot>;
   snapshot(module: string): ModuleSnapshot;
   leave(module: string): void;
   set(module: string, key: string, value: SettingsScalar | SettingsScalar[]): Promise<void>;

@@ -56,8 +56,8 @@ test("configuration resources bypass the persistence handler", async () => {
       throw Error("must not load");
     },
   });
-  assert.equal(await handler({ ...req("HEAD"), url: "https://example.org/configs/Module.json" }), undefined);
-  assert.equal(await handler({ ...req("GET"), url: "https://example.org/configs/Module.json" }), undefined);
+  assert.equal(await handler({ ...req("HEAD"), url: "https://example.org/configs/Module" }), undefined);
+  assert.equal(await handler({ ...req("GET"), url: "https://example.org/configs/Module" }), undefined);
   assert.equal(reads, 0);
   assert.equal(writes, 0);
 });

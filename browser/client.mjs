@@ -32,20 +32,11 @@ export function createPreferencesClient({ fetch: request = globalThis.fetch.bind
       signal?.removeEventListener("abort", abort);
     }
   }
-  const configResource = (value) => {
-    if (typeof value !== "string" || !value) throw new TypeError("config URL is required");
-    const url = new URL(value, "https://example.invalid");
-    if (
-      (!value.startsWith("/") && !value.startsWith("https://")) ||
-      value.startsWith("//") ||
-      url.protocol !== "https:" ||
-      url.username ||
-      url.password ||
-      url.hash ||
-      /^\/api(?:\/|$)/.test(url.pathname)
-    )
-      throw new TypeError("config must be a root-relative or HTTPS resource URL outside /api/");
-    return value;
+  const configPath = (module) => {
+    if (typeof module !== "string" || !module) throw new TypeError("module is required");
+    const parts = parseSettingsPath(`https://example.invalid/api/${encodeURIComponent(module)}/`);
+    if (parts.length !== 1) throw new TypeError("Expected a module name");
+    return `/configs/${encodeURIComponent(module)}`;
   };
   const snapshot = (module) => {
     const state = sessions.get(module);
@@ -76,24 +67,22 @@ export function createPreferencesClient({ fetch: request = globalThis.fetch.bind
     }
   }
   return {
-    async probe(configURL) {
+    async probe(module) {
       try {
-        await send(configResource(configURL), "HEAD", undefined, undefined, true);
+        await send(configPath(module), "HEAD", undefined, undefined, true);
         return true;
       } catch {
         return false;
       }
     },
-    async open(module, configURL) {
+    async open(module) {
       const previous = sessions.get(module);
       if (previous?.saving) throw new Error("Cannot refresh while saving");
       previous?.controller.abort();
       const state = { controller: new AbortController(), definition: null, values: {}, saving: false };
       sessions.set(module, state);
       try {
-        const parts = parseSettingsPath(`https://example.invalid/api/${encodeURIComponent(module)}/`);
-        if (parts.length !== 1) throw new TypeError("Expected a module name");
-        const resource = configResource(configURL);
+        const resource = configPath(module);
         const definition = normalizeBoxJs(await (await send(resource, "GET", undefined, state.controller.signal, true)).json(), module);
         if (definition.settingsPath.length < 2) throw new TypeError("BoxJS fields must share a settings subtree below the module root");
         const subtree = await (
