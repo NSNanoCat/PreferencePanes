@@ -12,7 +12,7 @@
 - 每 30 分钟由打开项目的 Apifox 客户端执行（runOn=APP），不是 Git push webhook。
 - 包发布：未执行；普通分支推送只触发 CI。
 
-截至 2026-09-07，本地 JSON 包含 1 个示例路径、4 个 HTTP 操作（HEAD/GET/POST/DELETE）、16 个响应定义。POST 带非空 values schema，GET 包含完整字段 schema 和配置说明；HEAD 无正文。example.org 为文档占位，不是已部署的服务。
+文档契约使用 `/settings/{module}`、`/configs/{module}`、`/api/{module}/`、`/api/{module}/{path}`，共 4 个路径、9 个 HTTP 操作，分为页面、配置、持久化读写三类。module 与 path 是路径参数；Enhanced、Settings/Home/Top_left 仅为参数示例。POST 正文为 BoxJS 约束的 JSON 值本身，POST/DELETE 成功均为 200。原生 JSON 采用一个根目录，内含三个分类目录；导入后必须逐分支回读全部 9 个操作，不能仅凭推送或定时导入时间判断成功。example.org 为文档占位，不是已部署的服务。
 
 首次同步验证：
 
