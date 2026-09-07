@@ -18,4 +18,4 @@ const client = createPreferencesClient({
 const snapshot = await client.open("Module");
 void snapshot.definition.storageKey;
 await client.set("Module", "Module.Settings.enabled", false);
-mountPreferencePanes({ element: document.body, modules: [{ id: "Module" }] }).destroy();
+mountPreferencePanes({ element: document.body }).destroy();

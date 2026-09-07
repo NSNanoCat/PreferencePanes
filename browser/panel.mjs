@@ -3,10 +3,10 @@ import { createPreferencesClient } from "./client.mjs";
 /**
  * 挂载从 BoxJS 实时生成的设置面板和短暂通知。
  * Mount runtime-generated BoxJS controls and transient notifications.
- * @param {import("../types/browser.js").PreferencesPanelOptions} options 容器、模块目录与请求 / Container, module directory and requests.
+ * @param {import("../types/browser.js").PreferencesPanelOptions} options 容器与请求；模块由页面 URL 的 module 参数指定 / Container and requests; module comes from the page URL.
  * @returns {{destroy(): void}} 清理接口 / Cleanup handle.
  */
-export function mountPreferencePanes({ element: root, modules, fetch, title = "Preferences" }) {
+export function mountPreferencePanes({ element: root, fetch, title = "Preferences" }) {
   const document = root.ownerDocument;
   const window = document.defaultView;
   const node = (tag, className, text) => {
@@ -28,9 +28,11 @@ export function mountPreferencePanes({ element: root, modules, fetch, title = "P
   shell.append(header, viewport, toast);
   root.append(shell);
   let timer,
+    routedSearch,
     generation = 0,
     active = null,
     saving = false,
+    pendingRoute = false,
     destroyed = false;
   const notify = (event) => {
     if (destroyed) return;
@@ -55,39 +57,14 @@ export function mountPreferencePanes({ element: root, modules, fetch, title = "P
         { duration: 180, easing: "ease-out" },
       );
   }
-  function home() {
-    const version = ++generation;
-    if (active) client.leave(active);
-    active = null;
-    back.hidden = true;
-    heading.textContent = title;
-    const view = node("section", "pp-home");
-    for (const module of modules) {
-      const button = node("button", "pp-module", module.name ?? module.id);
-      button.type = "button";
-      button.disabled = true;
-      const status = node("span", "pp-module-status", "检测中");
-      button.append(status);
-      view.append(button);
-      button.onclick = () => {
-        window.location.hash = encodeURIComponent(module.id);
-      };
-      client.probe(module.id).then((available) => {
-        if (version !== generation) return;
-        button.disabled = !available;
-        status.textContent = available ? "" : "未启用";
-      });
-    }
-    replace(view, -1);
-  }
   async function open(module) {
     const version = ++generation;
-    active = module.id;
-    back.hidden = false;
-    heading.textContent = module.name ?? module.id;
+    active = module;
+    back.disabled = window.history.length <= 1;
+    heading.textContent = module;
     replace(node("p", "pp-loading", "读取设置…"), 1);
     try {
-      await client.open(module.id);
+      await client.open(module);
       if (version === generation) controls();
     } catch (error) {
       if (version !== generation) return;
@@ -193,7 +170,7 @@ export function mountPreferencePanes({ element: root, modules, fetch, title = "P
             /* 客户端已显示错误通知 / Client already displayed an error notification. */
           } finally {
             saving = false;
-            back.disabled = false;
+            back.disabled = window.history.length <= 1;
             view.querySelectorAll("button,input,select,textarea").forEach((input) => {
               input.disabled = false;
             });
@@ -202,7 +179,7 @@ export function mountPreferencePanes({ element: root, modules, fetch, title = "P
               // Update this control without discarding other unsaved inputs.
               write(client.snapshot(active).values[field.key]);
             }
-            if (!destroyed && window.location.hash.slice(1) !== encodeURIComponent(active)) route();
+            if (!destroyed && pendingRoute) route();
           }
         };
         actions.append(button);
@@ -213,22 +190,40 @@ export function mountPreferencePanes({ element: root, modules, fetch, title = "P
     viewport.replaceChildren(view);
   }
   function route() {
-    if (saving) return;
-    const module = modules.find((module) => encodeURIComponent(module.id) === window.location.hash.slice(1));
-    if (module) {
-      if (active) client.leave(active);
-      open(module);
-    } else home();
+    if (saving) {
+      pendingRoute = true;
+      return;
+    }
+    pendingRoute = false;
+    if (active) client.leave(active);
+    routedSearch = window.location.search;
+    const modules = new URLSearchParams(routedSearch).getAll("module");
+    if (modules.length !== 1 || !modules[0]) {
+      generation++;
+      active = null;
+      heading.textContent = title;
+      replace(node("p", "pp-error", "请在页面 URL 中提供一个 module 参数，格式为 ?module=模块标识。"), 1);
+      return;
+    }
+    open(modules[0]);
   }
-  back.onclick = () => {
-    if (!saving) window.location.hash = "";
+  const onPopState = () => {
+    if (window.location.search !== routedSearch) route();
   };
-  window.addEventListener("hashchange", route);
+  const onPageShow = (event) => {
+    if (event.persisted) route();
+  };
+  back.onclick = () => {
+    if (!saving) window.history.back();
+  };
+  window.addEventListener("popstate", onPopState);
+  window.addEventListener("pageshow", onPageShow);
   route();
   return {
     destroy() {
       destroyed = true;
-      window.removeEventListener("hashchange", route);
+      window.removeEventListener("popstate", onPopState);
+      window.removeEventListener("pageshow", onPageShow);
       generation++;
       if (active) client.leave(active);
       clearTimeout(timer);

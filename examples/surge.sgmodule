@@ -2,8 +2,8 @@
 #!desc=集成模板，example.org 和 assets.example.org 均须替换为实际地址；不部署任何 /api/ 静态文件。
 
 [Map Local]
-# 主入口维护者只配置一次页面外壳和公共资源 Mock。
-^https://example\.org/settings/?$ data-type=file data="https://assets.example.org/index.html" status-code=200 header="Content-Type:text/html; charset=utf-8|Cache-Control:no-store"
+# 主入口维护者只配置一次通用页面和公共资源 Mock；访问 /settings/?module=Module。
+^https://example\.org/settings/?(?:\?.*)?$ data-type=file data="https://assets.example.org/index.html" status-code=200 header="Content-Type:text/html; charset=utf-8|Cache-Control:no-store"
 ^https://example\.org/resources/preference-panes\.mjs$ data-type=file data="https://assets.example.org/preference-panes.mjs" header="Content-Type:text/javascript; charset=utf-8"
 ^https://example\.org/resources/panel\.css$ data-type=file data="https://assets.example.org/panel.css" header="Content-Type:text/css; charset=utf-8"
 # 每个模块只添加自己的配置 Mock；HEAD 和 GET 使用同一个资源。

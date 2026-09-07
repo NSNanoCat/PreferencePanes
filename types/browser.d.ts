@@ -25,7 +25,6 @@ export interface PreferencesClient {
 }
 export interface PreferencesPanelOptions {
   element: HTMLElement;
-  modules: { id: string; name?: string }[];
   title?: string;
   fetch?: typeof globalThis.fetch;
 }

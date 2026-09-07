@@ -27,11 +27,6 @@
   overflow: auto;
   padding: 16px;
 }
-.pp-home {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 12px;
-}
 .pp-panel button {
   font: inherit;
   cursor: pointer;
@@ -44,13 +39,6 @@
 .pp-panel button:disabled {
   opacity: 0.45;
   cursor: default;
-}
-.pp-module {
-  min-height: 84px;
-}
-.pp-module-status {
-  display: block;
-  font-size: 12px;
 }
 .pp-field {
   margin: 0 0 16px;
