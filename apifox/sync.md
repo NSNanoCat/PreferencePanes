@@ -12,6 +12,13 @@
 - 每 30 分钟由打开项目的 Apifox 客户端执行（runOn=APP），不是 Git push webhook。
 - 包发布：未执行；普通分支推送只触发 CI。
 
+2026-09-08 同步修正：
+
+- 原生 Apifox 格式使用 `apiOverwriteMode: methodAndPath`、`docOverwriteMode: name`、`schemaOverwriteMode: name`。此前保存的 `BOTH` 在本项目只新增接口、未更新已有接口，不能继续沿用。
+- 两个数据源均已在界面保存上述模式，根目录为 95175399，本机执行的 runnerId 为 0；Git main/dev 仍分别导入同名分支。
+- 最终文档每个分支各更新 9 个操作。路径采用 `{module}`、`{path}`，路径参数和 POST 正文默认留空，业务示例仅保留在 Markdown 说明中。
+- 自动导入保留未匹配资源，因此历史 `/settings/api/{module}` 以及 main 的固定 Enhanced 示例仍存在；它们不在当前 Git JSON 中，也不属于新版九个操作。新版目录为“通用设置页面”“模块配置”“持久化读写”。
+
 文档契约使用 `/settings/{module}`、`/configs/{module}`、`/api/{module}/`、`/api/{module}/{path}`，共 4 个路径、9 个 HTTP 操作，分为页面、配置、持久化读写三类。module 与 path 是路径参数；Enhanced、Settings/Home/Top_left 仅为参数示例。POST 正文为 BoxJS 约束的 JSON 值本身，POST/DELETE 成功均为 200。原生 JSON 采用一个根目录，内含三个分类目录；导入后必须逐分支回读全部 9 个操作，不能仅凭推送或定时导入时间判断成功。example.org 为文档占位，不是已部署的服务。
 
 首次同步验证：

@@ -13,13 +13,14 @@
   "interval": 30,
   "enable": true,
   "runOn": "APP",
-  "apiFolderId": 0,
+  "apiFolderId": 95175399,
   "schemaFolderId": 0,
-  "apiOverwriteMode": "BOTH",
-  "schemaOverwriteMode": "BOTH",
-  "docOverwriteMode": "BOTH",
+  "apiOverwriteMode": "methodAndPath",
+  "schemaOverwriteMode": "name",
+  "docOverwriteMode": "name",
   "syncApiFolder": true,
   "deleteUnmatchedResources": false,
   "importBasePath": false,
-  "options": {}
+  "options": {},
+  "runnerId": 0
 }
