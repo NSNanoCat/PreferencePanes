@@ -14,6 +14,12 @@
 
 `module` 是动态模块标识；`path` 是模块内的相对 database 路径，允许多级，用 `/` 分隔。`Settings/Home/Top_left` 只是 path 示例，Settings、Home 和键名都不固定。路径逐段编码，不能把分隔用的 `/` 整体编码为 `%2F`。页面、配置资源、持久化读写使用同一个 module；不是三个各自指定的模块参数，也不使用 query 参数。
 
+### 在 Apifox 中调试
+
+接口路径保留 Apifox 的 `{module}`、`{path}` 路径参数，不使用固定业务 URL，也不把 `*` 当作真实请求路径。调试前在 Path 参数区填写目标模块与模块内路径；参数值和 POST 正文默认留空，不预置任何项目或待写入值。服务地址由使用者的环境配置提供。
+
+POST 的 Body 为原始 JSON，须按目标字段类型填写字符串、数字、布尔值或数组。响应 Schema 描述通用结构；下面各节的实际 URL、请求值、返回对象只是文档中的示例，不会作为调试请求或 Mock 的默认数据。路径每段仅允许英文字母、数字、下划线和连字符，不接受空段、点号或 __proto__/prototype/constructor。
+
 例如 module=Enhanced、path=Settings/Home/Top_left 时，实际请求才是 `/api/Enhanced/Settings/Home/Top_left`。以下具体 URL、BoxJS 字段和返回值均为使用示例，不能当作通用接口的固定路径或枚举。
 
 ## 页面通过 module 选择配置
@@ -144,6 +150,18 @@ resolveSettings 可由模块按已有规则合并 database、argument、持久�
 
 ## 错误与限制
 
-未知键 404；非法路径、类型或 JSON 400；缺标记或异源 403；整树写入及不支持的方法 405；正文过长 413；非 JSON 写入 415；配置源加载/解析失败 502；存储写入失败 500。POST 上限 65536 个 UTF-16 code units，字符串上限 2048。响应 no-store；HEAD 始终无正文。配置资源由原生 Mock 管理，其失败响应格式由代理或原站决定。
+| 状态码 | 持久化接口语义 |
+| --- | --- |
+| 200 | HEAD 路径受支持；GET 返回值或子树；POST/DELETE 操作成功 |
+| 400 | 路径非法、JSON 无法解析或值不满足 BoxJS 类型/枚举约束 |
+| 403 | 缺少页面标记头，或请求 Origin 与代理配置不符 |
+| 404 | 路径未声明；或 GET 叶子尚无持久化值 |
+| 405 | 对子树执行 POST/DELETE，或使用不支持的方法 |
+| 413 | POST 正文超过 65536 个 UTF-16 code units |
+| 415 | POST Content-Type 不是 application/json |
+| 500 | 持久化写入或代理执行失败 |
+| 502 | BoxJS 配置源加载、解析或模块定义校验失败 |
+
+GET 子树无覆盖值返回 200 和空对象，GET 叶子无覆盖值返回 404；两者不同。HEAD 成功不代表已有值。POST 字符串上限 2048，选择项与数组项按 BoxJS 校验；不接受 null 或对象作为叶子写入值。持久化响应 no-store；HEAD 始终无正文。配置资源由原生 Mock 管理，其失败响应格式由代理或原站决定，不能套用持久化接口的 JSON 错误结构。
 
 GitHub main/dev 分别绑定 Apifox 同名分支，JSON 路径为 apifox/preference-panes.apifox.json。提交 JSON 后仍需客户端执行数据源导入，并按分支回读确认结果。npm/GitHub Packages 未发布，Biliverse 消费端本轮未迁移。
