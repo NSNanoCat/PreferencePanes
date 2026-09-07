@@ -64,6 +64,20 @@ const descriptions = {
 const leaf = "/api/Enhanced/Settings/Home/Top_left";
 const declarations = [
   {
+    id: "pp-page-get",
+    method: "get",
+    path: "/settings/",
+    name: "打开通用设置页",
+    group: "通用设置页面",
+    mock: true,
+    page: true,
+    schema: {},
+    example:
+      '<!doctype html><html><body><main id="preferences"></main><script type="module">import { mountPreferencePanes } from "/resources/preference-panes.mjs"; mountPreferencePanes({ element: document.querySelector("#preferences") });</script></body></html>',
+    description:
+      "同一份 HTML 由浏览器读取 URL 的 module 参数，再 GET /api/<module>/ 获取 BoxJS 并生成设置界面。页面不包含模块目录。缺失、重复或非法 module 在页面显示错误，不发送 API 请求。",
+  },
+  {
     id: "pp-config-head",
     method: "head",
     path: "/api/Enhanced/",
@@ -165,7 +179,26 @@ const apis = declarations.map((entry) => {
     operationId: `preference_panes_${id}`,
     sourceUrl: "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/guide.md",
     description: `${entry.description}\n\n${guide}`,
-    parameters: { path: [], query: [], cookie: [], header: entry.mock ? [] : headers },
+    parameters: {
+      path: [],
+      query: entry.page
+        ? [
+            {
+              id: "module#0",
+              name: "module",
+              type: "string",
+              schema: { type: "string", pattern: "^[a-zA-Z0-9_-]+$", minLength: 1 },
+              required: true,
+              enable: true,
+              example: "Enhanced",
+              description:
+                "配置命名空间，对应 /api/Enhanced/；不是代理模块文件名或 BoxJS 下载地址。只允许一个值，禁止 __proto__/prototype/constructor。",
+            },
+          ]
+        : [],
+      cookie: [],
+      header: entry.mock ? [] : headers,
+    },
     requestBody:
       method === "post"
         ? {
@@ -181,13 +214,21 @@ const apis = declarations.map((entry) => {
       code,
       name: code === 200 ? "成功" : descriptions[code],
       headers: [],
-      contentType: method === "head" ? "noContent" : entry.mock && code !== 200 ? "html" : "json",
+      contentType: method === "head" ? "noContent" : entry.page || (entry.mock && code !== 200) ? "html" : "json",
       jsonSchema: method === "head" || (entry.mock && code !== 200) ? {} : code === 200 ? entry.schema : errorSchema,
       description:
-        method === "head" ? "无正文" : entry.mock && code !== 200 ? "Mock 不可用时由代理或原站决定响应格式，不保证 JSON。" : "JSON 响应",
+        method === "head"
+          ? "无正文"
+          : entry.mock && code !== 200
+            ? "Mock 不可用时由代理或原站决定响应格式，不保证 JSON。"
+            : entry.page
+              ? "通用 HTML 外壳；浏览器通过 query module 选择配置。"
+              : "JSON 响应",
     })),
     responseExamples:
-      entry.example === undefined ? [] : [{ name: entry.name, responseId: `pp-${id}-200`, data: JSON.stringify(entry.example, null, 2) }],
+      entry.example === undefined
+        ? []
+        : [{ name: entry.name, responseId: `pp-${id}-200`, data: entry.page ? entry.example : JSON.stringify(entry.example, null, 2) }],
     auth: {},
     securityScheme: {},
     commonParameters: {},
@@ -224,7 +265,7 @@ const document = {
     servers: [{ id: "default", name: "默认服务", moduleId }],
     cloudMock: {},
   },
-  apiCollection: ["模块配置", "页面初次读取", "配置键值"].map((group, index) => ({
+  apiCollection: ["模块配置", "页面初次读取", "配置键值", "通用设置页面"].map((group, index) => ({
     id: index === 2 ? 95176128 : `pp-folder-${index}`,
     name: group,
     moduleId,

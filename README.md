@@ -24,13 +24,32 @@ import "@nsnanocat/preference-panes/browser/panel.css";
 
 const panel = mountPreferencePanes({
   element: document.querySelector("#preferences"),
-  title: "Preferences",
-  modules: [{ id: "Enhanced", name: "Enhanced" }, { id: "Global", name: "Global" }]
+  title: "Preferences"
 });
 // 卸载时 panel.destroy()
 ```
 
-模块目录只声明入口名称和 ID。页面根据 BoxJS 生成表单、校验值并读写。hash 导航支持前进、后退和在当前模块刷新；没有整页跳转。每次重新进入模块都会读取，不使用 localStorage/sessionStorage。默认 CSS 是独立的通用样式，可由调用方替换；本包不依赖 Bilibili CSS 或页面框架。
+同一份 HTML 使用 URL 查询参数选择配置：
+
+```text
+/settings/?module=Enhanced → GET /api/Enhanced/
+/settings/?module=Global   → GET /api/Global/
+```
+
+`module` 是配置命名空间，也就是 `/api/` 后的第一段；它必须与 BoxJS ID 中存储根后的段一致，例如 `@BiliBili.Enhanced.Settings.…` 中的 Enhanced。它不是代理模块的文件名、脚本名或 BoxJS 下载地址。HTML 和通用 JS 不包含业务模块目录，不接收 modules 参数。缺少、重复或非法 module 会显示错误，不请求设置。前进、后退恢复以及刷新时，页面根据当前 URL 重新读取；没有旧 hash 模块路由。
+
+业务主菜单由调用项目维护（Biliverse 由 Enhanced 负责），通过通用 client.probe 并发 HEAD 检测各入口，再打开相应带 module 参数的链接。通用设置页只负责一个 URL 所指定模块的设置；已有单页业务导航也可以挂载/卸载组件，无需复制表单实现。
+
+页面根据 BoxJS 生成表单、校验值并读写。每次重新进入模块都会读取，不使用 localStorage/sessionStorage。默认 CSS 是独立的通用样式，可由调用方替换；本包不依赖 Bilibili CSS 或页面框架。
+
+| 地址示例 | 谁响应 | 内容来源 |
+| --- | --- | --- |
+| `/settings/?module=Enhanced` | 公共 HTML Mock | 同一份通用 HTML、JS、CSS |
+| `/api/Enhanced/` | Enhanced 自己的配置 Mock | Enhanced argument config 经原有生成器生成的 BoxJS JSON |
+| `/api/Enhanced/Settings/` | 通用代理脚本 | 读取 util 持久化设置，返回公开子树 |
+| `/api/Enhanced/Settings/Home/Top_left` | 同一通用代理脚本 | 单键 GET/POST/DELETE |
+
+根 `/api/Enhanced/` 不交给读写脚本。模块模板分别配置根路径 Mock 和子路径脚本规则；通用脚本的 configURL 与 Mock 引用同一个 BoxJS 资源。页面通过 module 找 Mock，代理通过 configURL 找校验配置，这两个参数用途不同。业务 BoxJS 由业务仓库生成；PreferencePanes 的构建只产出通用 JS，不生成业务配置。
 
 已有 UI 可只用 `createPreferencesClient({ fetch, notify })`：`probe/open/snapshot/set/remove/leave` 共用相同缓存与请求逻辑。`snapshot` 返回副本，`notify` 收到 success/error、write/delete、module、key 和错误 message。请求超时默认 10 秒；HTTP 204 也视为操作失败。
 
