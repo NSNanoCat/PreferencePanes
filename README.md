@@ -106,4 +106,4 @@ Quantumult X 等不能通过模板传递 `$argument` 的平台，需要在构建
 - [Apifox 原生 JSON](apifox/preference-panes.apifox.json)
 - [Apifox 项目](https://app.apifox.com/project/8803052)、[Git 数据源绑定记录](apifox/sync.md)
 
-main/dev 普通推送只触发 CI；已有两套 v* tag workflow 分别发布 npm 与 GitHub Packages。本轮只准备源码、测试和文档，不发布 package、不推送 tag，不迁移 Biliverse 消费端。首次发布和权限配置仍待评审确认。
+main/dev 普通推送与手动 CI 只验证并生成候选 tgz；两套 v* tag workflow 分别发布 npm 与 GitHub Packages。首版拟定为 `0.1.0`，发布步骤、首次 npm 注册与 Trusted Publisher 配置见 [RELEASING.md](RELEASING.md)。Enhanced 可先用候选 tgz 验证，正式依赖及 lockfile 必须在 registry 首发成功后生成。
