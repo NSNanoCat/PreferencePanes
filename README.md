@@ -6,7 +6,7 @@
 
 | 操作 | 网络请求 | 页面缓存 |
 | --- | --- | --- |
-| 进入主菜单 | 并发 HEAD `/api/<模块>/` | 不读取持久化设置 |
+| 进入主菜单 | 并发 HEAD 各入口显式指定的配置 Mock 地址，例如 `/configs/Enhanced.json` | 不读取持久化设置 |
 | 打开、再次进入或刷新模块页 | GET 模块 BoxJS，再 GET 声明字段的公共子树，各一次 | 建立新的内存会话，替换旧值 |
 | 修改单值 | POST 对应键路径，正文为 JSON 值本身 | 仅 HTTP 200 后更新该键 |
 | 删除单值 | DELETE 对应键路径 | 仅 HTTP 200 后移除覆盖值，显示 BoxJS 默认值 |
@@ -14,7 +14,7 @@
 
 只有 `/api/` 是固定前缀。`@BiliBili.Enhanced.Settings.Home.Top_left` 映射为 `/api/Enhanced/Settings/Home/Top_left`；`BiliBili` 从 BoxJS ID 解析，不经浏览器 header 传递。
 
-模块根 `/api/Enhanced/` 由模块的配置 Mock 提供 HEAD/GET。该路径不部署公网静态文件；关闭模块后，页面以 HEAD 非 200 或请求失败判为不可用。配置下载源是另一个资源地址。公共 HTML 外壳、JS、CSS 可以在线托管后由代理 Mock 提供，选项由浏览器实时生成。
+配置资源与数据接口使用不同前缀：`/configs/Enhanced.json` 是 BoxJS Mock，`/api/Enhanced/…` 是持久化 API。配置 Mock 地址不部署同名线上文件，关闭模块后 HEAD 非 200 或失败即禁用入口；它的下载源可以是另一个在线资源地址。公共 HTML、JS、CSS 可以在线托管后由代理 Mock 提供，选项由浏览器实时生成。
 
 ## 浏览器组件
 
@@ -29,29 +29,38 @@ const panel = mountPreferencePanes({
 // 卸载时 panel.destroy()
 ```
 
-同一份 HTML 使用 URL 查询参数选择配置：
+同一份 HTML 通过 **config 参数显式接收 BoxJS JSON 地址**：
 
 ```text
-/settings/?module=Enhanced → GET /api/Enhanced/
-/settings/?module=Global   → GET /api/Global/
+/settings/?module=Enhanced&config=%2Fconfigs%2FEnhanced.json
 ```
 
-`module` 是配置命名空间，也就是 `/api/` 后的第一段；它必须与 BoxJS ID 中存储根后的段一致，例如 `@BiliBili.Enhanced.Settings.…` 中的 Enhanced。它不是代理模块的文件名、脚本名或 BoxJS 下载地址。HTML 和通用 JS 不包含业务模块目录，不接收 modules 参数。缺少、重复或非法 module 会显示错误，不请求设置。前进、后退恢复以及刷新时，页面根据当前 URL 重新读取；没有旧 hash 模块路由。
+解码后的 `config=/configs/Enhanced.json` 就是浏览器 GET 的地址。也可传入经过 URL 编码的完整 HTTPS JSON 地址；跨域源必须允许浏览器 CORS 读取。参数值请用 URLSearchParams 编码，避免配置地址自身的查询参数被截断。
 
-业务主菜单由调用项目维护（Biliverse 由 Enhanced 负责），通过通用 client.probe 并发 HEAD 检测各入口，再打开相应带 module 参数的链接。通用设置页只负责一个 URL 所指定模块的设置；已有单页业务导航也可以挂载/卸载组件，无需复制表单实现。
+```js
+const query = new URLSearchParams({
+  module: "Enhanced",
+  config: "/configs/Enhanced.json"
+});
+const href = `/settings/?${query}`;
+```
 
-页面根据 BoxJS 生成表单、校验值并读写。每次重新进入模块都会读取，不使用 localStorage/sessionStorage。默认 CSS 是独立的通用样式，可由调用方替换；本包不依赖 Bilibili CSS 或页面框架。
+`config` 与 `module` 互相独立：同一个订阅 JSON 可以包含多个模块，module 选择其中 ID 为 `@存储根.Enhanced.…` 的字段。module 同时对应持久化 `/api/` 后第一段；它不是配置文件名，也不用于猜测配置地址。缺失 config 时直接显示错误，没有回退到 `/api/<module>/` 的逻辑。HTML 不包含业务模块目录。
 
-| 地址示例 | 谁响应 | 内容来源 |
+| 地址 | 谁响应 | 内容 |
 | --- | --- | --- |
-| `/settings/?module=Enhanced` | 公共 HTML Mock | 同一份通用 HTML、JS、CSS |
-| `/api/Enhanced/` | Enhanced 自己的配置 Mock | Enhanced argument config 经原有生成器生成的 BoxJS JSON |
-| `/api/Enhanced/Settings/` | 通用代理脚本 | 读取 util 持久化设置，返回公开子树 |
-| `/api/Enhanced/Settings/Home/Top_left` | 同一通用代理脚本 | 单键 GET/POST/DELETE |
+| `/settings/?module=Enhanced&config=%2Fconfigs%2FEnhanced.json` | 公共 HTML Mock | 通用设置页面 |
+| `/configs/Enhanced.json` | Enhanced 的配置 Mock | argument config 经原有生成器生成的 BoxJS JSON |
+| `/api/Enhanced/` 或 `/api/Enhanced/Settings/` | 通用读写脚本 | 已声明字段的持久化子树 |
+| `/api/Enhanced/Settings/Home/Top_left` | 同一个通用读写脚本 | 单键 GET/POST/DELETE |
 
-根 `/api/Enhanced/` 不交给读写脚本。模块模板分别配置根路径 Mock 和子路径脚本规则；通用脚本的 configURL 与 Mock 引用同一个 BoxJS 资源。页面通过 module 找 Mock，代理通过 configURL 找校验配置，这两个参数用途不同。业务 BoxJS 由业务仓库生成；PreferencePanes 的构建只产出通用 JS，不生成业务配置。
+模块模板的配置规则只匹配 `/configs/…`，脚本规则只匹配 `/api/…`，两者没有交集，不依赖命中先后顺序。代理脚本自己的 configURL 参数由模块模板提供，指向与 Mock 相同版本的 BoxJS 下载源，用于写入校验；浏览器不会用页面 config 参数改变代理端的校验源。
 
-已有 UI 可只用 `createPreferencesClient({ fetch, notify })`：`probe/open/snapshot/set/remove/leave` 共用相同缓存与请求逻辑。`snapshot` 返回副本，`notify` 收到 success/error、write/delete、module、key 和错误 message。请求超时默认 10 秒；HTTP 204 也视为操作失败。
+业务主菜单由调用项目维护（Biliverse 由 Enhanced 负责），每次进入通过 `client.probe(configURL)` 并发 HEAD **配置 Mock 地址**，再打开带 module 和 config 的链接。HEAD 只检测配置 Mock 可用性，不读取存储。若用普通线上 JSON 地址探测，结果只代表该资源可访问，不能代表代理模块安装状态。
+
+通用设置页每次进入、刷新或浏览器缓存恢复时，用 `client.open(module, configURL)` GET 配置一次，再 GET 持久化子树一次。用配置实时生成表单，值放在内存，不使用 localStorage/sessionStorage。保存/删除仅 HTTP 200 后更新缓存和通知，不追加 GET。现有 UI 可直接使用同一客户端的 snapshot/set/remove/leave；snapshot 返回副本。
+
+默认 CSS 是独立的通用样式，可由调用方替换；本包不依赖 Bilibili 样式或框架。字段定义由 BoxJS 决定，通用 JS 只定义每类控件如何绘制，不编入各项目的具体选项。
 
 ## 代理读写组件
 
@@ -71,7 +80,7 @@ const response = await handle($request);
 // 接入现有平台的 done 适配；或直接使用下述打包入口。
 ```
 
-每个支持面板的模块都携带自己的配置 Mock，并引用同一个通用读写脚本。脚本正则只匹配各自 `/api/<模块>/<键路径>`，不接管模块根，避免互相覆盖安装探测。处理器每次键值请求运行时加载配置，仅允许操作已声明的字段。
+每个支持面板的模块都携带自己的配置 Mock，并引用同一个通用读写脚本。脚本正则只匹配各自 `/api/<模块>` 的数据路径，配置 Mock 则只匹配 `/configs/`。处理器每次键值请求运行时加载配置，仅允许操作已声明的字段。
 
 持久化 GET 调用一次 util `Storage.getItem`；POST/DELETE 在写入前重新读取最新根对象，再用 util `Lodash.set/unset` 修改单键并 `Storage.setItem` 写回，保留其它模块、隐藏字段和缓存。这是代理端必要的读改写，浏览器不会因此重新 GET 整个模块。多个独立脚本上下文同时写同一根键仍受代理存储无事务能力的限制。
 
