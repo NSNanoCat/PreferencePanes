@@ -1,15 +1,10 @@
-import { createSettingsHandler, type SettingsField } from "@nsnanocat/preference-panes";
+import { createSettingsHandler, parseSettingsPath, type SettingsField } from "@nsnanocat/preference-panes";
 
-const fields: SettingsField[] = [{ key: "mode", name: "Mode", type: "number", defaultValue: 1, options: [{ key: 1, label: "One" }] }];
-const handler = createSettingsHandler({
-  module: "Example",
-  fields,
-  storageKey: "@Example.Settings",
-  endpoint: "https://example.org/settings/api",
-});
-const response = handler({ url: "https://example.org/settings/api", method: "HEAD" });
-const status: number | undefined = response?.status;
-void status;
-// @ts-expect-error Boolean defaults must remain boolean.
-const wrong: SettingsField = { key: "enabled", name: "Enabled", type: "boolean", defaultValue: "true" };
-void wrong;
+const fields: SettingsField[] = [{ key: "Enhanced.Settings.Home.Top_left", name: "Top left", type: "string", defaultValue: "mine" }];
+const handler = createSettingsHandler({ origin: "https://example.org", storageKey: "BiliBili", fields });
+handler({ url: "https://example.org/api/Enhanced/Settings/Home/Top_left", method: "POST", body: '"mine"' });
+const parts: string[] | undefined = parseSettingsPath("https://example.org/api/a/b");
+void parts;
+// @ts-expect-error Boolean defaults are not strings.
+const bad: SettingsField = { key: "enabled", name: "Enabled", type: "boolean", defaultValue: "true" };
+void bad;

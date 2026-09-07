@@ -1,31 +1,30 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-const values = new Map();
+const data = new Map();
 globalThis.$task = {};
 globalThis.$prefs = {
-  valueForKey: (key) => values.get(key) ?? null,
+  valueForKey: (key) => data.get(key) ?? null,
   setValueForKey: (value, key) => {
-    values.set(key, value);
+    data.set(key, value);
     return true;
   },
 };
 const { createSettingsHandler } = await import("../index.mjs");
-test("Quantumult storage uses util prefs backend with the same handler", () => {
-  const handle = createSettingsHandler({
-    module: "QX",
-    fields: [{ key: "enabled", name: "Enabled", type: "boolean" }],
-    storageKey: "@Example.QX.Settings",
-    endpoint: "https://example.org/api",
-    requestHeader: "X-Example-Settings",
+test("the same path handler uses util prefs for Quantumult X", () => {
+  const handler = createSettingsHandler({
+    origin: "https://example.org",
+    storageKey: "QX",
+    fields: [{ key: "prefs.enabled", name: "Enabled", type: "boolean" }],
   });
-  const req = {
-    url: "https://example.org/api",
+  const request = {
+    url: "https://example.org/api/prefs/enabled",
     method: "POST",
-    headers: { "x-example-settings": "1", "content-type": "application/json" },
-    body: '{"values":{"enabled":true}}',
+    body: "true",
+    headers: { "X-Settings-Client": "1", "Content-Type": "application/json" },
   };
-  assert.equal(handle(req).status, 200);
-  assert.equal(JSON.parse(handle({ ...req, method: "GET" }).body).values.enabled, true);
-  assert.ok(values.has("Example"));
+  assert.equal(handler(request).status, 204);
+  assert.equal(handler({ ...request, method: "GET" }).body, "true");
+  assert.equal(handler({ ...request, method: "DELETE" }).status, 204);
+  assert.equal(handler({ ...request, method: "GET" }).status, 404);
 });
