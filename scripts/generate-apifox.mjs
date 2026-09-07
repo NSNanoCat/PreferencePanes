@@ -46,7 +46,7 @@ const header = (name, example, description, required = false) => ({
 });
 const headers = [
   header("X-Settings-Client", "1", "默认页面标记，不是认证凭据；调用方可通过 requestHeader 改名。", true),
-  header("Origin", "https://example.org", "存在时必须与配置的 origin 相同。"),
+  header("Origin", "", "浏览器请求来源；存在时必须与代理脚本配置的 origin 相同，不预设项目域名。"),
 ];
 const descriptions = {
   400: "非法路径或 JSON 值",
@@ -132,10 +132,11 @@ const declarations = [
     id: "511372916",
     method: "head",
     path: leaf,
-    name: "探测指定配置键",
+    name: "探测指定键或子树",
     group: "持久化读写",
     schema: {},
-    description: "读取配置确认字段已声明，不读写存储。主菜单 HEAD 配置 Mock 地址。",
+    description:
+      "加载 BoxJS，确认 path 是已声明叶子或具有已声明后代字段的父路径。200 仅表示路径受支持，不表示已有持久化值；不读写存储。主菜单使用 HEAD /configs/{module}。",
   },
   {
     id: "511372917",
@@ -187,7 +188,7 @@ const apis = declarations.map((entry) => {
     tags: [entry.group],
     operationId: `preference_panes_${id}`,
     sourceUrl: "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/guide.md",
-    description: `${entry.description}\n\n${guide}`,
+    description: `## 接口用途\n\n${entry.description}\n\n## 请求契约\n\n\`${method.toUpperCase()} ${entry.path}\`\n\nmodule 是必填路径参数，与配置文件中字段所属模块一致。${entry.path.includes("{path}") ? "path 是模块内的相对路径，可包含以 / 分隔的多级目录。" : ""}路径参数不预填业务示例值；具体取值由接入项目决定。${entry.mock ? "该资源由代理 Mock 提供，不需要 X-Settings-Client 请求头。" : "请求需携带 X-Settings-Client: 1；该标记不是认证凭据。"}\n\n${method === "post" ? "正文必须为 application/json，直接传字段值本身；不接受整树对象或 values 包装。实际类型、枚举范围由 BoxJS 校验。" : "请求没有正文。"}\n\n${entry.example === undefined ? "" : `## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n\`\`\`${entry.page ? "html" : "json"}\n${entry.page ? entry.example : JSON.stringify(entry.example, null, 2)}\n\`\`\`\n\n`}## 调用流程与具体示例\n\n${guide}`,
     parameters: {
       path: [
         {
@@ -197,7 +198,7 @@ const apis = declarations.map((entry) => {
           schema: { type: "string", pattern: "^[a-zA-Z0-9_-]+$", minLength: 1 },
           required: true,
           enable: true,
-          example: "Enhanced",
+          example: "",
           description:
             "模块标识：同一值用于 /settings/{module}、/configs/{module}、/api/{module}/…。对应 BoxJS ID 的 @存储根.模块.路径 中的模块段；Enhanced 仅为示例。",
         },
@@ -210,7 +211,7 @@ const apis = declarations.map((entry) => {
                 schema: { type: "string", minLength: 1 },
                 required: true,
                 enable: true,
-                example: "Settings/Home/Top_left",
+                example: "",
                 description:
                   "模块内的相对 database 路径，可有多级，用 / 连接各段。逐段编码，不要把分隔斜线编码为 %2F；POST/DELETE 必须指向 BoxJS 声明的叶子，GET/HEAD 也支持父路径。Settings 和 Home 均不是固定层级。",
               },
@@ -228,7 +229,7 @@ const apis = declarations.map((entry) => {
             required: true,
             parameters: [],
             jsonSchema: { ...value, description: "值的具体类型及可选值由运行时 BoxJS 字段约束；不固定为字符串或某个模块的枚举。" },
-            data: '"mine"',
+            data: "",
           }
         : { type: "none", required: false, parameters: [] },
     responses: codes.map((code) => ({
@@ -247,10 +248,7 @@ const apis = declarations.map((entry) => {
               ? "通用 HTML；通过页面路径 /settings/{module} 按约定读取 /configs/{module}。"
               : "JSON 响应",
     })),
-    responseExamples:
-      entry.example === undefined
-        ? []
-        : [{ name: entry.name, responseId: `pp-${id}-200`, data: entry.page ? entry.example : JSON.stringify(entry.example, null, 2) }],
+    responseExamples: [],
     auth: {},
     securityScheme: {},
     commonParameters: {},
@@ -352,7 +350,8 @@ console.log(
     paths: new Set(apis.map((api) => api.path)).size,
     writes: apis.filter((api) => api.method === "post").length,
     withBody: apis.filter((api) => api.requestBody.type === "application/json").length,
-    writeBody: '"mine"',
+    schemas: document.schemaCollection.length,
+    emptyObjectBodies: apis.filter((api) => api.method === "post" && Object.keys(api.requestBody.jsonSchema).length === 0).length,
     responseDefinitions: apis.reduce((n, api) => n + api.responses.length, 0),
   }),
 );
