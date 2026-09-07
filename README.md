@@ -4,9 +4,9 @@
 
 ## Apifox 文档
 
-团队 NSNanoCat，项目 [Preference Panes](https://app.apifox.com/project/8803052)，目标分支 main。通俗说明见 [配置与读写流程](apifox/guide.md)，原生文档数据为 [preference-panes.apifox.json](apifox/preference-panes.apifox.json)。在 GET 接口描述中也嵌入了完整说明，包括 endpoint、storageKey、requestHeader 和 resolveSettings。
+团队 NSNanoCat，项目 [Preference Panes](https://app.apifox.com/project/8803052)，GitHub main/dev 分别绑定 Apifox main/dev。通俗说明见 [配置与读写流程](apifox/guide.md)，原生文档数据为 [preference-panes.apifox.json](apifox/preference-panes.apifox.json)。在 GET 接口描述中也嵌入了完整说明，包括 endpoint、storageKey、requestHeader 和 resolveSettings。
 
-运行 `npm run apifox:generate` 更新原生 JSON，运行 `node scripts/generate-apifox.mjs --check` 检查生成文件一致性。文档源位于 GitHub dev，计划单向 Git -> Apifox 同步；不启用反向自动备份。绑定与导入当前状态见 [同步记录](apifox/sync.md)。
+运行 `npm run apifox:generate` 更新原生 JSON，运行 `node scripts/generate-apifox.mjs --check` 检查生成文件一致性。文档源位于 GitHub 对应分支，单向 Git -> Apifox 同名分支同步；不启用反向自动备份。绑定与导入当前状态见 [同步记录](apifox/sync.md)。
 
 ## 职责
 
