@@ -75,12 +75,12 @@ const declarations = [
     example:
       '<!doctype html><html><body><main id="preferences"></main><script type="module">import { mountPreferencePanes } from "/resources/preference-panes.mjs"; mountPreferencePanes({ element: document.querySelector("#preferences") });</script></body></html>',
     description:
-      "同一份 HTML 通过 config 参数明确接收 BoxJS JSON 地址并 GET 该资源，module 仅选择 JSON 内的模块字段。缺失、重复或非法参数在页面显示错误，不猜测配置源。",
+      "同一份 HTML 只接收 module 参数，按约定 GET /configs/{module} 取得 BoxJS 并生成设置界面。缺失、重复或非法 module 不发送请求。",
   },
   {
     id: "pp-config-head",
     method: "head",
-    path: "/configs/Enhanced.json",
+    path: "/configs/Enhanced",
     name: "探测模块配置 Mock",
     group: "模块配置",
     mock: true,
@@ -91,7 +91,7 @@ const declarations = [
   {
     id: "pp-config-get",
     method: "get",
-    path: "/configs/Enhanced.json",
+    path: "/configs/Enhanced",
     name: "获取模块 BoxJS 配置",
     group: "模块配置",
     mock: true,
@@ -192,18 +192,7 @@ const apis = declarations.map((entry) => {
               enable: true,
               example: "Enhanced",
               description:
-                "从 config 指定的 JSON 中选择 Enhanced 字段，也对应持久化 /api/Enhanced/；不用于生成配置资源地址。只允许一个值。",
-            },
-            {
-              id: "config#0",
-              name: "config",
-              type: "string",
-              schema: { type: "string", minLength: 1 },
-              required: true,
-              enable: true,
-              example: "/configs/Enhanced.json",
-              description:
-                "必填 BoxJS JSON 地址；站点根相对路径或 HTTPS URL，禁止 /api/ 路径。URL 参数编码后传入。没有按 module 拼接的默认源。跨域源须允许 CORS。",
+                "配置 Mock 路径为 /configs/Enhanced，字段 ID 匹配 @存储根.Enhanced.…，持久化路径为 /api/Enhanced/…。只允许一个值。",
             },
           ]
         : [],
@@ -233,7 +222,7 @@ const apis = declarations.map((entry) => {
           : entry.mock && code !== 200
             ? "Mock 不可用时由代理或原站决定响应格式，不保证 JSON。"
             : entry.page
-              ? "通用 HTML；浏览器通过 query config 指定 JSON 地址，module 选择模块字段。"
+              ? "通用 HTML；通过 query module 按约定读取 /configs/{module}。"
               : "JSON 响应",
     })),
     responseExamples:

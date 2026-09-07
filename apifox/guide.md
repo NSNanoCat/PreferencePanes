@@ -2,46 +2,43 @@
 
 本包尚未发布。下面的 Enhanced 只是路径示例，example.org 没有部署接口；各项目复用相同代码，从自己的 BoxJS JSON 生成设置界面。
 
-## 页面明确指定配置 JSON
+## 页面通过 module 选择配置
 
 ```http
-GET /settings/?module=Enhanced&config=%2Fconfigs%2FEnhanced.json
+GET /settings/?module=Enhanced
 ```
 
-同一份 HTML 读取两个独立参数：
+通用页面只接收一个 module 参数。渲染器按固定约定 GET `/configs/Enhanced`，读取返回的 BoxJS JSON，再动态生成设置项。更换为 module=Global 就 GET `/configs/Global`，不需要 config 参数，不修改 HTML。
 
-- config：浏览器实际请求的 BoxJS JSON 地址。上例解码为 `/configs/Enhanced.json`，也支持 URL 编码的完整 HTTPS 地址。跨域读取需要配置源允许 CORS；不携带持久化专用 header。
-- module：从该 JSON 中选择哪个模块，例如匹配 `@BiliBili.Enhanced.Settings.…` 中的 Enhanced，同时决定持久化键路径。它不是配置文件名，不负责拼接 JSON 地址。
-
-两者都必须出现一次且非空。module 限英文字母、数字、下划线、连字符，禁止 __proto__/prototype/constructor。config 支持以单个 / 开头的相对站点根路径或 HTTPS URL，不允许 /api/ 路径、URL 账号密码、片段或非 HTTPS 协议。缺失或非法参数在页面显示错误，不发 API 请求；没有默认猜测配置源的逻辑。包含查询参数的完整 JSON URL 用 URLSearchParams 编码后再传入。
+module 必须与 BoxJS ID `@BiliBili.Enhanced.Settings.…` 中的 Enhanced 一致；它也对应持久化 `/api/` 后第一段。实际 BoxJS 文件地址由模块模板的 Mock 规则指定。module 必须出现一次且非空，只允许英文字母、数字、下划线、连字符，禁止 __proto__/prototype/constructor。缺失、重复或非法参数在页面显示错误，不发送配置或存储请求。
 
 | 请求 | 响应方 | 内容 |
 | --- | --- | --- |
-| GET /settings/?module=Enhanced&config=%2Fconfigs%2FEnhanced.json | 公共 HTML Mock | 同一份通用设置页 |
-| HEAD、GET /configs/Enhanced.json | Enhanced 的配置 Mock | 配置可用性、BoxJS 静态 JSON |
+| GET /settings/?module=Enhanced | 公共 HTML Mock | 同一份通用设置页 |
+| HEAD、GET /configs/Enhanced | Enhanced 的配置 Mock | 配置可用性、BoxJS 静态 JSON |
 | GET /api/Enhanced/ 或 /api/Enhanced/Settings/ | 通用代理读写脚本 | 当前持久化设置的公开子树 |
 | GET、POST、DELETE /api/Enhanced/Settings/Home/Top_left | 同一个通用代理读写脚本 | 单键查询、修改、删除 |
 
-配置资源使用 `/configs/`，持久化接口使用 `/api/`，两种模板正则互不重叠，不依赖执行优先级。各业务项目用现有 argument config 生成器生成 BoxJS JSON。模块的 Mock 规则引用生成文件的下载源；通用读写脚本参数 configURL 引用同一版本资源进行校验。浏览器的 config 参数只控制页面读取源，不能更改代理端的校验源。
+配置资源使用 `/configs/`，持久化接口使用 `/api/`，两种模板正则互不重叠，不依赖执行优先级。各业务项目用现有 argument config 生成器生成 BoxJS JSON。模块的 Mock 规则引用生成文件的下载源；通用读写脚本参数 configURL 引用同一版本资源进行校验。configURL 是代理脚本的模板参数，不是页面参数；页面仅用 module 按约定寻找配置 Mock。
 
-业务主菜单独立于通用设置页，由调用项目提供配置地址和模块链接；Biliverse 主菜单归 Enhanced。HTML 和通用 JS 不包含 Enhanced/Global 等目录或字段，本仓库尚未迁移 Biliverse。
+业务主菜单独立于通用设置页，由调用项目提供模块链接；Biliverse 主菜单归 Enhanced。HTML 和通用 JS 不包含 Enhanced/Global 等目录或字段，本仓库尚未迁移 Biliverse。
 
 ## 一、主菜单只探测配置 Mock
 
-每次进入业务主菜单，用通用 client.probe(configURL) 并发发送：
+每次进入业务主菜单，用通用 client.probe(module) 并发发送：
 
 ```http
-HEAD /configs/Enhanced.json
-HEAD /configs/Global.json
+HEAD /configs/Enhanced
+HEAD /configs/Global
 ```
 
 这些地址由各模块的 BoxJS Mock 提供。200 才启用入口；非 200、无响应或超时则禁用。HEAD 无正文，不读持久化存储、不执行通用读写脚本，也不证明读写脚本运行正常。
 
-配置 Mock 地址不部署同名在线静态文件，下载源在另一个地址。普通线上 JSON 可以直接用于渲染，但对它 HEAD 只能证明资源可访问，不能检测插件是否安装。
+配置 Mock 地址不部署同名在线静态文件，下载源在另一个地址。页面只请求约定的配置 Mock 地址。
 
 ## 二、每次真正进入或刷新设置页
 
-先 GET 页面 config 参数指定的 `/configs/Enhanced.json`，取得 BoxJS。可使用 settings 数组、单 app 或 apps 订阅。示例：
+先 GET 根据 module 生成的 `/configs/Enhanced`，取得 BoxJS。可使用 settings 数组、单 app 或 apps 订阅。示例：
 
 ```json
 [
