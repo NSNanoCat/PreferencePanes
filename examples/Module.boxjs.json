@@ -1,0 +1,10 @@
+[
+  { "id": "@Example.Module.Settings.enabled", "name": "启用功能", "type": "boolean", "val": true },
+  {
+    "id": "@Example.Module.Settings.mode",
+    "name": "运行模式",
+    "type": "selects",
+    "val": "auto",
+    "items": [{ "key": "auto", "label": "自动" }, { "key": "manual", "label": "手动" }]
+  }
+]

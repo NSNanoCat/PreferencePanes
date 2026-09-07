@@ -27,7 +27,8 @@
       "import": "./browser/index.mjs"
     },
     "./browser/panel.css": "./browser/panel.css",
-    "./dist/preference-panes.mjs": "./dist/preference-panes.mjs"
+    "./dist/preference-panes.mjs": "./dist/preference-panes.mjs",
+    "./dist/preference-panes.request.js": "./dist/preference-panes.request.js"
   },
   "types": "types/index.d.ts",
   "scripts": {
@@ -49,9 +50,11 @@
     "lib",
     "browser",
     "types",
-    "dist"
+    "dist",
+    "proxy"
   ],
   "dependencies": {
+    "@nsnanocat/url": "^1.2.6",
     "@nsnanocat/util": "^2.7.4"
   },
   "devDependencies": {
