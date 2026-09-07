@@ -66,7 +66,7 @@ const declarations = [
   {
     id: "pp-page-get",
     method: "get",
-    path: "/settings/",
+    path: "/settings/{module}",
     name: "打开通用设置页",
     group: "通用设置页面",
     mock: true,
@@ -75,7 +75,7 @@ const declarations = [
     example:
       '<!doctype html><html><body><main id="preferences"></main><script type="module">import { mountPreferencePanes } from "/resources/preference-panes.mjs"; mountPreferencePanes({ element: document.querySelector("#preferences") });</script></body></html>',
     description:
-      "同一份 HTML 只接收 module 参数，按约定 GET /configs/{module} 取得 BoxJS 并生成设置界面。缺失、重复或非法 module 不发送请求。",
+      "同一份 HTML 从 /settings/{module} 路径读取模块标识，按约定 GET /configs/{module} 取得 BoxJS 并生成设置界面。不使用查询参数。缺失、多余或非法路径段不发送请求。",
   },
   {
     id: "pp-config-head",
@@ -180,8 +180,7 @@ const apis = declarations.map((entry) => {
     sourceUrl: "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/guide.md",
     description: `${entry.description}\n\n${guide}`,
     parameters: {
-      path: [],
-      query: entry.page
+      path: entry.page
         ? [
             {
               id: "module#0",
@@ -196,6 +195,7 @@ const apis = declarations.map((entry) => {
             },
           ]
         : [],
+      query: [],
       cookie: [],
       header: entry.mock ? [] : headers,
     },
@@ -222,7 +222,7 @@ const apis = declarations.map((entry) => {
           : entry.mock && code !== 200
             ? "Mock 不可用时由代理或原站决定响应格式，不保证 JSON。"
             : entry.page
-              ? "通用 HTML；通过 query module 按约定读取 /configs/{module}。"
+              ? "通用 HTML；通过页面路径 /settings/{module} 按约定读取 /configs/{module}。"
               : "JSON 响应",
     })),
     responseExamples:

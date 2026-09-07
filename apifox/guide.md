@@ -5,16 +5,16 @@
 ## 页面通过 module 选择配置
 
 ```http
-GET /settings/?module=Enhanced
+GET /settings/Enhanced
 ```
 
-通用页面只接收一个 module 参数。渲染器按固定约定 GET `/configs/Enhanced`，读取返回的 BoxJS JSON，再动态生成设置项。更换为 module=Global 就 GET `/configs/Global`，不需要 config 参数，不修改 HTML。
+通用页面从 `/settings/{module}` 路径读取模块标识，不读取 module 或 config 查询参数。渲染器按固定约定 GET `/configs/Enhanced`，读取返回的 BoxJS JSON，再动态生成设置项。改为 `/settings/Global` 就 GET `/configs/Global`，不修改 HTML。
 
-module 必须与 BoxJS ID `@BiliBili.Enhanced.Settings.…` 中的 Enhanced 一致；它也对应持久化 `/api/` 后第一段。实际 BoxJS 文件地址由模块模板的 Mock 规则指定。module 必须出现一次且非空，只允许英文字母、数字、下划线、连字符，禁止 __proto__/prototype/constructor。缺失、重复或非法参数在页面显示错误，不发送配置或存储请求。
+module 必须与 BoxJS ID `@BiliBili.Enhanced.Settings.…` 中的 Enhanced 一致；它也对应持久化 `/api/` 后第一段。实际 BoxJS 文件地址由模块模板的 Mock 规则指定。页面路径只允许一个非空模块段，可带结尾斜线；模块名只允许英文字母、数字、下划线、连字符，禁止 __proto__/prototype/constructor。缺失模块段、多余路径段或非法模块名在页面显示错误，不发送配置或存储请求。
 
 | 请求 | 响应方 | 内容 |
 | --- | --- | --- |
-| GET /settings/?module=Enhanced | 公共 HTML Mock | 同一份通用设置页 |
+| GET /settings/Enhanced | 公共 HTML Mock | 同一份通用设置页 |
 | HEAD、GET /configs/Enhanced | Enhanced 的配置 Mock | 配置可用性、BoxJS 静态 JSON |
 | GET /api/Enhanced/ 或 /api/Enhanced/Settings/ | 通用代理读写脚本 | 当前持久化设置的公开子树 |
 | GET、POST、DELETE /api/Enhanced/Settings/Home/Top_left | 同一个通用代理读写脚本 | 单键查询、修改、删除 |

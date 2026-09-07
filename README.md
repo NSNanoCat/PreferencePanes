@@ -29,25 +29,25 @@ const panel = mountPreferencePanes({
 // 卸载时 panel.destroy()
 ```
 
-同一份 HTML 只接收一个页面参数 `module`，按固定路径约定读取配置：
+同一份 HTML 从 `/settings/{module}` 路径读取模块标识，按固定约定读取配置：
 
 ```text
-/settings/?module=Enhanced → GET /configs/Enhanced
-/settings/?module=Global   → GET /configs/Global
+/settings/Enhanced → GET /configs/Enhanced
+/settings/Global   → GET /configs/Global
 ```
 
-不需要 config 参数。module 既决定配置 Mock 路径，也选择 BoxJS ID 中对应模块的字段，例如 `@BiliBili.Enhanced.Settings.…` 中的 Enhanced。配置文件的实际下载地址由模块模板中的 Mock 规则指定，不写入 HTML 或页面 URL。HTML 和通用 JS 不包含业务模块目录。
+不需要查询参数。路径中的 module 既决定配置 Mock 路径，也选择 BoxJS ID 中对应模块的字段，例如 `@BiliBili.Enhanced.Settings.…` 中的 Enhanced。配置文件的实际下载地址由模块模板中的 Mock 规则指定，不写入 HTML 或页面 URL。HTML 和通用 JS 不包含业务模块目录。
 
 | 地址 | 谁响应 | 内容 |
 | --- | --- | --- |
-| `/settings/?module=Enhanced` | 公共 HTML Mock | 通用设置页面 |
+| `/settings/Enhanced` | 公共 HTML Mock | 通用设置页面 |
 | `/configs/Enhanced` | Enhanced 的配置 Mock | argument config 经原有生成器生成的 BoxJS JSON |
 | `/api/Enhanced/` 或 `/api/Enhanced/Settings/` | 通用读写脚本 | 已声明字段的持久化子树 |
 | `/api/Enhanced/Settings/Home/Top_left` | 同一个通用读写脚本 | 单键 GET/POST/DELETE |
 
 模块模板的配置规则只匹配 `/configs/…`，脚本规则只匹配 `/api/…`，两者没有交集，不依赖命中先后顺序。代理脚本自己的 configURL 参数由模块模板提供，指向与 Mock 相同版本的 BoxJS 下载源，用于写入校验；该 configURL 是代理脚本的模块模板参数，不是页面参数。
 
-业务主菜单由调用项目维护（Biliverse 由 Enhanced 负责），每次进入通过 `client.probe(module)` 并发 HEAD `/configs/{module}`，再打开 `/settings/?module=模块标识`。HEAD 只检测配置 Mock 可用性，不读取存储。
+业务主菜单由调用项目维护（Biliverse 由 Enhanced 负责），每次进入通过 `client.probe(module)` 并发 HEAD `/configs/{module}`，再打开 `/settings/模块标识`。HEAD 只检测配置 Mock 可用性，不读取存储。
 
 通用设置页每次进入、刷新或浏览器缓存恢复时，用 `client.open(module)` GET `/configs/{module}` 一次，再 GET 持久化子树一次。用配置实时生成表单，值放在内存，不使用 localStorage/sessionStorage。保存/删除仅 HTTP 200 后更新缓存和通知，不追加 GET。现有 UI 可直接使用同一客户端的 snapshot/set/remove/leave；snapshot 返回副本。
 
