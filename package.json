@@ -21,7 +21,13 @@
     ".": {
       "types": "./types/index.d.ts",
       "import": "./index.mjs"
-    }
+    },
+    "./browser": {
+      "types": "./types/browser.d.ts",
+      "import": "./browser/index.mjs"
+    },
+    "./browser/panel.css": "./browser/panel.css",
+    "./dist/preference-panes.mjs": "./dist/preference-panes.mjs"
   },
   "types": "types/index.d.ts",
   "scripts": {
@@ -30,7 +36,7 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "typecheck": "tsc --noEmit",
-    "build": "node --check index.mjs && node --check lib/settings-handler.mjs",
+    "build": "rollup -c",
     "prepack": "npm run build",
     "apifox:generate": "node scripts/generate-apifox.mjs"
   },
@@ -41,13 +47,17 @@
   "files": [
     "index.mjs",
     "lib",
-    "types"
+    "browser",
+    "types",
+    "dist"
   ],
   "dependencies": {
     "@nsnanocat/util": "^2.7.4"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.6",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "rollup": "^4.63.1",
     "typescript": "^5.9.3"
   },
   "publishConfig": {

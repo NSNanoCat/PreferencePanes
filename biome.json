@@ -1,6 +1,6 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.6/schema.json",
-  "files": { "includes": ["**", "!package-lock.json", "!apifox/*.apifox.json"] },
+  "files": { "includes": ["**", "!package-lock.json", "!dist", "!apifox/*.apifox.json"] },
   "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 140 },
   "linter": { "enabled": true, "rules": { "recommended": true } }
 }
