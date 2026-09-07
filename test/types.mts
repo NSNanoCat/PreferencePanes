@@ -15,7 +15,7 @@ const client = createPreferencesClient({
     void kind;
   },
 });
-const snapshot = await client.open("Module");
+const snapshot = await client.open("Module", "/configs/Module.json");
 void snapshot.definition.storageKey;
 await client.set("Module", "Module.Settings.enabled", false);
 mountPreferencePanes({ element: document.body }).destroy();

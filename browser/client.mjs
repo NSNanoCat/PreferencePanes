@@ -10,7 +10,7 @@ import { parseSettingsPath } from "../lib/settings-path.mjs";
  */
 export function createPreferencesClient({ fetch: request = globalThis.fetch.bind(globalThis), notify = () => {}, timeout = 10000 } = {}) {
   const sessions = new Map();
-  async function send(path, method, body, signal) {
+  async function send(path, method, body, signal, resource = false) {
     const controller = new AbortController();
     const abort = () => controller.abort();
     if (signal?.aborted) abort();
@@ -22,10 +22,7 @@ export function createPreferencesClient({ fetch: request = globalThis.fetch.bind
         credentials: "omit",
         cache: "no-store",
         signal: controller.signal,
-        headers:
-          method === "HEAD" || /^\/api\/[^/]+\/$/.test(path)
-            ? {}
-            : { "X-Settings-Client": "1", ...(method === "POST" ? { "Content-Type": "application/json" } : {}) },
+        headers: resource ? {} : { "X-Settings-Client": "1", ...(method === "POST" ? { "Content-Type": "application/json" } : {}) },
         ...(method === "POST" ? { body: JSON.stringify(body) } : {}),
       });
       if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
@@ -35,10 +32,20 @@ export function createPreferencesClient({ fetch: request = globalThis.fetch.bind
       signal?.removeEventListener("abort", abort);
     }
   }
-  const moduleURL = (module) => {
-    const parts = parseSettingsPath(`https://example.invalid/api/${encodeURIComponent(module)}/`);
-    if (parts.length !== 1) throw new TypeError("Expected a module name");
-    return `/api/${encodeURIComponent(module)}/`;
+  const configResource = (value) => {
+    if (typeof value !== "string" || !value) throw new TypeError("config URL is required");
+    const url = new URL(value, "https://example.invalid");
+    if (
+      (!value.startsWith("/") && !value.startsWith("https://")) ||
+      value.startsWith("//") ||
+      url.protocol !== "https:" ||
+      url.username ||
+      url.password ||
+      url.hash ||
+      /^\/api(?:\/|$)/.test(url.pathname)
+    )
+      throw new TypeError("config must be a root-relative or HTTPS resource URL outside /api/");
+    return value;
   };
   const snapshot = (module) => {
     const state = sessions.get(module);
@@ -69,22 +76,25 @@ export function createPreferencesClient({ fetch: request = globalThis.fetch.bind
     }
   }
   return {
-    async probe(module) {
+    async probe(configURL) {
       try {
-        await send(moduleURL(module), "HEAD");
+        await send(configResource(configURL), "HEAD", undefined, undefined, true);
         return true;
       } catch {
         return false;
       }
     },
-    async open(module) {
+    async open(module, configURL) {
       const previous = sessions.get(module);
       if (previous?.saving) throw new Error("Cannot refresh while saving");
       previous?.controller.abort();
       const state = { controller: new AbortController(), definition: null, values: {}, saving: false };
       sessions.set(module, state);
       try {
-        const definition = normalizeBoxJs(await (await send(moduleURL(module), "GET", undefined, state.controller.signal)).json(), module);
+        const parts = parseSettingsPath(`https://example.invalid/api/${encodeURIComponent(module)}/`);
+        if (parts.length !== 1) throw new TypeError("Expected a module name");
+        const resource = configResource(configURL);
+        const definition = normalizeBoxJs(await (await send(resource, "GET", undefined, state.controller.signal, true)).json(), module);
         if (definition.settingsPath.length < 2) throw new TypeError("BoxJS fields must share a settings subtree below the module root");
         const subtree = await (
           await send(`/api/${definition.settingsPath.map(encodeURIComponent).join("/")}/`, "GET", undefined, state.controller.signal)

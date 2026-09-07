@@ -25,7 +25,7 @@ for (const platform of ["surge", "quantumult"]) {
           $argument: "origin=https://example.org&configURL=https://assets.example.org/Module.boxjs.json",
           $request: {
             method,
-            url: `https://example.org/api/${path}`,
+            url: path.startsWith("/") ? `https://example.org${path}` : `https://example.org/api/${path}`,
             body,
             headers: { "X-Settings-Client": "1", "Content-Type": "application/json" },
           },
@@ -62,7 +62,7 @@ for (const platform of ["surge", "quantumult"]) {
       });
     const unwrap = (response) => (platform === "surge" ? response.response : response);
     const status = (response) => (platform === "surge" ? response.status : Number(response.status.split(" ")[1]));
-    assert.deepEqual(JSON.parse(JSON.stringify(await run("HEAD", "Module/"))), {});
+    assert.deepEqual(JSON.parse(JSON.stringify(await run("HEAD", "/configs/Module.json"))), {});
     assert.equal(requests, 0);
     assert.equal(reads, 0);
     let response = unwrap(await run("POST", undefined, "9"));

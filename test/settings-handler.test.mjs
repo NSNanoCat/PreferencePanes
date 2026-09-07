@@ -49,15 +49,15 @@ test("BoxJS array, app and subscription normalize IDs without project constants"
   assert.throws(() => normalizeBoxJs([...config, { ...config[0], id: "@Other.Module.Settings.x" }], "Module"), /one storage root/);
 });
 
-test("HEAD module root belongs exclusively to native configuration Mock", async () => {
+test("configuration resources bypass the persistence handler", async () => {
   const handler = createSettingsHandler({
     ...options,
     loadConfig() {
       throw Error("must not load");
     },
   });
-  assert.equal(await handler(req("HEAD", "Module/")), undefined);
-  assert.equal(await handler(req("GET", "Module/")), undefined);
+  assert.equal(await handler({ ...req("HEAD"), url: "https://example.org/configs/Module.json" }), undefined);
+  assert.equal(await handler({ ...req("GET"), url: "https://example.org/configs/Module.json" }), undefined);
   assert.equal(reads, 0);
   assert.equal(writes, 0);
 });
@@ -77,6 +77,16 @@ test("subtree GET reads storage once and exposes only runtime-declared fields", 
   assert.equal(loads, 1);
   assert.equal((await handler(req("HEAD", "Module/Settings/"))).status, 200);
   assert.equal(reads, 1);
+});
+
+test("API module root returns only persistence data, never BoxJS config", async () => {
+  const handler = createSettingsHandler(options);
+  store.set("Example", JSON.stringify({ Module: { Settings: { count: 3 }, Caches: { token: "hidden" } } }));
+  assert.equal((await handler(req("HEAD", "Module/"))).status, 200);
+  assert.equal(reads, 0);
+  assert.deepEqual(JSON.parse((await handler(req("GET", "Module/"))).body), { Settings: { count: 3 } });
+  assert.equal(reads, 1);
+  assert.equal((await handler(req("POST", "Module/", {}))).status, 405);
 });
 
 test("POST and DELETE return 200, use util and preserve hidden/sibling data", async () => {

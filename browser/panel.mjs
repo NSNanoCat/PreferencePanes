@@ -3,7 +3,7 @@ import { createPreferencesClient } from "./client.mjs";
 /**
  * 挂载从 BoxJS 实时生成的设置面板和短暂通知。
  * Mount runtime-generated BoxJS controls and transient notifications.
- * @param {import("../types/browser.js").PreferencesPanelOptions} options 容器与请求；模块由页面 URL 的 module 参数指定 / Container and requests; module comes from the page URL.
+ * @param {import("../types/browser.js").PreferencesPanelOptions} options 容器与请求；页面 URL 的 config 指定 JSON，module 选择其中字段 / Container and requests; config selects JSON, module selects fields.
  * @returns {{destroy(): void}} 清理接口 / Cleanup handle.
  */
 export function mountPreferencePanes({ element: root, fetch, title = "Preferences" }) {
@@ -57,21 +57,21 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
         { duration: 180, easing: "ease-out" },
       );
   }
-  async function open(module) {
+  async function open(module, configURL) {
     const version = ++generation;
     active = module;
     back.disabled = window.history.length <= 1;
     heading.textContent = module;
     replace(node("p", "pp-loading", "读取设置…"), 1);
     try {
-      await client.open(module);
+      await client.open(module, configURL);
       if (version === generation) controls();
     } catch (error) {
       if (version !== generation) return;
       const view = node("section", "pp-error");
       view.append(node("p", "", `加载失败：${error.message}`));
       const retry = node("button", "", "重新读取");
-      retry.onclick = () => open(module);
+      retry.onclick = () => open(module, configURL);
       view.append(retry);
       replace(view, 1);
     }
@@ -197,15 +197,17 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
     pendingRoute = false;
     if (active) client.leave(active);
     routedSearch = window.location.search;
-    const modules = new URLSearchParams(routedSearch).getAll("module");
-    if (modules.length !== 1 || !modules[0]) {
+    const params = new URLSearchParams(routedSearch);
+    const modules = params.getAll("module");
+    const configs = params.getAll("config");
+    if (modules.length !== 1 || !modules[0] || configs.length !== 1 || !configs[0]) {
       generation++;
       active = null;
       heading.textContent = title;
-      replace(node("p", "pp-error", "请在页面 URL 中提供一个 module 参数，格式为 ?module=模块标识。"), 1);
+      replace(node("p", "pp-error", "请在页面 URL 中提供 module 标识和 config 配置地址。"), 1);
       return;
     }
-    open(modules[0]);
+    open(modules[0], configs[0]);
   }
   const onPopState = () => {
     if (window.location.search !== routedSearch) route();

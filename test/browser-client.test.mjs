@@ -1,7 +1,74 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createPreferencesClient } from "../browser/client.mjs";
 import { config } from "./fixtures/module.mjs";
+
+test("explicit config URL is independent of module and never receives storage headers", async () => {
+  const calls = [];
+  const source = "https://assets.example.org/custom/subscription.json?version=3";
+  const client = createPreferencesClient({
+    fetch: async (url, options) => {
+      calls.push({ url, ...options });
+      return options.method === "HEAD" ? new Response(null) : Response.json(url === source ? { apps: [{ settings: config }] } : {});
+    },
+  });
+  assert.equal(await client.probe(source), true);
+  await client.open("Module", source);
+  assert.deepEqual(
+    calls.map((call) => call.url),
+    [source, source, "/api/Module/Settings/"],
+  );
+  assert.deepEqual(calls[0].headers, {});
+  assert.deepEqual(calls[1].headers, {});
+  assert.equal(calls[2].headers["X-Settings-Client"], "1");
+});
+
+test("missing or invalid config URL never falls back to an API path", async () => {
+  const { client, calls } = fixture();
+  for (const source of [
+    undefined,
+    "",
+    "/api/Module/",
+    "https://example.org/api/Module/",
+    "//other.example/config.json",
+    "javascript:alert(1)",
+    "http://example.org/config.json",
+  ]) {
+    await assert.rejects(client.open("Module", source), /config/);
+    assert.equal(await client.probe(source), false);
+  }
+  assert.equal(calls.length, 0);
+});
+
+test("template config Mock and API script patterns are disjoint regardless of rule order", async () => {
+  const template = await readFile(new URL("../examples/surge.sgmodule", import.meta.url), "utf8");
+  const mock = new RegExp(
+    template
+      .split("\n")
+      .find((line) => line.startsWith("^") && line.includes("/configs/"))
+      .split(" ")[0],
+  );
+  const script = new RegExp(template.match(/pattern=([^,]+)/)[1]);
+  const page = new RegExp(
+    template
+      .split("\n")
+      .find((line) => line.startsWith("^") && line.includes("/settings/"))
+      .split(" ")[0],
+  );
+  assert.equal(page.test("https://example.org/settings/?module=Module&config=%2Fconfigs%2FModule.json"), true);
+  for (const url of [
+    "https://example.org/configs/Module.json",
+    "https://example.org/api/Module/",
+    "https://example.org/api/Module/Settings/",
+    "https://example.org/api/Module/Settings/enabled",
+  ]) {
+    assert.equal(Number(mock.test(url)) + Number(script.test(url)), 1, url);
+    assert.equal(mock.test(url), url.includes("/configs/"));
+  }
+  assert.equal(script.test("https://example.org/api/ModuleOther/Settings/"), false);
+  assert.equal(mock.test("https://example.org/configs/Other.json"), false);
+});
 
 function fixture() {
   const calls = [],
@@ -13,7 +80,9 @@ function fixture() {
       calls.push({ url, ...options });
       if (state.error) throw state.error;
       const body =
-        options.method === "HEAD" || state.status === 204 ? null : JSON.stringify(url === "/api/Module/" ? state.config : state.stored);
+        options.method === "HEAD" || state.status === 204
+          ? null
+          : JSON.stringify(url === "/configs/Module.json" ? state.config : state.stored);
       return new Response(body, { status: state.status });
     },
   });
@@ -22,15 +91,15 @@ function fixture() {
 
 test("menu probes only HEAD; opening loads config and subtree exactly once", async () => {
   const { client, calls } = fixture();
-  await Promise.all([client.probe("Module"), client.probe("Other")]);
+  await Promise.all([client.probe("/configs/Module.json"), client.probe("/configs/Other.json")]);
   assert.deepEqual(
     calls.map((call) => [call.method, call.url]),
     [
-      ["HEAD", "/api/Module/"],
-      ["HEAD", "/api/Other/"],
+      ["HEAD", "/configs/Module.json"],
+      ["HEAD", "/configs/Other.json"],
     ],
   );
-  const { values } = await client.open("Module");
+  const { values } = await client.open("Module", "/configs/Module.json");
   assert.equal(values["Module.Settings.Home.enabled"], false);
   assert.deepEqual(values["Module.Settings.items"], ["a", "b"]);
   assert.equal(values["Module.Settings.count"], 1);
@@ -38,7 +107,7 @@ test("menu probes only HEAD; opening loads config and subtree exactly once", asy
   assert.deepEqual(
     calls.slice(2).map((call) => [call.method, call.url]),
     [
-      ["GET", "/api/Module/"],
+      ["GET", "/configs/Module.json"],
       ["GET", "/api/Module/Settings/"],
     ],
   );
@@ -49,7 +118,7 @@ test("menu probes only HEAD; opening loads config and subtree exactly once", asy
 
 test("HTTP 200 writes and deletes update isolated cache without GET", async () => {
   const { client, calls, notifications } = fixture();
-  await client.open("Module");
+  await client.open("Module", "/configs/Module.json");
   const snapshot = client.snapshot("Module");
   snapshot.values["Module.Settings.items"].push("x");
   snapshot.definition.fields.length = 0;
@@ -77,7 +146,7 @@ test("HTTP 200 writes and deletes update isolated cache without GET", async () =
 
 test("non-200, network and invalid value errors notify and preserve cached values", async () => {
   const { client, calls, notifications, state } = fixture();
-  await client.open("Module");
+  await client.open("Module", "/configs/Module.json");
   const previous = client.snapshot("Module");
   for (const status of [204, 400, 500]) {
     state.status = status;
@@ -96,29 +165,29 @@ test("non-200, network and invalid value errors notify and preserve cached value
 
 test("every entry or refresh replaces config and values; failed reopen clears stale cache", async () => {
   const { client, calls, state } = fixture();
-  await client.open("Module");
+  await client.open("Module", "/configs/Module.json");
   client.leave("Module");
   assert.throws(() => client.snapshot("Module"), /Open/);
   state.config = [...config, { id: "@Example.Module.Settings.added", name: "Added", type: "boolean", val: true }];
   state.stored = { count: 9 };
-  await client.open("Module");
+  await client.open("Module", "/configs/Module.json");
   assert.equal(client.snapshot("Module").values["Module.Settings.added"], true);
   assert.equal(client.snapshot("Module").values["Module.Settings.count"], 9);
   state.stored = { count: 10 };
-  await client.open("Module");
+  await client.open("Module", "/configs/Module.json");
   assert.equal(client.snapshot("Module").values["Module.Settings.count"], 10);
   assert.equal(calls.filter((call) => call.method === "GET").length, 6);
   state.status = 404;
-  assert.equal(await client.probe("Module"), false);
-  await assert.rejects(client.open("Module"));
+  assert.equal(await client.probe("/configs/Module.json"), false);
+  await assert.rejects(client.open("Module", "/configs/Module.json"));
   assert.throws(() => client.snapshot("Module"), /Open/);
 });
 
 test("leaving cancels pending entry; an older entry cannot restore a replaced session", async () => {
   const pending = [];
   const client = createPreferencesClient({ fetch: (url, options) => new Promise((resolve) => pending.push({ url, options, resolve })) });
-  const first = client.open("Module");
-  const second = client.open("Module");
+  const first = client.open("Module", "/configs/Module.json");
+  const second = client.open("Module", "/configs/Module.json");
   assert.equal(pending[0].options.signal.aborted, true);
   pending[1].resolve(Response.json(config));
   await new Promise((resolve) => setImmediate(resolve));
@@ -143,12 +212,12 @@ test("writes are serialized and completing after leave cannot resurrect cache", 
         return new Promise((resolve) => {
           finish = resolve;
         });
-      return Response.json(url === "/api/Module/" ? config : {});
+      return Response.json(url === "/configs/Module.json" ? config : {});
     },
   });
-  await client.open("Module");
+  await client.open("Module", "/configs/Module.json");
   const write = client.set("Module", "Module.Settings.count", 2);
-  await assert.rejects(client.open("Module"), /saving/);
+  await assert.rejects(client.open("Module", "/configs/Module.json"), /saving/);
   await assert.rejects(client.set("Module", "Module.Settings.count", 3), /progress/);
   client.leave("Module");
   finish(Response.json({ saved: true }));
