@@ -3,7 +3,7 @@ import { createPreferencesClient } from "./client.mjs";
 /**
  * 挂载从 BoxJS 实时生成的设置面板和短暂通知。
  * Mount runtime-generated BoxJS controls and transient notifications.
- * @param {import("../types/browser.js").PreferencesPanelOptions} options 容器与请求；页面 URL 的 module 对应 /configs/{module} / Container and requests; module selects /configs/{module}.
+ * @param {import("../types/browser.js").PreferencesPanelOptions} options 容器与请求；页面路径 /settings/{module} 对应配置 / Container and requests; /settings/{module} selects config.
  * @returns {{destroy(): void}} 清理接口 / Cleanup handle.
  */
 export function mountPreferencePanes({ element: root, fetch, title = "Preferences" }) {
@@ -28,7 +28,7 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
   shell.append(header, viewport, toast);
   root.append(shell);
   let timer,
-    routedSearch,
+    routedPath,
     generation = 0,
     active = null,
     saving = false,
@@ -196,20 +196,19 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
     }
     pendingRoute = false;
     if (active) client.leave(active);
-    routedSearch = window.location.search;
-    const params = new URLSearchParams(routedSearch);
-    const modules = params.getAll("module");
-    if (modules.length !== 1 || !modules[0]) {
+    routedPath = window.location.pathname;
+    const match = /^\/settings\/([a-zA-Z0-9_-]+)\/?$/.exec(routedPath);
+    if (!match) {
       generation++;
       active = null;
       heading.textContent = title;
-      replace(node("p", "pp-error", "请在页面 URL 中提供一个 module 参数。"), 1);
+      replace(node("p", "pp-error", "页面地址应为 /settings/模块标识。"), 1);
       return;
     }
-    open(modules[0]);
+    open(match[1]);
   }
   const onPopState = () => {
-    if (window.location.search !== routedSearch) route();
+    if (window.location.pathname !== routedPath) route();
   };
   const onPageShow = (event) => {
     if (event.persisted) route();

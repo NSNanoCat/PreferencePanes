@@ -28,7 +28,9 @@ test("template config Mock and API script patterns are disjoint regardless of ru
       .find((line) => line.startsWith("^") && line.includes("/settings/"))
       .split(" ")[0],
   );
-  assert.equal(page.test("https://example.org/settings/?module=Module"), true);
+  assert.equal(page.test("https://example.org/settings/Module"), true);
+  assert.equal(page.test("https://example.org/settings/?module=Module"), false);
+  assert.equal(page.test("https://example.org/settings/Other"), true);
   for (const url of [
     "https://example.org/configs/Module",
     "https://example.org/api/Module/",
