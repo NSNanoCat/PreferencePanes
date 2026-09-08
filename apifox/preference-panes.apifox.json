@@ -7,7 +7,7 @@
   },
   "info": {
     "name": "Preference Panes",
-    "description": "运行时 BoxJS、模块探测、页面初次读取与单键读写（0.2.0）",
+    "description": "前端 BoxJS 设置页面与模块存储桥接、缓存清理及模块重置（0.3.0）",
     "mockRule": {
       "rules": [],
       "enableSystemRule": true
@@ -77,7 +77,7 @@
                 ],
                 "operationId": "preference_panes_pp-page-get",
                 "sourceUrl": "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/guide.md",
-                "description": "## 接口用途\n\n同一份 HTML 从 /settings/{module} 路径读取模块标识，按约定 GET /configs/{module} 取得 BoxJS 并生成设置界面。不使用查询参数。缺失、多余或非法路径段不发送请求。\n\n## 请求契约\n\n`GET /settings/{module}`\n\nmodule 是必填路径参数，与配置文件中字段所属模块一致。路径参数不预填业务示例值；具体取值由接入项目决定。该资源由代理 Mock 提供，不需要 X-Settings-Client 请求头。\n\n请求没有正文。\n\n## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n```html\n<!doctype html><html><body><main id=\"preferences\"></main><script type=\"module\">import { mountPreferencePanes } from \"/resources/preference-panes.mjs\"; mountPreferencePanes({ element: document.querySelector(\"#preferences\") });</script></body></html>\n```\n\n## 调用流程与具体示例\n\n# PreferencePanes：从入口探测到单键读写\n\n当前已发布版本为 0.2.0，包含 SettingsHandler class 和 BoxJS 元数据兼容增强。下面的 Enhanced 只是路径示例，example.org 没有部署接口；各项目复用相同代码，从自己的 BoxJS JSON 生成设置界面。\n\n## 通用路径契约\n\n| 方法 | 相对路径定义 | 用途 |\n| --- | --- | --- |\n| GET | `/settings/{module}` | 通用 HTML 页面，按路径中的模块生成界面 |\n| HEAD、GET | `/configs/{module}` | 探测配置 Mock、读取 BoxJS JSON |\n| HEAD、GET | `/api/{module}/` | 探测读写路由、读取模块公开子树 |\n| HEAD、GET | `/api/{module}/{path}` | 探测、读取模块内的键或子树 |\n| POST、DELETE | `/api/{module}/{path}` | 修改、删除声明的单个键 |\n\n`module` 是动态模块标识；`path` 是模块内的相对 database 路径，允许多级，用 `/` 分隔。`Settings/Home/Top_left` 只是 path 示例，Settings、Home 和键名都不固定。路径逐段编码，不能把分隔用的 `/` 整体编码为 `%2F`。页面、配置资源、持久化读写使用同一个 module；不是三个各自指定的模块参数，也不使用 query 参数。\n\n### 在 Apifox 中调试\n\n接口路径保留 Apifox 的 `{module}`、`{path}` 路径参数，不使用固定业务 URL，也不把 `*` 当作真实请求路径。调试前在 Path 参数区填写目标模块与模块内路径；参数值和 POST 正文默认留空，不预置任何项目或待写入值。服务地址由使用者的环境配置提供。\n\nPOST 的 Body 为原始 JSON，须按目标字段类型填写字符串、数字、布尔值或数组。响应 Schema 描述通用结构；下面各节的实际 URL、请求值、返回对象只是文档中的示例，不会作为调试请求或 Mock 的默认数据。路径每段仅允许英文字母、数字、下划线和连字符，不接受空段、点号或 __proto__/prototype/constructor。\n\n例如 module=Enhanced、path=Settings/Home/Top_left 时，实际请求才是 `/api/Enhanced/Settings/Home/Top_left`。以下具体 URL、BoxJS 字段和返回值均为使用示例，不能当作通用接口的固定路径或枚举。\n\n## 页面通过 module 选择配置\n\n```http\nGET /settings/Enhanced\n```\n\n通用页面从 `/settings/{module}` 路径读取模块标识，不读取 module 或 config 查询参数。渲染器按固定约定 GET `/configs/Enhanced`，读取返回的 BoxJS JSON，再动态生成设置项。改为 `/settings/Global` 就 GET `/configs/Global`，不修改 HTML。\n\nmodule 必须与 BoxJS ID `@BiliBili.Enhanced.Settings.…` 中的 Enhanced 一致；它也对应持久化 `/api/` 后第一段。实际 BoxJS 文件地址由模块模板的 Mock 规则指定。页面路径只允许一个非空模块段，可带结尾斜线；模块名只允许英文字母、数字、下划线、连字符，禁止 __proto__/prototype/constructor。缺失模块段、多余路径段或非法模块名在页面显示错误，不发送配置或存储请求。\n\n| 请求 | 响应方 | 内容 |\n| --- | --- | --- |\n| GET /settings/{module} | 公共 HTML Mock | 同一份通用设置页 |\n| HEAD、GET /configs/{module} | 对应模块的配置 Mock | 配置可用性、BoxJS 静态 JSON |\n| GET /api/{module}/ 或 /api/{module}/{path} | 通用代理读写脚本 | 当前持久化设置的公开子树或叶子值 |\n| POST、DELETE /api/{module}/{path} | 同一个通用代理读写脚本 | 单键修改、删除 |\n\n配置资源使用 `/configs/`，持久化接口使用 `/api/`，两种模板正则互不重叠，不依赖执行优先级。各业务项目用现有 argument config 生成器生成 BoxJS JSON。模块的 Mock 规则引用生成文件的下载源；通用读写脚本参数 configURL 引用同一版本资源进行校验。configURL 是代理脚本的模板参数，不是页面参数；页面仅用 module 按约定寻找配置 Mock。\n\n业务主菜单独立于通用设置页，由调用项目提供模块链接；Biliverse 主菜单归 Enhanced。通用 JS 不包含 Enhanced/Global 等目录或字段，Enhanced 已通过包的公开接口接入。\n\n## 一、主菜单只探测配置 Mock\n\n每次进入业务主菜单，用通用 client.probe(module) 并发发送：\n\n```http\nHEAD /configs/Enhanced\nHEAD /configs/Global\n```\n\n这些地址由各模块的 BoxJS Mock 提供。200 才启用入口；非 200、无响应或超时则禁用。HEAD 无正文，不读持久化存储、不执行通用读写脚本，也不证明读写脚本运行正常。\n\n配置 Mock 地址不部署同名在线静态文件，下载源在另一个地址。页面只请求约定的配置 Mock 地址。\n\n## 二、每次真正进入或刷新设置页\n\n先 GET 根据 module 生成的 `/configs/Enhanced`，取得 BoxJS。可使用 settings 数组、单 app 或 apps 订阅。示例：\n\n```json\n[\n  {\n    \"id\": \"@BiliBili.Enhanced.Settings.Home.Top_left\",\n    \"name\": \"顶栏左侧\", \"type\": \"selects\", \"val\": \"mine\",\n    \"items\": [{ \"key\": \"mine\", \"label\": \"我的\" }, { \"key\": \"videoshortcut\", \"label\": \"短视频\" }]\n  },\n  { \"id\": \"@BiliBili.Enhanced.Settings.enabled\", \"name\": \"启用\", \"type\": \"boolean\", \"val\": true }\n]\n```\n\n通用组件由 ID 解析出存储根 BiliBili 和公共子树 Enhanced.Settings，再读取一次：\n\n```http\nGET /api/Enhanced/Settings/\nX-Settings-Client: 1\n```\n\n返回 HTTP 200 和公开字段的持久化覆盖值，例如：\n\n```json\n{ \"Home\": { \"Top_left\": \"videoshortcut\" } }\n```\n\n只返回 BoxJS 声明的字段，不泄露同根下的缓存和其它模块。没有任何覆盖值时返回 `{}`。页面用 BoxJS val 补充未设置字段，并创建新的内存缓存；不使用 localStorage/sessionStorage。返回主菜单不 GET，再次进入重新执行上述两次 GET。刷新当前模块页也重新读取；浏览器前进、后退恢复缓存页面时会重新读取当前 URL 的模块。\n\n只有 `/api/` 固定；其它组织可以使用 `/api/Weather/Preferences/Units`。同模块必须使用一个存储根，并具有模块根以下的公共父路径，才能一次读取设置子树。控件支持 boolean/selects/checkboxes/text/textarea/number，不执行 BoxJS 脚本。\n\n## 三、修改单个键\n\n```http\nPOST /api/Enhanced/Settings/Home/Top_left\nContent-Type: application/json\nX-Settings-Client: 1\n\n\"mine\"\n```\n\n正文就是 JSON 值本身，没有 values 包装。成功返回 HTTP 200：\n\n```json\n{ \"saved\": true }\n```\n\n组件显示“修改成功”，只更新内存中的该键。不会随后 GET 整个模块。非 200（包括 204）或网络错误显示“操作失败”，缓存保留原值，其它控件的未保存输入也保留。\n\n代理执行端运行时读取 BoxJS 校验字段，然后读取最新存储根，通过 util set 修改该键并写回。不会把浏览器的整棵旧缓存覆盖回存储；只修改持久化数据，不修改源码 database.mjs 或 argument 配置。\n\n## 四、删除覆盖值\n\n```http\nDELETE /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n```\n\n没有正文。成功返回 HTTP 200：\n\n```json\n{ \"deleted\": true }\n```\n\n重复删除仍成功。代理通过 util unset 删除单键，保留同级字段、其它模块和缓存；不递归删除空父对象。浏览器显示“删除成功”，移除该键缓存的覆盖值，改用 BoxJS val；不追加 GET。删除覆盖值不等于关闭功能。\n\n## 五、需要时直接查询单键\n\n```http\nGET /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n```\n\n有覆盖值则返回 HTTP 200，正文直接为 `\"mine\"`；无值时 404。默认 GET 不返回 BoxJS 默认值。也支持 HEAD 完整叶子路径：声明过则 200，否则 404；不读取存储。主菜单应 HEAD 配置 Mock 地址，不是持久化叶子探测。\n\n## 通用脚本参数与读取时机\n\n### BoxJS 页面属性\n\n本地 dev 优化：WebView 使用原生对象访问，不再打包 util Lodash。代理每次仍从自己的 configURL 下载配置并校验字段，只提取存储根、字段路径、类型、默认值和枚举约束；不处理标题、描述、图标、占位文字、rows/autoGrow 等展示属性。展示属性由 WebView 校验，非法展示属性不会影响默认代理对合法字段的访问。自定义 GET resolver 仍收到完整 ModuleDefinition，保留其既有契约。HTTP 路径、状态码、访问范围与存储读写次数不变，未取消代理端配置请求。\n\n配置可以是 settings 数组、单个 app 或 apps 订阅。字段的 name/val/type/desc/items 决定控件，placeholder 设置输入提示；textarea 保持字符串类型，rows 为正整数基础行数，autoGrow 为布尔值。首次显示、输入及删除覆盖值后都会按内容调整高度。\n\n如果模块字段只属于一个 app，definition.metadata 保留它的 id/name/author/repo/script/icon/icons/desc/descs/description。页面使用 name 作为显示标题，author/desc/descs 作为纯文本，repo 作为项目链接。模块路由和存储根仍由字段的 @根.模块.路径 决定，不能由 app.id/name 推断。多个 app 分别声明同一模块的字段时合并字段，不任意选择一个 app 的展示元数据。\n\nicon 优先于 icons；原版 icons[0] 是透明版，icons[1] 是彩色版，并非亮暗顺序。默认使用彩色版，只有一个图标时使用该图标。页面图片与链接仅接受 HTTP(S) 或同源相对地址。script 只保留元数据，不请求或执行；不渲染 desc_html/descs_html，不使用 keys 推导额外可读写字段。\n\n| 参数或数据 | 来源与作用 |\n| --- | --- |\n| origin | 调用方的 HTTPS 页面来源，不带路径 |\n| configURL | 传给 SettingsHandler 的 HTTPS BoxJS 下载地址；类内部每次通过 util fetch 加载，按请求中的 module 选择字段 |\n| storageKey | 从 BoxJS 的 @根键.模块.路径 提取，不通过 header 传递 |\n| requestHeader | 默认 X-Settings-Client，值为 1；同源页面标记，不是认证凭据 |\n| resolveSettings(stored, definition) | 可选 GET 有效配置解析器，返回完整 database 形状的对象；不参与 HEAD/POST/DELETE |\n\n独立打包脚本通过 argument 的 origin/configURL 接收地址，用 util fetch 下载 BoxJS，用 util Storage/Lodash 读写。不同模块引用同一份脚本，分别配置自己的 /api/ 正则与校验 BoxJS 地址；/configs/ Mock 不经过此脚本。原生配置 Mock 与脚本应使用同一版本的配置源；代理自己的 Mock 资源缓存需要按代理机制更新。\n\n0.2.0 的代理调用方式为 `new SettingsHandler({ origin, configURL }).handle(request)`。配置下载、HTTP 200 检查、JSON 解析及字段归一化均由这个 class 完成，调用方不再提供 loadConfig 回调。网络异常、非 200、非法 JSON 或模块配置解析失败统一返回 502；不会继续读写持久化存储。0.1.0 使用旧工厂函数；HTTP 路径、方法和返回契约不变。\n\n每次 GET 持久化设置读根一次。每次 POST/DELETE 写入前重新读根，再单键修改、写回一次。浏览器缓存不触发额外 GET，但不能取消代理端保证保留其它数据所需的读改写。不同代理脚本同时写同一根键不具备事务隔离保证。\n\nresolveSettings 可由模块按已有规则合并 database、argument、持久化值。默认不传时只读持久化值，页面使用 BoxJS 默认值补缺。本包不自动修改模块现有配置优先级；删除后不调用 resolver，下次进入/刷新才重新读取。\n\n## 错误与限制\n\n| 状态码 | 持久化接口语义 |\n| --- | --- |\n| 200 | HEAD 路径受支持；GET 返回值或子树；POST/DELETE 操作成功 |\n| 400 | 路径非法、JSON 无法解析或值不满足 BoxJS 类型/枚举约束 |\n| 403 | 缺少页面标记头，或请求 Origin 与代理配置不符 |\n| 404 | 路径未声明；或 GET 叶子尚无持久化值 |\n| 405 | 对子树执行 POST/DELETE，或使用不支持的方法 |\n| 413 | POST 正文超过 65536 个 UTF-16 code units |\n| 415 | POST Content-Type 不是 application/json |\n| 500 | 持久化写入或代理执行失败 |\n| 502 | BoxJS 配置源加载、解析或模块定义校验失败 |\n\nGET 子树无覆盖值返回 200 和空对象，GET 叶子无覆盖值返回 404；两者不同。HEAD 成功不代表已有值。POST 字符串上限 2048，选择项与数组项按 BoxJS 校验；不接受 null 或对象作为叶子写入值。持久化响应 no-store；HEAD 始终无正文。配置资源由原生 Mock 管理，其失败响应格式由代理或原站决定，不能套用持久化接口的 JSON 错误结构。\n\nGitHub main/dev 分别绑定 Apifox 同名分支，JSON 路径为 apifox/preference-panes.apifox.json。提交 JSON 后仍需客户端执行数据源导入，并按分支回读确认结果。npm/GitHub Packages 未发布，Biliverse 消费端本轮未迁移。\n",
+                "description": "## 接口用途\n\n同一份 HTML 从 /settings/{module} 路径读取模块标识，按约定 GET /configs/{module} 取得 BoxJS 并生成设置界面。不使用查询参数。缺失、多余或非法路径段不发送请求。\n\n## 请求契约\n\n`GET /settings/{module}`\n\nmodule 是必填路径参数，必须属于插件安装配置中的模块。路径参数不预填业务示例值；具体取值由接入项目决定。该资源由代理 Mock 提供，不需要 X-Settings-Client 请求头。\n\n请求没有正文。\n\n## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n```html\n<!doctype html><html><body><main id=\"preferences\"></main><script type=\"module\">import { mountPreferencePanes } from \"/resources/preference-panes.mjs\"; mountPreferencePanes({ element: document.querySelector(\"#preferences\") });</script></body></html>\n```\n\n## 调用流程与具体示例\n\n# PreferencePanes 0.3.0 接口契约\n\n前端负责 BoxJS 解析、控件生成和字段输入校验。API 只桥接安装配置指定的持久化根与模块，不下载 BoxJS，不校验字段声明、枚举或控件类型。\n\n## 路径和参数\n\n| 方法 | 路径 | 行为 |\n| --- | --- | --- |\n| GET | /settings/{module} | 同一个 WebView 页面，按路径选择模块 |\n| HEAD、GET | /configs/{module} | 模块配置 Mock：探测、加载 BoxJS |\n| HEAD、GET、POST、DELETE | /api/{module}/ | 探测路由、读取、替换或删除整个模块 |\n| HEAD、GET、POST、DELETE | /api/{module}/{path} | 探测路由、读取、替换或删除任意键或子树 |\n| GET、DELETE | /api/{module}/Caches | 查看、清空模块缓存，使用相同的通用存储处理器 |\n\nmodule 和 path 使用 Apifox 路径参数，不预填业务示例。path 以 / 分隔层级，每段独立编码；不能把分隔斜线编码为 %2F。片段允许字母、数字、下划线、连字符，拒绝空片段及 __proto__/prototype/constructor。这些是路径结构校验，不是 BoxJS 字段校验。API 接受不存在于 BoxJS 中的新键。\n\n## 安装配置决定存储映射\n\n代理入口构造：\n\n~~~js\nconst handler = new SettingsHandler({\n  origin: \"https://biliverse.github.io\",\n  storageKey: \"BiliBili\",\n  module: \"Enhanced\"\n});\nconst response = await handler.handle($request);\n~~~\n\n此处由已安装插件提供可信配置，不经浏览器 header/body 提供。API 从 /api/ 后第一段确认模块，再将路径映射到固定存储根：\n\n~~~text\n/api/Enhanced/Settings/Home/Top_left → BiliBili.Enhanced.Settings.Home.Top_left\n/api/Enhanced/Caches                → BiliBili.Enhanced.Caches\n/api/Enhanced/                      → BiliBili.Enhanced\n~~~\n\nEnhanced 处理器不能访问 BiliBili.Global；重置 Enhanced 也保留 Global。类不接受 configURL、loadConfig 或 resolveSettings。通用独立代理脚本的 argument 为 origin、storageKey、module。配置 Mock 的实际下载源仍由模块模板指定，与 API 无关。\n\n## 前端读取与缓存\n\n每次进入主菜单，并发 HEAD /configs/{module}，仅 200 启用按钮；此时不 GET 设置。配置 Mock 地址不部署同名线上文件，静态下载源另设路径。\n\n每次打开、再次进入或刷新设置页面：\n1. GET /configs/{module} 一次，由前端解析 BoxJS、生成控件和默认值。\n2. GET BoxJS 字段公共子树一次，例如 /api/Enhanced/Settings/。\n3. 在当前页面建立内存缓存。若子树缺失返回 404，则用空覆盖值加 BoxJS 默认值绘制；兼容旧存储中以 JSON 字符串编码的设置子树。\n\n保存或删除只按目标路径发送一次请求，根据是否返回 200 显示短暂通知；失败保留缓存及未保存输入。成功后仅更新内存，不 GET 整个模块。仅前端校验控件类型和选项；直接调用 API 可写入任何合法 JSON 值。\n\n## 读写示例\n\n~~~http\nGET /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n已有值返回 200，正文是该值本身。GET 父路径返回全部子树，包括未在页面展示的键；不存在返回 404。不会自动合并 BoxJS 默认值。\n\n~~~http\nPOST /api/Enhanced/Settings/Home/Top_left\nContent-Type: application/json\nX-Settings-Client: 1\n\n\"mine\"\n~~~\n\n正文允许字符串、数字、布尔值、null、任意数组和对象；没有 values 包装。POST 替换指定位置的值而非合并对象。未存在的父节点会创建，JSON 数组元素可通过数字路径访问。路径之外的数据保持不变。\n\n~~~json\n{ \"saved\": true }\n~~~\n\n~~~http\nDELETE /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n删除键或整棵子树，不存在时也返回 200。前端删除设置覆盖值后显示当前 BoxJS 默认值。\n\n~~~json\n{ \"deleted\": true }\n~~~\n\n## Caches 与模块重置\n\n“查看 Caches”按需 GET /api/{module}/Caches，显示全部缓存 JSON；404 表示暂无缓存。再次点击刷新才重新读取，不在进入页面时自动下载缓存。\n\n“清空 Caches”确认后 DELETE /api/{module}/Caches，仅删除该节点，保留 Settings 及其它模块。成功后清空当前缓存视图，不追加 GET。\n\n“重置模块”确认后 DELETE /api/{module}/，删除模块的 Settings、Caches 和其它全部持久化键，保留同根的其它模块。成功后清除页面覆盖值、使用已加载 BoxJS 的默认值，隐藏旧缓存内容，不重新读取设置。再次进入页面时按正常打开流程读取。\n\n~~~http\nDELETE /api/Enhanced/\nX-Settings-Client: 1\n~~~\n\n## 代理存储操作\n\nHEAD 仅确认本处理器接管合法模块路径，不读取存储，也不证明已有值。GET 读取一次根；POST/DELETE 写入前读取最新根，使用 util Lodash 修改对应节点并写回一次。API 不发送网络请求。\n\n历史 JSON 字符串中间节点会在路径遍历时解码；GET 直接指向字符串叶子时保留字符串。无法继续遍历标量父节点返回 500，不悄悄覆盖原数据。DELETE 数组元素采用删除键语义，不移动其它索引。\n\nAPI 响应带 Cache-Control: no-store。默认需要 X-Settings-Client: 1，Origin 存在时须与安装来源一致；该请求头是页面标记，不是认证凭据。POST 正文上限为 65536 个 UTF-16 code units。多个代理脚本同时写同一根仍没有事务隔离保证。\n\n| 状态码 | 含义 |\n| --- | --- |\n| 200 | 探测或读写成功；HEAD 无正文 |\n| 400 | 路径或 JSON 正文格式无效 |\n| 403 | 缺少页面标记，或请求来源不符 |\n| 404 | 模块不由当前处理器接管，或 GET 目标不存在 |\n| 405 | 不支持的 HTTP 方法 |\n| 413 | POST 正文过长 |\n| 415 | POST 正文不是 application/json |\n| 500 | 存储读取、路径遍历或写入失败 |\n\nAPI 不再返回 BoxJS 配置加载错误 502。配置 Mock 失败的格式仍由代理或原站决定。\n\n## BoxJS 仅用于 WebView\n\n支持 settings 数组、单 app 和 apps 订阅。字段 ID 仍使用 @根.模块.路径；名称、type、val、items、desc 生成控件，placeholder/rows/autoGrow 控制文本输入展示。app 元数据用于页面标题、说明和图标，script 只保留不执行；icons[0]/icons[1] 是透明/彩色变体，不是亮暗顺序。\n\n浏览器解析的根名仅为配置信息；代理不会因此改变固定 storageKey。插件作者应让 BoxJS 路径与安装映射一致。设置默认值、类型与枚举都由 WebView 处理，API 本身与 BoxJS 无关。\n\nGitHub main/dev 分别绑定 Apifox 同名分支。修改 apifox/preference-panes.apifox.json 后由已绑定数据源导入，并按分支回读验证。\n",
                 "parameters": {
                   "path": [
                     {
@@ -117,7 +117,7 @@
                   {
                     "id": "pp-pp-page-get-404",
                     "code": 404,
-                    "name": "未知字段、无覆盖值或模块未启用",
+                    "name": "存储路径不存在、非接管模块或 Mock 不可用",
                     "headers": [],
                     "contentType": "html",
                     "jsonSchema": {},
@@ -174,7 +174,7 @@
                 ],
                 "operationId": "preference_panes_pp-config-head",
                 "sourceUrl": "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/guide.md",
-                "description": "## 接口用途\n\n主菜单并发探测。模块的原生 BoxJS Mock 返回 200 才启用入口，不读取持久化设置。该路径没有线上静态文件。\n\n## 请求契约\n\n`HEAD /configs/{module}`\n\nmodule 是必填路径参数，与配置文件中字段所属模块一致。路径参数不预填业务示例值；具体取值由接入项目决定。该资源由代理 Mock 提供，不需要 X-Settings-Client 请求头。\n\n请求没有正文。\n\n## 调用流程与具体示例\n\n# PreferencePanes：从入口探测到单键读写\n\n当前已发布版本为 0.2.0，包含 SettingsHandler class 和 BoxJS 元数据兼容增强。下面的 Enhanced 只是路径示例，example.org 没有部署接口；各项目复用相同代码，从自己的 BoxJS JSON 生成设置界面。\n\n## 通用路径契约\n\n| 方法 | 相对路径定义 | 用途 |\n| --- | --- | --- |\n| GET | `/settings/{module}` | 通用 HTML 页面，按路径中的模块生成界面 |\n| HEAD、GET | `/configs/{module}` | 探测配置 Mock、读取 BoxJS JSON |\n| HEAD、GET | `/api/{module}/` | 探测读写路由、读取模块公开子树 |\n| HEAD、GET | `/api/{module}/{path}` | 探测、读取模块内的键或子树 |\n| POST、DELETE | `/api/{module}/{path}` | 修改、删除声明的单个键 |\n\n`module` 是动态模块标识；`path` 是模块内的相对 database 路径，允许多级，用 `/` 分隔。`Settings/Home/Top_left` 只是 path 示例，Settings、Home 和键名都不固定。路径逐段编码，不能把分隔用的 `/` 整体编码为 `%2F`。页面、配置资源、持久化读写使用同一个 module；不是三个各自指定的模块参数，也不使用 query 参数。\n\n### 在 Apifox 中调试\n\n接口路径保留 Apifox 的 `{module}`、`{path}` 路径参数，不使用固定业务 URL，也不把 `*` 当作真实请求路径。调试前在 Path 参数区填写目标模块与模块内路径；参数值和 POST 正文默认留空，不预置任何项目或待写入值。服务地址由使用者的环境配置提供。\n\nPOST 的 Body 为原始 JSON，须按目标字段类型填写字符串、数字、布尔值或数组。响应 Schema 描述通用结构；下面各节的实际 URL、请求值、返回对象只是文档中的示例，不会作为调试请求或 Mock 的默认数据。路径每段仅允许英文字母、数字、下划线和连字符，不接受空段、点号或 __proto__/prototype/constructor。\n\n例如 module=Enhanced、path=Settings/Home/Top_left 时，实际请求才是 `/api/Enhanced/Settings/Home/Top_left`。以下具体 URL、BoxJS 字段和返回值均为使用示例，不能当作通用接口的固定路径或枚举。\n\n## 页面通过 module 选择配置\n\n```http\nGET /settings/Enhanced\n```\n\n通用页面从 `/settings/{module}` 路径读取模块标识，不读取 module 或 config 查询参数。渲染器按固定约定 GET `/configs/Enhanced`，读取返回的 BoxJS JSON，再动态生成设置项。改为 `/settings/Global` 就 GET `/configs/Global`，不修改 HTML。\n\nmodule 必须与 BoxJS ID `@BiliBili.Enhanced.Settings.…` 中的 Enhanced 一致；它也对应持久化 `/api/` 后第一段。实际 BoxJS 文件地址由模块模板的 Mock 规则指定。页面路径只允许一个非空模块段，可带结尾斜线；模块名只允许英文字母、数字、下划线、连字符，禁止 __proto__/prototype/constructor。缺失模块段、多余路径段或非法模块名在页面显示错误，不发送配置或存储请求。\n\n| 请求 | 响应方 | 内容 |\n| --- | --- | --- |\n| GET /settings/{module} | 公共 HTML Mock | 同一份通用设置页 |\n| HEAD、GET /configs/{module} | 对应模块的配置 Mock | 配置可用性、BoxJS 静态 JSON |\n| GET /api/{module}/ 或 /api/{module}/{path} | 通用代理读写脚本 | 当前持久化设置的公开子树或叶子值 |\n| POST、DELETE /api/{module}/{path} | 同一个通用代理读写脚本 | 单键修改、删除 |\n\n配置资源使用 `/configs/`，持久化接口使用 `/api/`，两种模板正则互不重叠，不依赖执行优先级。各业务项目用现有 argument config 生成器生成 BoxJS JSON。模块的 Mock 规则引用生成文件的下载源；通用读写脚本参数 configURL 引用同一版本资源进行校验。configURL 是代理脚本的模板参数，不是页面参数；页面仅用 module 按约定寻找配置 Mock。\n\n业务主菜单独立于通用设置页，由调用项目提供模块链接；Biliverse 主菜单归 Enhanced。通用 JS 不包含 Enhanced/Global 等目录或字段，Enhanced 已通过包的公开接口接入。\n\n## 一、主菜单只探测配置 Mock\n\n每次进入业务主菜单，用通用 client.probe(module) 并发发送：\n\n```http\nHEAD /configs/Enhanced\nHEAD /configs/Global\n```\n\n这些地址由各模块的 BoxJS Mock 提供。200 才启用入口；非 200、无响应或超时则禁用。HEAD 无正文，不读持久化存储、不执行通用读写脚本，也不证明读写脚本运行正常。\n\n配置 Mock 地址不部署同名在线静态文件，下载源在另一个地址。页面只请求约定的配置 Mock 地址。\n\n## 二、每次真正进入或刷新设置页\n\n先 GET 根据 module 生成的 `/configs/Enhanced`，取得 BoxJS。可使用 settings 数组、单 app 或 apps 订阅。示例：\n\n```json\n[\n  {\n    \"id\": \"@BiliBili.Enhanced.Settings.Home.Top_left\",\n    \"name\": \"顶栏左侧\", \"type\": \"selects\", \"val\": \"mine\",\n    \"items\": [{ \"key\": \"mine\", \"label\": \"我的\" }, { \"key\": \"videoshortcut\", \"label\": \"短视频\" }]\n  },\n  { \"id\": \"@BiliBili.Enhanced.Settings.enabled\", \"name\": \"启用\", \"type\": \"boolean\", \"val\": true }\n]\n```\n\n通用组件由 ID 解析出存储根 BiliBili 和公共子树 Enhanced.Settings，再读取一次：\n\n```http\nGET /api/Enhanced/Settings/\nX-Settings-Client: 1\n```\n\n返回 HTTP 200 和公开字段的持久化覆盖值，例如：\n\n```json\n{ \"Home\": { \"Top_left\": \"videoshortcut\" } }\n```\n\n只返回 BoxJS 声明的字段，不泄露同根下的缓存和其它模块。没有任何覆盖值时返回 `{}`。页面用 BoxJS val 补充未设置字段，并创建新的内存缓存；不使用 localStorage/sessionStorage。返回主菜单不 GET，再次进入重新执行上述两次 GET。刷新当前模块页也重新读取；浏览器前进、后退恢复缓存页面时会重新读取当前 URL 的模块。\n\n只有 `/api/` 固定；其它组织可以使用 `/api/Weather/Preferences/Units`。同模块必须使用一个存储根，并具有模块根以下的公共父路径，才能一次读取设置子树。控件支持 boolean/selects/checkboxes/text/textarea/number，不执行 BoxJS 脚本。\n\n## 三、修改单个键\n\n```http\nPOST /api/Enhanced/Settings/Home/Top_left\nContent-Type: application/json\nX-Settings-Client: 1\n\n\"mine\"\n```\n\n正文就是 JSON 值本身，没有 values 包装。成功返回 HTTP 200：\n\n```json\n{ \"saved\": true }\n```\n\n组件显示“修改成功”，只更新内存中的该键。不会随后 GET 整个模块。非 200（包括 204）或网络错误显示“操作失败”，缓存保留原值，其它控件的未保存输入也保留。\n\n代理执行端运行时读取 BoxJS 校验字段，然后读取最新存储根，通过 util set 修改该键并写回。不会把浏览器的整棵旧缓存覆盖回存储；只修改持久化数据，不修改源码 database.mjs 或 argument 配置。\n\n## 四、删除覆盖值\n\n```http\nDELETE /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n```\n\n没有正文。成功返回 HTTP 200：\n\n```json\n{ \"deleted\": true }\n```\n\n重复删除仍成功。代理通过 util unset 删除单键，保留同级字段、其它模块和缓存；不递归删除空父对象。浏览器显示“删除成功”，移除该键缓存的覆盖值，改用 BoxJS val；不追加 GET。删除覆盖值不等于关闭功能。\n\n## 五、需要时直接查询单键\n\n```http\nGET /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n```\n\n有覆盖值则返回 HTTP 200，正文直接为 `\"mine\"`；无值时 404。默认 GET 不返回 BoxJS 默认值。也支持 HEAD 完整叶子路径：声明过则 200，否则 404；不读取存储。主菜单应 HEAD 配置 Mock 地址，不是持久化叶子探测。\n\n## 通用脚本参数与读取时机\n\n### BoxJS 页面属性\n\n本地 dev 优化：WebView 使用原生对象访问，不再打包 util Lodash。代理每次仍从自己的 configURL 下载配置并校验字段，只提取存储根、字段路径、类型、默认值和枚举约束；不处理标题、描述、图标、占位文字、rows/autoGrow 等展示属性。展示属性由 WebView 校验，非法展示属性不会影响默认代理对合法字段的访问。自定义 GET resolver 仍收到完整 ModuleDefinition，保留其既有契约。HTTP 路径、状态码、访问范围与存储读写次数不变，未取消代理端配置请求。\n\n配置可以是 settings 数组、单个 app 或 apps 订阅。字段的 name/val/type/desc/items 决定控件，placeholder 设置输入提示；textarea 保持字符串类型，rows 为正整数基础行数，autoGrow 为布尔值。首次显示、输入及删除覆盖值后都会按内容调整高度。\n\n如果模块字段只属于一个 app，definition.metadata 保留它的 id/name/author/repo/script/icon/icons/desc/descs/description。页面使用 name 作为显示标题，author/desc/descs 作为纯文本，repo 作为项目链接。模块路由和存储根仍由字段的 @根.模块.路径 决定，不能由 app.id/name 推断。多个 app 分别声明同一模块的字段时合并字段，不任意选择一个 app 的展示元数据。\n\nicon 优先于 icons；原版 icons[0] 是透明版，icons[1] 是彩色版，并非亮暗顺序。默认使用彩色版，只有一个图标时使用该图标。页面图片与链接仅接受 HTTP(S) 或同源相对地址。script 只保留元数据，不请求或执行；不渲染 desc_html/descs_html，不使用 keys 推导额外可读写字段。\n\n| 参数或数据 | 来源与作用 |\n| --- | --- |\n| origin | 调用方的 HTTPS 页面来源，不带路径 |\n| configURL | 传给 SettingsHandler 的 HTTPS BoxJS 下载地址；类内部每次通过 util fetch 加载，按请求中的 module 选择字段 |\n| storageKey | 从 BoxJS 的 @根键.模块.路径 提取，不通过 header 传递 |\n| requestHeader | 默认 X-Settings-Client，值为 1；同源页面标记，不是认证凭据 |\n| resolveSettings(stored, definition) | 可选 GET 有效配置解析器，返回完整 database 形状的对象；不参与 HEAD/POST/DELETE |\n\n独立打包脚本通过 argument 的 origin/configURL 接收地址，用 util fetch 下载 BoxJS，用 util Storage/Lodash 读写。不同模块引用同一份脚本，分别配置自己的 /api/ 正则与校验 BoxJS 地址；/configs/ Mock 不经过此脚本。原生配置 Mock 与脚本应使用同一版本的配置源；代理自己的 Mock 资源缓存需要按代理机制更新。\n\n0.2.0 的代理调用方式为 `new SettingsHandler({ origin, configURL }).handle(request)`。配置下载、HTTP 200 检查、JSON 解析及字段归一化均由这个 class 完成，调用方不再提供 loadConfig 回调。网络异常、非 200、非法 JSON 或模块配置解析失败统一返回 502；不会继续读写持久化存储。0.1.0 使用旧工厂函数；HTTP 路径、方法和返回契约不变。\n\n每次 GET 持久化设置读根一次。每次 POST/DELETE 写入前重新读根，再单键修改、写回一次。浏览器缓存不触发额外 GET，但不能取消代理端保证保留其它数据所需的读改写。不同代理脚本同时写同一根键不具备事务隔离保证。\n\nresolveSettings 可由模块按已有规则合并 database、argument、持久化值。默认不传时只读持久化值，页面使用 BoxJS 默认值补缺。本包不自动修改模块现有配置优先级；删除后不调用 resolver，下次进入/刷新才重新读取。\n\n## 错误与限制\n\n| 状态码 | 持久化接口语义 |\n| --- | --- |\n| 200 | HEAD 路径受支持；GET 返回值或子树；POST/DELETE 操作成功 |\n| 400 | 路径非法、JSON 无法解析或值不满足 BoxJS 类型/枚举约束 |\n| 403 | 缺少页面标记头，或请求 Origin 与代理配置不符 |\n| 404 | 路径未声明；或 GET 叶子尚无持久化值 |\n| 405 | 对子树执行 POST/DELETE，或使用不支持的方法 |\n| 413 | POST 正文超过 65536 个 UTF-16 code units |\n| 415 | POST Content-Type 不是 application/json |\n| 500 | 持久化写入或代理执行失败 |\n| 502 | BoxJS 配置源加载、解析或模块定义校验失败 |\n\nGET 子树无覆盖值返回 200 和空对象，GET 叶子无覆盖值返回 404；两者不同。HEAD 成功不代表已有值。POST 字符串上限 2048，选择项与数组项按 BoxJS 校验；不接受 null 或对象作为叶子写入值。持久化响应 no-store；HEAD 始终无正文。配置资源由原生 Mock 管理，其失败响应格式由代理或原站决定，不能套用持久化接口的 JSON 错误结构。\n\nGitHub main/dev 分别绑定 Apifox 同名分支，JSON 路径为 apifox/preference-panes.apifox.json。提交 JSON 后仍需客户端执行数据源导入，并按分支回读确认结果。npm/GitHub Packages 未发布，Biliverse 消费端本轮未迁移。\n",
+                "description": "## 接口用途\n\n主菜单并发探测。模块的原生 BoxJS Mock 返回 200 才启用入口，不读取持久化设置。该路径没有线上静态文件。\n\n## 请求契约\n\n`HEAD /configs/{module}`\n\nmodule 是必填路径参数，必须属于插件安装配置中的模块。路径参数不预填业务示例值；具体取值由接入项目决定。该资源由代理 Mock 提供，不需要 X-Settings-Client 请求头。\n\n请求没有正文。\n\n## 调用流程与具体示例\n\n# PreferencePanes 0.3.0 接口契约\n\n前端负责 BoxJS 解析、控件生成和字段输入校验。API 只桥接安装配置指定的持久化根与模块，不下载 BoxJS，不校验字段声明、枚举或控件类型。\n\n## 路径和参数\n\n| 方法 | 路径 | 行为 |\n| --- | --- | --- |\n| GET | /settings/{module} | 同一个 WebView 页面，按路径选择模块 |\n| HEAD、GET | /configs/{module} | 模块配置 Mock：探测、加载 BoxJS |\n| HEAD、GET、POST、DELETE | /api/{module}/ | 探测路由、读取、替换或删除整个模块 |\n| HEAD、GET、POST、DELETE | /api/{module}/{path} | 探测路由、读取、替换或删除任意键或子树 |\n| GET、DELETE | /api/{module}/Caches | 查看、清空模块缓存，使用相同的通用存储处理器 |\n\nmodule 和 path 使用 Apifox 路径参数，不预填业务示例。path 以 / 分隔层级，每段独立编码；不能把分隔斜线编码为 %2F。片段允许字母、数字、下划线、连字符，拒绝空片段及 __proto__/prototype/constructor。这些是路径结构校验，不是 BoxJS 字段校验。API 接受不存在于 BoxJS 中的新键。\n\n## 安装配置决定存储映射\n\n代理入口构造：\n\n~~~js\nconst handler = new SettingsHandler({\n  origin: \"https://biliverse.github.io\",\n  storageKey: \"BiliBili\",\n  module: \"Enhanced\"\n});\nconst response = await handler.handle($request);\n~~~\n\n此处由已安装插件提供可信配置，不经浏览器 header/body 提供。API 从 /api/ 后第一段确认模块，再将路径映射到固定存储根：\n\n~~~text\n/api/Enhanced/Settings/Home/Top_left → BiliBili.Enhanced.Settings.Home.Top_left\n/api/Enhanced/Caches                → BiliBili.Enhanced.Caches\n/api/Enhanced/                      → BiliBili.Enhanced\n~~~\n\nEnhanced 处理器不能访问 BiliBili.Global；重置 Enhanced 也保留 Global。类不接受 configURL、loadConfig 或 resolveSettings。通用独立代理脚本的 argument 为 origin、storageKey、module。配置 Mock 的实际下载源仍由模块模板指定，与 API 无关。\n\n## 前端读取与缓存\n\n每次进入主菜单，并发 HEAD /configs/{module}，仅 200 启用按钮；此时不 GET 设置。配置 Mock 地址不部署同名线上文件，静态下载源另设路径。\n\n每次打开、再次进入或刷新设置页面：\n1. GET /configs/{module} 一次，由前端解析 BoxJS、生成控件和默认值。\n2. GET BoxJS 字段公共子树一次，例如 /api/Enhanced/Settings/。\n3. 在当前页面建立内存缓存。若子树缺失返回 404，则用空覆盖值加 BoxJS 默认值绘制；兼容旧存储中以 JSON 字符串编码的设置子树。\n\n保存或删除只按目标路径发送一次请求，根据是否返回 200 显示短暂通知；失败保留缓存及未保存输入。成功后仅更新内存，不 GET 整个模块。仅前端校验控件类型和选项；直接调用 API 可写入任何合法 JSON 值。\n\n## 读写示例\n\n~~~http\nGET /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n已有值返回 200，正文是该值本身。GET 父路径返回全部子树，包括未在页面展示的键；不存在返回 404。不会自动合并 BoxJS 默认值。\n\n~~~http\nPOST /api/Enhanced/Settings/Home/Top_left\nContent-Type: application/json\nX-Settings-Client: 1\n\n\"mine\"\n~~~\n\n正文允许字符串、数字、布尔值、null、任意数组和对象；没有 values 包装。POST 替换指定位置的值而非合并对象。未存在的父节点会创建，JSON 数组元素可通过数字路径访问。路径之外的数据保持不变。\n\n~~~json\n{ \"saved\": true }\n~~~\n\n~~~http\nDELETE /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n删除键或整棵子树，不存在时也返回 200。前端删除设置覆盖值后显示当前 BoxJS 默认值。\n\n~~~json\n{ \"deleted\": true }\n~~~\n\n## Caches 与模块重置\n\n“查看 Caches”按需 GET /api/{module}/Caches，显示全部缓存 JSON；404 表示暂无缓存。再次点击刷新才重新读取，不在进入页面时自动下载缓存。\n\n“清空 Caches”确认后 DELETE /api/{module}/Caches，仅删除该节点，保留 Settings 及其它模块。成功后清空当前缓存视图，不追加 GET。\n\n“重置模块”确认后 DELETE /api/{module}/，删除模块的 Settings、Caches 和其它全部持久化键，保留同根的其它模块。成功后清除页面覆盖值、使用已加载 BoxJS 的默认值，隐藏旧缓存内容，不重新读取设置。再次进入页面时按正常打开流程读取。\n\n~~~http\nDELETE /api/Enhanced/\nX-Settings-Client: 1\n~~~\n\n## 代理存储操作\n\nHEAD 仅确认本处理器接管合法模块路径，不读取存储，也不证明已有值。GET 读取一次根；POST/DELETE 写入前读取最新根，使用 util Lodash 修改对应节点并写回一次。API 不发送网络请求。\n\n历史 JSON 字符串中间节点会在路径遍历时解码；GET 直接指向字符串叶子时保留字符串。无法继续遍历标量父节点返回 500，不悄悄覆盖原数据。DELETE 数组元素采用删除键语义，不移动其它索引。\n\nAPI 响应带 Cache-Control: no-store。默认需要 X-Settings-Client: 1，Origin 存在时须与安装来源一致；该请求头是页面标记，不是认证凭据。POST 正文上限为 65536 个 UTF-16 code units。多个代理脚本同时写同一根仍没有事务隔离保证。\n\n| 状态码 | 含义 |\n| --- | --- |\n| 200 | 探测或读写成功；HEAD 无正文 |\n| 400 | 路径或 JSON 正文格式无效 |\n| 403 | 缺少页面标记，或请求来源不符 |\n| 404 | 模块不由当前处理器接管，或 GET 目标不存在 |\n| 405 | 不支持的 HTTP 方法 |\n| 413 | POST 正文过长 |\n| 415 | POST 正文不是 application/json |\n| 500 | 存储读取、路径遍历或写入失败 |\n\nAPI 不再返回 BoxJS 配置加载错误 502。配置 Mock 失败的格式仍由代理或原站决定。\n\n## BoxJS 仅用于 WebView\n\n支持 settings 数组、单 app 和 apps 订阅。字段 ID 仍使用 @根.模块.路径；名称、type、val、items、desc 生成控件，placeholder/rows/autoGrow 控制文本输入展示。app 元数据用于页面标题、说明和图标，script 只保留不执行；icons[0]/icons[1] 是透明/彩色变体，不是亮暗顺序。\n\n浏览器解析的根名仅为配置信息；代理不会因此改变固定 storageKey。插件作者应让 BoxJS 路径与安装映射一致。设置默认值、类型与枚举都由 WebView 处理，API 本身与 BoxJS 无关。\n\nGitHub main/dev 分别绑定 Apifox 同名分支。修改 apifox/preference-panes.apifox.json 后由已绑定数据源导入，并按分支回读验证。\n",
                 "parameters": {
                   "path": [
                     {
@@ -214,7 +214,7 @@
                   {
                     "id": "pp-pp-config-head-404",
                     "code": 404,
-                    "name": "未知字段、无覆盖值或模块未启用",
+                    "name": "存储路径不存在、非接管模块或 Mock 不可用",
                     "headers": [],
                     "contentType": "noContent",
                     "jsonSchema": {},
@@ -254,7 +254,7 @@
                 ],
                 "operationId": "preference_panes_pp-config-get",
                 "sourceUrl": "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/guide.md",
-                "description": "## 接口用途\n\n每次进入或刷新模块页先取一次配置，实时生成控件。从 ID 提取 storageKey，不使用浏览器传来的存储根键。\n\n## 请求契约\n\n`GET /configs/{module}`\n\nmodule 是必填路径参数，与配置文件中字段所属模块一致。路径参数不预填业务示例值；具体取值由接入项目决定。该资源由代理 Mock 提供，不需要 X-Settings-Client 请求头。\n\n请求没有正文。\n\n## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n```json\n[\n  {\n    \"id\": \"@BiliBili.Enhanced.Settings.Home.Top_left\",\n    \"name\": \"顶栏左侧\",\n    \"type\": \"selects\",\n    \"val\": \"mine\",\n    \"items\": [\n      {\n        \"key\": \"mine\",\n        \"label\": \"我的\"\n      },\n      {\n        \"key\": \"videoshortcut\",\n        \"label\": \"短视频\"\n      }\n    ]\n  },\n  {\n    \"id\": \"@BiliBili.Enhanced.Settings.enabled\",\n    \"name\": \"启用\",\n    \"type\": \"boolean\",\n    \"val\": true\n  }\n]\n```\n\n## 调用流程与具体示例\n\n# PreferencePanes：从入口探测到单键读写\n\n当前已发布版本为 0.2.0，包含 SettingsHandler class 和 BoxJS 元数据兼容增强。下面的 Enhanced 只是路径示例，example.org 没有部署接口；各项目复用相同代码，从自己的 BoxJS JSON 生成设置界面。\n\n## 通用路径契约\n\n| 方法 | 相对路径定义 | 用途 |\n| --- | --- | --- |\n| GET | `/settings/{module}` | 通用 HTML 页面，按路径中的模块生成界面 |\n| HEAD、GET | `/configs/{module}` | 探测配置 Mock、读取 BoxJS JSON |\n| HEAD、GET | `/api/{module}/` | 探测读写路由、读取模块公开子树 |\n| HEAD、GET | `/api/{module}/{path}` | 探测、读取模块内的键或子树 |\n| POST、DELETE | `/api/{module}/{path}` | 修改、删除声明的单个键 |\n\n`module` 是动态模块标识；`path` 是模块内的相对 database 路径，允许多级，用 `/` 分隔。`Settings/Home/Top_left` 只是 path 示例，Settings、Home 和键名都不固定。路径逐段编码，不能把分隔用的 `/` 整体编码为 `%2F`。页面、配置资源、持久化读写使用同一个 module；不是三个各自指定的模块参数，也不使用 query 参数。\n\n### 在 Apifox 中调试\n\n接口路径保留 Apifox 的 `{module}`、`{path}` 路径参数，不使用固定业务 URL，也不把 `*` 当作真实请求路径。调试前在 Path 参数区填写目标模块与模块内路径；参数值和 POST 正文默认留空，不预置任何项目或待写入值。服务地址由使用者的环境配置提供。\n\nPOST 的 Body 为原始 JSON，须按目标字段类型填写字符串、数字、布尔值或数组。响应 Schema 描述通用结构；下面各节的实际 URL、请求值、返回对象只是文档中的示例，不会作为调试请求或 Mock 的默认数据。路径每段仅允许英文字母、数字、下划线和连字符，不接受空段、点号或 __proto__/prototype/constructor。\n\n例如 module=Enhanced、path=Settings/Home/Top_left 时，实际请求才是 `/api/Enhanced/Settings/Home/Top_left`。以下具体 URL、BoxJS 字段和返回值均为使用示例，不能当作通用接口的固定路径或枚举。\n\n## 页面通过 module 选择配置\n\n```http\nGET /settings/Enhanced\n```\n\n通用页面从 `/settings/{module}` 路径读取模块标识，不读取 module 或 config 查询参数。渲染器按固定约定 GET `/configs/Enhanced`，读取返回的 BoxJS JSON，再动态生成设置项。改为 `/settings/Global` 就 GET `/configs/Global`，不修改 HTML。\n\nmodule 必须与 BoxJS ID `@BiliBili.Enhanced.Settings.…` 中的 Enhanced 一致；它也对应持久化 `/api/` 后第一段。实际 BoxJS 文件地址由模块模板的 Mock 规则指定。页面路径只允许一个非空模块段，可带结尾斜线；模块名只允许英文字母、数字、下划线、连字符，禁止 __proto__/prototype/constructor。缺失模块段、多余路径段或非法模块名在页面显示错误，不发送配置或存储请求。\n\n| 请求 | 响应方 | 内容 |\n| --- | --- | --- |\n| GET /settings/{module} | 公共 HTML Mock | 同一份通用设置页 |\n| HEAD、GET /configs/{module} | 对应模块的配置 Mock | 配置可用性、BoxJS 静态 JSON |\n| GET /api/{module}/ 或 /api/{module}/{path} | 通用代理读写脚本 | 当前持久化设置的公开子树或叶子值 |\n| POST、DELETE /api/{module}/{path} | 同一个通用代理读写脚本 | 单键修改、删除 |\n\n配置资源使用 `/configs/`，持久化接口使用 `/api/`，两种模板正则互不重叠，不依赖执行优先级。各业务项目用现有 argument config 生成器生成 BoxJS JSON。模块的 Mock 规则引用生成文件的下载源；通用读写脚本参数 configURL 引用同一版本资源进行校验。configURL 是代理脚本的模板参数，不是页面参数；页面仅用 module 按约定寻找配置 Mock。\n\n业务主菜单独立于通用设置页，由调用项目提供模块链接；Biliverse 主菜单归 Enhanced。通用 JS 不包含 Enhanced/Global 等目录或字段，Enhanced 已通过包的公开接口接入。\n\n## 一、主菜单只探测配置 Mock\n\n每次进入业务主菜单，用通用 client.probe(module) 并发发送：\n\n```http\nHEAD /configs/Enhanced\nHEAD /configs/Global\n```\n\n这些地址由各模块的 BoxJS Mock 提供。200 才启用入口；非 200、无响应或超时则禁用。HEAD 无正文，不读持久化存储、不执行通用读写脚本，也不证明读写脚本运行正常。\n\n配置 Mock 地址不部署同名在线静态文件，下载源在另一个地址。页面只请求约定的配置 Mock 地址。\n\n## 二、每次真正进入或刷新设置页\n\n先 GET 根据 module 生成的 `/configs/Enhanced`，取得 BoxJS。可使用 settings 数组、单 app 或 apps 订阅。示例：\n\n```json\n[\n  {\n    \"id\": \"@BiliBili.Enhanced.Settings.Home.Top_left\",\n    \"name\": \"顶栏左侧\", \"type\": \"selects\", \"val\": \"mine\",\n    \"items\": [{ \"key\": \"mine\", \"label\": \"我的\" }, { \"key\": \"videoshortcut\", \"label\": \"短视频\" }]\n  },\n  { \"id\": \"@BiliBili.Enhanced.Settings.enabled\", \"name\": \"启用\", \"type\": \"boolean\", \"val\": true }\n]\n```\n\n通用组件由 ID 解析出存储根 BiliBili 和公共子树 Enhanced.Settings，再读取一次：\n\n```http\nGET /api/Enhanced/Settings/\nX-Settings-Client: 1\n```\n\n返回 HTTP 200 和公开字段的持久化覆盖值，例如：\n\n```json\n{ \"Home\": { \"Top_left\": \"videoshortcut\" } }\n```\n\n只返回 BoxJS 声明的字段，不泄露同根下的缓存和其它模块。没有任何覆盖值时返回 `{}`。页面用 BoxJS val 补充未设置字段，并创建新的内存缓存；不使用 localStorage/sessionStorage。返回主菜单不 GET，再次进入重新执行上述两次 GET。刷新当前模块页也重新读取；浏览器前进、后退恢复缓存页面时会重新读取当前 URL 的模块。\n\n只有 `/api/` 固定；其它组织可以使用 `/api/Weather/Preferences/Units`。同模块必须使用一个存储根，并具有模块根以下的公共父路径，才能一次读取设置子树。控件支持 boolean/selects/checkboxes/text/textarea/number，不执行 BoxJS 脚本。\n\n## 三、修改单个键\n\n```http\nPOST /api/Enhanced/Settings/Home/Top_left\nContent-Type: application/json\nX-Settings-Client: 1\n\n\"mine\"\n```\n\n正文就是 JSON 值本身，没有 values 包装。成功返回 HTTP 200：\n\n```json\n{ \"saved\": true }\n```\n\n组件显示“修改成功”，只更新内存中的该键。不会随后 GET 整个模块。非 200（包括 204）或网络错误显示“操作失败”，缓存保留原值，其它控件的未保存输入也保留。\n\n代理执行端运行时读取 BoxJS 校验字段，然后读取最新存储根，通过 util set 修改该键并写回。不会把浏览器的整棵旧缓存覆盖回存储；只修改持久化数据，不修改源码 database.mjs 或 argument 配置。\n\n## 四、删除覆盖值\n\n```http\nDELETE /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n```\n\n没有正文。成功返回 HTTP 200：\n\n```json\n{ \"deleted\": true }\n```\n\n重复删除仍成功。代理通过 util unset 删除单键，保留同级字段、其它模块和缓存；不递归删除空父对象。浏览器显示“删除成功”，移除该键缓存的覆盖值，改用 BoxJS val；不追加 GET。删除覆盖值不等于关闭功能。\n\n## 五、需要时直接查询单键\n\n```http\nGET /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n```\n\n有覆盖值则返回 HTTP 200，正文直接为 `\"mine\"`；无值时 404。默认 GET 不返回 BoxJS 默认值。也支持 HEAD 完整叶子路径：声明过则 200，否则 404；不读取存储。主菜单应 HEAD 配置 Mock 地址，不是持久化叶子探测。\n\n## 通用脚本参数与读取时机\n\n### BoxJS 页面属性\n\n本地 dev 优化：WebView 使用原生对象访问，不再打包 util Lodash。代理每次仍从自己的 configURL 下载配置并校验字段，只提取存储根、字段路径、类型、默认值和枚举约束；不处理标题、描述、图标、占位文字、rows/autoGrow 等展示属性。展示属性由 WebView 校验，非法展示属性不会影响默认代理对合法字段的访问。自定义 GET resolver 仍收到完整 ModuleDefinition，保留其既有契约。HTTP 路径、状态码、访问范围与存储读写次数不变，未取消代理端配置请求。\n\n配置可以是 settings 数组、单个 app 或 apps 订阅。字段的 name/val/type/desc/items 决定控件，placeholder 设置输入提示；textarea 保持字符串类型，rows 为正整数基础行数，autoGrow 为布尔值。首次显示、输入及删除覆盖值后都会按内容调整高度。\n\n如果模块字段只属于一个 app，definition.metadata 保留它的 id/name/author/repo/script/icon/icons/desc/descs/description。页面使用 name 作为显示标题，author/desc/descs 作为纯文本，repo 作为项目链接。模块路由和存储根仍由字段的 @根.模块.路径 决定，不能由 app.id/name 推断。多个 app 分别声明同一模块的字段时合并字段，不任意选择一个 app 的展示元数据。\n\nicon 优先于 icons；原版 icons[0] 是透明版，icons[1] 是彩色版，并非亮暗顺序。默认使用彩色版，只有一个图标时使用该图标。页面图片与链接仅接受 HTTP(S) 或同源相对地址。script 只保留元数据，不请求或执行；不渲染 desc_html/descs_html，不使用 keys 推导额外可读写字段。\n\n| 参数或数据 | 来源与作用 |\n| --- | --- |\n| origin | 调用方的 HTTPS 页面来源，不带路径 |\n| configURL | 传给 SettingsHandler 的 HTTPS BoxJS 下载地址；类内部每次通过 util fetch 加载，按请求中的 module 选择字段 |\n| storageKey | 从 BoxJS 的 @根键.模块.路径 提取，不通过 header 传递 |\n| requestHeader | 默认 X-Settings-Client，值为 1；同源页面标记，不是认证凭据 |\n| resolveSettings(stored, definition) | 可选 GET 有效配置解析器，返回完整 database 形状的对象；不参与 HEAD/POST/DELETE |\n\n独立打包脚本通过 argument 的 origin/configURL 接收地址，用 util fetch 下载 BoxJS，用 util Storage/Lodash 读写。不同模块引用同一份脚本，分别配置自己的 /api/ 正则与校验 BoxJS 地址；/configs/ Mock 不经过此脚本。原生配置 Mock 与脚本应使用同一版本的配置源；代理自己的 Mock 资源缓存需要按代理机制更新。\n\n0.2.0 的代理调用方式为 `new SettingsHandler({ origin, configURL }).handle(request)`。配置下载、HTTP 200 检查、JSON 解析及字段归一化均由这个 class 完成，调用方不再提供 loadConfig 回调。网络异常、非 200、非法 JSON 或模块配置解析失败统一返回 502；不会继续读写持久化存储。0.1.0 使用旧工厂函数；HTTP 路径、方法和返回契约不变。\n\n每次 GET 持久化设置读根一次。每次 POST/DELETE 写入前重新读根，再单键修改、写回一次。浏览器缓存不触发额外 GET，但不能取消代理端保证保留其它数据所需的读改写。不同代理脚本同时写同一根键不具备事务隔离保证。\n\nresolveSettings 可由模块按已有规则合并 database、argument、持久化值。默认不传时只读持久化值，页面使用 BoxJS 默认值补缺。本包不自动修改模块现有配置优先级；删除后不调用 resolver，下次进入/刷新才重新读取。\n\n## 错误与限制\n\n| 状态码 | 持久化接口语义 |\n| --- | --- |\n| 200 | HEAD 路径受支持；GET 返回值或子树；POST/DELETE 操作成功 |\n| 400 | 路径非法、JSON 无法解析或值不满足 BoxJS 类型/枚举约束 |\n| 403 | 缺少页面标记头，或请求 Origin 与代理配置不符 |\n| 404 | 路径未声明；或 GET 叶子尚无持久化值 |\n| 405 | 对子树执行 POST/DELETE，或使用不支持的方法 |\n| 413 | POST 正文超过 65536 个 UTF-16 code units |\n| 415 | POST Content-Type 不是 application/json |\n| 500 | 持久化写入或代理执行失败 |\n| 502 | BoxJS 配置源加载、解析或模块定义校验失败 |\n\nGET 子树无覆盖值返回 200 和空对象，GET 叶子无覆盖值返回 404；两者不同。HEAD 成功不代表已有值。POST 字符串上限 2048，选择项与数组项按 BoxJS 校验；不接受 null 或对象作为叶子写入值。持久化响应 no-store；HEAD 始终无正文。配置资源由原生 Mock 管理，其失败响应格式由代理或原站决定，不能套用持久化接口的 JSON 错误结构。\n\nGitHub main/dev 分别绑定 Apifox 同名分支，JSON 路径为 apifox/preference-panes.apifox.json。提交 JSON 后仍需客户端执行数据源导入，并按分支回读确认结果。npm/GitHub Packages 未发布，Biliverse 消费端本轮未迁移。\n",
+                "description": "## 接口用途\n\n每次进入或刷新模块页先取一次配置，实时生成控件。从 ID 提取 storageKey，不使用浏览器传来的存储根键。\n\n## 请求契约\n\n`GET /configs/{module}`\n\nmodule 是必填路径参数，必须属于插件安装配置中的模块。路径参数不预填业务示例值；具体取值由接入项目决定。该资源由代理 Mock 提供，不需要 X-Settings-Client 请求头。\n\n请求没有正文。\n\n## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n```json\n[\n  {\n    \"id\": \"@BiliBili.Enhanced.Settings.Home.Top_left\",\n    \"name\": \"顶栏左侧\",\n    \"type\": \"selects\",\n    \"val\": \"mine\",\n    \"items\": [\n      {\n        \"key\": \"mine\",\n        \"label\": \"我的\"\n      },\n      {\n        \"key\": \"videoshortcut\",\n        \"label\": \"短视频\"\n      }\n    ]\n  },\n  {\n    \"id\": \"@BiliBili.Enhanced.Settings.enabled\",\n    \"name\": \"启用\",\n    \"type\": \"boolean\",\n    \"val\": true\n  }\n]\n```\n\n## 调用流程与具体示例\n\n# PreferencePanes 0.3.0 接口契约\n\n前端负责 BoxJS 解析、控件生成和字段输入校验。API 只桥接安装配置指定的持久化根与模块，不下载 BoxJS，不校验字段声明、枚举或控件类型。\n\n## 路径和参数\n\n| 方法 | 路径 | 行为 |\n| --- | --- | --- |\n| GET | /settings/{module} | 同一个 WebView 页面，按路径选择模块 |\n| HEAD、GET | /configs/{module} | 模块配置 Mock：探测、加载 BoxJS |\n| HEAD、GET、POST、DELETE | /api/{module}/ | 探测路由、读取、替换或删除整个模块 |\n| HEAD、GET、POST、DELETE | /api/{module}/{path} | 探测路由、读取、替换或删除任意键或子树 |\n| GET、DELETE | /api/{module}/Caches | 查看、清空模块缓存，使用相同的通用存储处理器 |\n\nmodule 和 path 使用 Apifox 路径参数，不预填业务示例。path 以 / 分隔层级，每段独立编码；不能把分隔斜线编码为 %2F。片段允许字母、数字、下划线、连字符，拒绝空片段及 __proto__/prototype/constructor。这些是路径结构校验，不是 BoxJS 字段校验。API 接受不存在于 BoxJS 中的新键。\n\n## 安装配置决定存储映射\n\n代理入口构造：\n\n~~~js\nconst handler = new SettingsHandler({\n  origin: \"https://biliverse.github.io\",\n  storageKey: \"BiliBili\",\n  module: \"Enhanced\"\n});\nconst response = await handler.handle($request);\n~~~\n\n此处由已安装插件提供可信配置，不经浏览器 header/body 提供。API 从 /api/ 后第一段确认模块，再将路径映射到固定存储根：\n\n~~~text\n/api/Enhanced/Settings/Home/Top_left → BiliBili.Enhanced.Settings.Home.Top_left\n/api/Enhanced/Caches                → BiliBili.Enhanced.Caches\n/api/Enhanced/                      → BiliBili.Enhanced\n~~~\n\nEnhanced 处理器不能访问 BiliBili.Global；重置 Enhanced 也保留 Global。类不接受 configURL、loadConfig 或 resolveSettings。通用独立代理脚本的 argument 为 origin、storageKey、module。配置 Mock 的实际下载源仍由模块模板指定，与 API 无关。\n\n## 前端读取与缓存\n\n每次进入主菜单，并发 HEAD /configs/{module}，仅 200 启用按钮；此时不 GET 设置。配置 Mock 地址不部署同名线上文件，静态下载源另设路径。\n\n每次打开、再次进入或刷新设置页面：\n1. GET /configs/{module} 一次，由前端解析 BoxJS、生成控件和默认值。\n2. GET BoxJS 字段公共子树一次，例如 /api/Enhanced/Settings/。\n3. 在当前页面建立内存缓存。若子树缺失返回 404，则用空覆盖值加 BoxJS 默认值绘制；兼容旧存储中以 JSON 字符串编码的设置子树。\n\n保存或删除只按目标路径发送一次请求，根据是否返回 200 显示短暂通知；失败保留缓存及未保存输入。成功后仅更新内存，不 GET 整个模块。仅前端校验控件类型和选项；直接调用 API 可写入任何合法 JSON 值。\n\n## 读写示例\n\n~~~http\nGET /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n已有值返回 200，正文是该值本身。GET 父路径返回全部子树，包括未在页面展示的键；不存在返回 404。不会自动合并 BoxJS 默认值。\n\n~~~http\nPOST /api/Enhanced/Settings/Home/Top_left\nContent-Type: application/json\nX-Settings-Client: 1\n\n\"mine\"\n~~~\n\n正文允许字符串、数字、布尔值、null、任意数组和对象；没有 values 包装。POST 替换指定位置的值而非合并对象。未存在的父节点会创建，JSON 数组元素可通过数字路径访问。路径之外的数据保持不变。\n\n~~~json\n{ \"saved\": true }\n~~~\n\n~~~http\nDELETE /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n删除键或整棵子树，不存在时也返回 200。前端删除设置覆盖值后显示当前 BoxJS 默认值。\n\n~~~json\n{ \"deleted\": true }\n~~~\n\n## Caches 与模块重置\n\n“查看 Caches”按需 GET /api/{module}/Caches，显示全部缓存 JSON；404 表示暂无缓存。再次点击刷新才重新读取，不在进入页面时自动下载缓存。\n\n“清空 Caches”确认后 DELETE /api/{module}/Caches，仅删除该节点，保留 Settings 及其它模块。成功后清空当前缓存视图，不追加 GET。\n\n“重置模块”确认后 DELETE /api/{module}/，删除模块的 Settings、Caches 和其它全部持久化键，保留同根的其它模块。成功后清除页面覆盖值、使用已加载 BoxJS 的默认值，隐藏旧缓存内容，不重新读取设置。再次进入页面时按正常打开流程读取。\n\n~~~http\nDELETE /api/Enhanced/\nX-Settings-Client: 1\n~~~\n\n## 代理存储操作\n\nHEAD 仅确认本处理器接管合法模块路径，不读取存储，也不证明已有值。GET 读取一次根；POST/DELETE 写入前读取最新根，使用 util Lodash 修改对应节点并写回一次。API 不发送网络请求。\n\n历史 JSON 字符串中间节点会在路径遍历时解码；GET 直接指向字符串叶子时保留字符串。无法继续遍历标量父节点返回 500，不悄悄覆盖原数据。DELETE 数组元素采用删除键语义，不移动其它索引。\n\nAPI 响应带 Cache-Control: no-store。默认需要 X-Settings-Client: 1，Origin 存在时须与安装来源一致；该请求头是页面标记，不是认证凭据。POST 正文上限为 65536 个 UTF-16 code units。多个代理脚本同时写同一根仍没有事务隔离保证。\n\n| 状态码 | 含义 |\n| --- | --- |\n| 200 | 探测或读写成功；HEAD 无正文 |\n| 400 | 路径或 JSON 正文格式无效 |\n| 403 | 缺少页面标记，或请求来源不符 |\n| 404 | 模块不由当前处理器接管，或 GET 目标不存在 |\n| 405 | 不支持的 HTTP 方法 |\n| 413 | POST 正文过长 |\n| 415 | POST 正文不是 application/json |\n| 500 | 存储读取、路径遍历或写入失败 |\n\nAPI 不再返回 BoxJS 配置加载错误 502。配置 Mock 失败的格式仍由代理或原站决定。\n\n## BoxJS 仅用于 WebView\n\n支持 settings 数组、单 app 和 apps 订阅。字段 ID 仍使用 @根.模块.路径；名称、type、val、items、desc 生成控件，placeholder/rows/autoGrow 控制文本输入展示。app 元数据用于页面标题、说明和图标，script 只保留不执行；icons[0]/icons[1] 是透明/彩色变体，不是亮暗顺序。\n\n浏览器解析的根名仅为配置信息；代理不会因此改变固定 storageKey。插件作者应让 BoxJS 路径与安装映射一致。设置默认值、类型与枚举都由 WebView 处理，API 本身与 BoxJS 无关。\n\nGitHub main/dev 分别绑定 Apifox 同名分支。修改 apifox/preference-panes.apifox.json 后由已绑定数据源导入，并按分支回读验证。\n",
                 "parameters": {
                   "path": [
                     {
@@ -732,7 +732,7 @@
                   {
                     "id": "pp-pp-config-get-404",
                     "code": 404,
-                    "name": "未知字段、无覆盖值或模块未启用",
+                    "name": "存储路径不存在、非接管模块或 Mock 不可用",
                     "headers": [],
                     "contentType": "html",
                     "jsonSchema": {},
@@ -774,7 +774,7 @@
           "inheritPostProcessors": {},
           "items": [
             {
-              "name": "读取模块公开子树",
+              "name": "读取模块全部数据",
               "api": {
                 "id": "pp-subtree-get",
                 "method": "get",
@@ -789,7 +789,7 @@
                 ],
                 "operationId": "preference_panes_pp-subtree-get",
                 "sourceUrl": "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/guide.md",
-                "description": "## 接口用途\n\n读取模块根下已声明字段的持久化覆盖值；无覆盖值返回空对象。页面通常通过 /api/{module}/{path} 读取 BoxJS 计算出的公共子树，不要求子树名为 Settings。\n\n## 请求契约\n\n`GET /api/{module}/`\n\nmodule 是必填路径参数，与配置文件中字段所属模块一致。路径参数不预填业务示例值；具体取值由接入项目决定。请求需携带 X-Settings-Client: 1；该标记不是认证凭据。\n\n请求没有正文。\n\n## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n```json\n{\n  \"Settings\": {\n    \"Home\": {\n      \"Top_left\": \"videoshortcut\"\n    }\n  }\n}\n```\n\n## 调用流程与具体示例\n\n# PreferencePanes：从入口探测到单键读写\n\n当前已发布版本为 0.2.0，包含 SettingsHandler class 和 BoxJS 元数据兼容增强。下面的 Enhanced 只是路径示例，example.org 没有部署接口；各项目复用相同代码，从自己的 BoxJS JSON 生成设置界面。\n\n## 通用路径契约\n\n| 方法 | 相对路径定义 | 用途 |\n| --- | --- | --- |\n| GET | `/settings/{module}` | 通用 HTML 页面，按路径中的模块生成界面 |\n| HEAD、GET | `/configs/{module}` | 探测配置 Mock、读取 BoxJS JSON |\n| HEAD、GET | `/api/{module}/` | 探测读写路由、读取模块公开子树 |\n| HEAD、GET | `/api/{module}/{path}` | 探测、读取模块内的键或子树 |\n| POST、DELETE | `/api/{module}/{path}` | 修改、删除声明的单个键 |\n\n`module` 是动态模块标识；`path` 是模块内的相对 database 路径，允许多级，用 `/` 分隔。`Settings/Home/Top_left` 只是 path 示例，Settings、Home 和键名都不固定。路径逐段编码，不能把分隔用的 `/` 整体编码为 `%2F`。页面、配置资源、持久化读写使用同一个 module；不是三个各自指定的模块参数，也不使用 query 参数。\n\n### 在 Apifox 中调试\n\n接口路径保留 Apifox 的 `{module}`、`{path}` 路径参数，不使用固定业务 URL，也不把 `*` 当作真实请求路径。调试前在 Path 参数区填写目标模块与模块内路径；参数值和 POST 正文默认留空，不预置任何项目或待写入值。服务地址由使用者的环境配置提供。\n\nPOST 的 Body 为原始 JSON，须按目标字段类型填写字符串、数字、布尔值或数组。响应 Schema 描述通用结构；下面各节的实际 URL、请求值、返回对象只是文档中的示例，不会作为调试请求或 Mock 的默认数据。路径每段仅允许英文字母、数字、下划线和连字符，不接受空段、点号或 __proto__/prototype/constructor。\n\n例如 module=Enhanced、path=Settings/Home/Top_left 时，实际请求才是 `/api/Enhanced/Settings/Home/Top_left`。以下具体 URL、BoxJS 字段和返回值均为使用示例，不能当作通用接口的固定路径或枚举。\n\n## 页面通过 module 选择配置\n\n```http\nGET /settings/Enhanced\n```\n\n通用页面从 `/settings/{module}` 路径读取模块标识，不读取 module 或 config 查询参数。渲染器按固定约定 GET `/configs/Enhanced`，读取返回的 BoxJS JSON，再动态生成设置项。改为 `/settings/Global` 就 GET `/configs/Global`，不修改 HTML。\n\nmodule 必须与 BoxJS ID `@BiliBili.Enhanced.Settings.…` 中的 Enhanced 一致；它也对应持久化 `/api/` 后第一段。实际 BoxJS 文件地址由模块模板的 Mock 规则指定。页面路径只允许一个非空模块段，可带结尾斜线；模块名只允许英文字母、数字、下划线、连字符，禁止 __proto__/prototype/constructor。缺失模块段、多余路径段或非法模块名在页面显示错误，不发送配置或存储请求。\n\n| 请求 | 响应方 | 内容 |\n| --- | --- | --- |\n| GET /settings/{module} | 公共 HTML Mock | 同一份通用设置页 |\n| HEAD、GET /configs/{module} | 对应模块的配置 Mock | 配置可用性、BoxJS 静态 JSON |\n| GET /api/{module}/ 或 /api/{module}/{path} | 通用代理读写脚本 | 当前持久化设置的公开子树或叶子值 |\n| POST、DELETE /api/{module}/{path} | 同一个通用代理读写脚本 | 单键修改、删除 |\n\n配置资源使用 `/configs/`，持久化接口使用 `/api/`，两种模板正则互不重叠，不依赖执行优先级。各业务项目用现有 argument config 生成器生成 BoxJS JSON。模块的 Mock 规则引用生成文件的下载源；通用读写脚本参数 configURL 引用同一版本资源进行校验。configURL 是代理脚本的模板参数，不是页面参数；页面仅用 module 按约定寻找配置 Mock。\n\n业务主菜单独立于通用设置页，由调用项目提供模块链接；Biliverse 主菜单归 Enhanced。通用 JS 不包含 Enhanced/Global 等目录或字段，Enhanced 已通过包的公开接口接入。\n\n## 一、主菜单只探测配置 Mock\n\n每次进入业务主菜单，用通用 client.probe(module) 并发发送：\n\n```http\nHEAD /configs/Enhanced\nHEAD /configs/Global\n```\n\n这些地址由各模块的 BoxJS Mock 提供。200 才启用入口；非 200、无响应或超时则禁用。HEAD 无正文，不读持久化存储、不执行通用读写脚本，也不证明读写脚本运行正常。\n\n配置 Mock 地址不部署同名在线静态文件，下载源在另一个地址。页面只请求约定的配置 Mock 地址。\n\n## 二、每次真正进入或刷新设置页\n\n先 GET 根据 module 生成的 `/configs/Enhanced`，取得 BoxJS。可使用 settings 数组、单 app 或 apps 订阅。示例：\n\n```json\n[\n  {\n    \"id\": \"@BiliBili.Enhanced.Settings.Home.Top_left\",\n    \"name\": \"顶栏左侧\", \"type\": \"selects\", \"val\": \"mine\",\n    \"items\": [{ \"key\": \"mine\", \"label\": \"我的\" }, { \"key\": \"videoshortcut\", \"label\": \"短视频\" }]\n  },\n  { \"id\": \"@BiliBili.Enhanced.Settings.enabled\", \"name\": \"启用\", \"type\": \"boolean\", \"val\": true }\n]\n```\n\n通用组件由 ID 解析出存储根 BiliBili 和公共子树 Enhanced.Settings，再读取一次：\n\n```http\nGET /api/Enhanced/Settings/\nX-Settings-Client: 1\n```\n\n返回 HTTP 200 和公开字段的持久化覆盖值，例如：\n\n```json\n{ \"Home\": { \"Top_left\": \"videoshortcut\" } }\n```\n\n只返回 BoxJS 声明的字段，不泄露同根下的缓存和其它模块。没有任何覆盖值时返回 `{}`。页面用 BoxJS val 补充未设置字段，并创建新的内存缓存；不使用 localStorage/sessionStorage。返回主菜单不 GET，再次进入重新执行上述两次 GET。刷新当前模块页也重新读取；浏览器前进、后退恢复缓存页面时会重新读取当前 URL 的模块。\n\n只有 `/api/` 固定；其它组织可以使用 `/api/Weather/Preferences/Units`。同模块必须使用一个存储根，并具有模块根以下的公共父路径，才能一次读取设置子树。控件支持 boolean/selects/checkboxes/text/textarea/number，不执行 BoxJS 脚本。\n\n## 三、修改单个键\n\n```http\nPOST /api/Enhanced/Settings/Home/Top_left\nContent-Type: application/json\nX-Settings-Client: 1\n\n\"mine\"\n```\n\n正文就是 JSON 值本身，没有 values 包装。成功返回 HTTP 200：\n\n```json\n{ \"saved\": true }\n```\n\n组件显示“修改成功”，只更新内存中的该键。不会随后 GET 整个模块。非 200（包括 204）或网络错误显示“操作失败”，缓存保留原值，其它控件的未保存输入也保留。\n\n代理执行端运行时读取 BoxJS 校验字段，然后读取最新存储根，通过 util set 修改该键并写回。不会把浏览器的整棵旧缓存覆盖回存储；只修改持久化数据，不修改源码 database.mjs 或 argument 配置。\n\n## 四、删除覆盖值\n\n```http\nDELETE /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n```\n\n没有正文。成功返回 HTTP 200：\n\n```json\n{ \"deleted\": true }\n```\n\n重复删除仍成功。代理通过 util unset 删除单键，保留同级字段、其它模块和缓存；不递归删除空父对象。浏览器显示“删除成功”，移除该键缓存的覆盖值，改用 BoxJS val；不追加 GET。删除覆盖值不等于关闭功能。\n\n## 五、需要时直接查询单键\n\n```http\nGET /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n```\n\n有覆盖值则返回 HTTP 200，正文直接为 `\"mine\"`；无值时 404。默认 GET 不返回 BoxJS 默认值。也支持 HEAD 完整叶子路径：声明过则 200，否则 404；不读取存储。主菜单应 HEAD 配置 Mock 地址，不是持久化叶子探测。\n\n## 通用脚本参数与读取时机\n\n### BoxJS 页面属性\n\n本地 dev 优化：WebView 使用原生对象访问，不再打包 util Lodash。代理每次仍从自己的 configURL 下载配置并校验字段，只提取存储根、字段路径、类型、默认值和枚举约束；不处理标题、描述、图标、占位文字、rows/autoGrow 等展示属性。展示属性由 WebView 校验，非法展示属性不会影响默认代理对合法字段的访问。自定义 GET resolver 仍收到完整 ModuleDefinition，保留其既有契约。HTTP 路径、状态码、访问范围与存储读写次数不变，未取消代理端配置请求。\n\n配置可以是 settings 数组、单个 app 或 apps 订阅。字段的 name/val/type/desc/items 决定控件，placeholder 设置输入提示；textarea 保持字符串类型，rows 为正整数基础行数，autoGrow 为布尔值。首次显示、输入及删除覆盖值后都会按内容调整高度。\n\n如果模块字段只属于一个 app，definition.metadata 保留它的 id/name/author/repo/script/icon/icons/desc/descs/description。页面使用 name 作为显示标题，author/desc/descs 作为纯文本，repo 作为项目链接。模块路由和存储根仍由字段的 @根.模块.路径 决定，不能由 app.id/name 推断。多个 app 分别声明同一模块的字段时合并字段，不任意选择一个 app 的展示元数据。\n\nicon 优先于 icons；原版 icons[0] 是透明版，icons[1] 是彩色版，并非亮暗顺序。默认使用彩色版，只有一个图标时使用该图标。页面图片与链接仅接受 HTTP(S) 或同源相对地址。script 只保留元数据，不请求或执行；不渲染 desc_html/descs_html，不使用 keys 推导额外可读写字段。\n\n| 参数或数据 | 来源与作用 |\n| --- | --- |\n| origin | 调用方的 HTTPS 页面来源，不带路径 |\n| configURL | 传给 SettingsHandler 的 HTTPS BoxJS 下载地址；类内部每次通过 util fetch 加载，按请求中的 module 选择字段 |\n| storageKey | 从 BoxJS 的 @根键.模块.路径 提取，不通过 header 传递 |\n| requestHeader | 默认 X-Settings-Client，值为 1；同源页面标记，不是认证凭据 |\n| resolveSettings(stored, definition) | 可选 GET 有效配置解析器，返回完整 database 形状的对象；不参与 HEAD/POST/DELETE |\n\n独立打包脚本通过 argument 的 origin/configURL 接收地址，用 util fetch 下载 BoxJS，用 util Storage/Lodash 读写。不同模块引用同一份脚本，分别配置自己的 /api/ 正则与校验 BoxJS 地址；/configs/ Mock 不经过此脚本。原生配置 Mock 与脚本应使用同一版本的配置源；代理自己的 Mock 资源缓存需要按代理机制更新。\n\n0.2.0 的代理调用方式为 `new SettingsHandler({ origin, configURL }).handle(request)`。配置下载、HTTP 200 检查、JSON 解析及字段归一化均由这个 class 完成，调用方不再提供 loadConfig 回调。网络异常、非 200、非法 JSON 或模块配置解析失败统一返回 502；不会继续读写持久化存储。0.1.0 使用旧工厂函数；HTTP 路径、方法和返回契约不变。\n\n每次 GET 持久化设置读根一次。每次 POST/DELETE 写入前重新读根，再单键修改、写回一次。浏览器缓存不触发额外 GET，但不能取消代理端保证保留其它数据所需的读改写。不同代理脚本同时写同一根键不具备事务隔离保证。\n\nresolveSettings 可由模块按已有规则合并 database、argument、持久化值。默认不传时只读持久化值，页面使用 BoxJS 默认值补缺。本包不自动修改模块现有配置优先级；删除后不调用 resolver，下次进入/刷新才重新读取。\n\n## 错误与限制\n\n| 状态码 | 持久化接口语义 |\n| --- | --- |\n| 200 | HEAD 路径受支持；GET 返回值或子树；POST/DELETE 操作成功 |\n| 400 | 路径非法、JSON 无法解析或值不满足 BoxJS 类型/枚举约束 |\n| 403 | 缺少页面标记头，或请求 Origin 与代理配置不符 |\n| 404 | 路径未声明；或 GET 叶子尚无持久化值 |\n| 405 | 对子树执行 POST/DELETE，或使用不支持的方法 |\n| 413 | POST 正文超过 65536 个 UTF-16 code units |\n| 415 | POST Content-Type 不是 application/json |\n| 500 | 持久化写入或代理执行失败 |\n| 502 | BoxJS 配置源加载、解析或模块定义校验失败 |\n\nGET 子树无覆盖值返回 200 和空对象，GET 叶子无覆盖值返回 404；两者不同。HEAD 成功不代表已有值。POST 字符串上限 2048，选择项与数组项按 BoxJS 校验；不接受 null 或对象作为叶子写入值。持久化响应 no-store；HEAD 始终无正文。配置资源由原生 Mock 管理，其失败响应格式由代理或原站决定，不能套用持久化接口的 JSON 错误结构。\n\nGitHub main/dev 分别绑定 Apifox 同名分支，JSON 路径为 apifox/preference-panes.apifox.json。提交 JSON 后仍需客户端执行数据源导入，并按分支回读确认结果。npm/GitHub Packages 未发布，Biliverse 消费端本轮未迁移。\n",
+                "description": "## 接口用途\n\n读取指定模块全部持久化数据，包括 Settings、Caches 和其它键，不按 BoxJS 过滤。模块不存在返回 404。\n\n## 请求契约\n\n`GET /api/{module}/`\n\nmodule 是必填路径参数，必须属于插件安装配置中的模块。路径参数不预填业务示例值；具体取值由接入项目决定。请求需携带 X-Settings-Client: 1；该标记不是认证凭据。\n\n请求没有正文。\n\n## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n```json\n{\n  \"Settings\": {\n    \"Home\": {\n      \"Top_left\": \"videoshortcut\"\n    }\n  }\n}\n```\n\n## 调用流程与具体示例\n\n# PreferencePanes 0.3.0 接口契约\n\n前端负责 BoxJS 解析、控件生成和字段输入校验。API 只桥接安装配置指定的持久化根与模块，不下载 BoxJS，不校验字段声明、枚举或控件类型。\n\n## 路径和参数\n\n| 方法 | 路径 | 行为 |\n| --- | --- | --- |\n| GET | /settings/{module} | 同一个 WebView 页面，按路径选择模块 |\n| HEAD、GET | /configs/{module} | 模块配置 Mock：探测、加载 BoxJS |\n| HEAD、GET、POST、DELETE | /api/{module}/ | 探测路由、读取、替换或删除整个模块 |\n| HEAD、GET、POST、DELETE | /api/{module}/{path} | 探测路由、读取、替换或删除任意键或子树 |\n| GET、DELETE | /api/{module}/Caches | 查看、清空模块缓存，使用相同的通用存储处理器 |\n\nmodule 和 path 使用 Apifox 路径参数，不预填业务示例。path 以 / 分隔层级，每段独立编码；不能把分隔斜线编码为 %2F。片段允许字母、数字、下划线、连字符，拒绝空片段及 __proto__/prototype/constructor。这些是路径结构校验，不是 BoxJS 字段校验。API 接受不存在于 BoxJS 中的新键。\n\n## 安装配置决定存储映射\n\n代理入口构造：\n\n~~~js\nconst handler = new SettingsHandler({\n  origin: \"https://biliverse.github.io\",\n  storageKey: \"BiliBili\",\n  module: \"Enhanced\"\n});\nconst response = await handler.handle($request);\n~~~\n\n此处由已安装插件提供可信配置，不经浏览器 header/body 提供。API 从 /api/ 后第一段确认模块，再将路径映射到固定存储根：\n\n~~~text\n/api/Enhanced/Settings/Home/Top_left → BiliBili.Enhanced.Settings.Home.Top_left\n/api/Enhanced/Caches                → BiliBili.Enhanced.Caches\n/api/Enhanced/                      → BiliBili.Enhanced\n~~~\n\nEnhanced 处理器不能访问 BiliBili.Global；重置 Enhanced 也保留 Global。类不接受 configURL、loadConfig 或 resolveSettings。通用独立代理脚本的 argument 为 origin、storageKey、module。配置 Mock 的实际下载源仍由模块模板指定，与 API 无关。\n\n## 前端读取与缓存\n\n每次进入主菜单，并发 HEAD /configs/{module}，仅 200 启用按钮；此时不 GET 设置。配置 Mock 地址不部署同名线上文件，静态下载源另设路径。\n\n每次打开、再次进入或刷新设置页面：\n1. GET /configs/{module} 一次，由前端解析 BoxJS、生成控件和默认值。\n2. GET BoxJS 字段公共子树一次，例如 /api/Enhanced/Settings/。\n3. 在当前页面建立内存缓存。若子树缺失返回 404，则用空覆盖值加 BoxJS 默认值绘制；兼容旧存储中以 JSON 字符串编码的设置子树。\n\n保存或删除只按目标路径发送一次请求，根据是否返回 200 显示短暂通知；失败保留缓存及未保存输入。成功后仅更新内存，不 GET 整个模块。仅前端校验控件类型和选项；直接调用 API 可写入任何合法 JSON 值。\n\n## 读写示例\n\n~~~http\nGET /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n已有值返回 200，正文是该值本身。GET 父路径返回全部子树，包括未在页面展示的键；不存在返回 404。不会自动合并 BoxJS 默认值。\n\n~~~http\nPOST /api/Enhanced/Settings/Home/Top_left\nContent-Type: application/json\nX-Settings-Client: 1\n\n\"mine\"\n~~~\n\n正文允许字符串、数字、布尔值、null、任意数组和对象；没有 values 包装。POST 替换指定位置的值而非合并对象。未存在的父节点会创建，JSON 数组元素可通过数字路径访问。路径之外的数据保持不变。\n\n~~~json\n{ \"saved\": true }\n~~~\n\n~~~http\nDELETE /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n删除键或整棵子树，不存在时也返回 200。前端删除设置覆盖值后显示当前 BoxJS 默认值。\n\n~~~json\n{ \"deleted\": true }\n~~~\n\n## Caches 与模块重置\n\n“查看 Caches”按需 GET /api/{module}/Caches，显示全部缓存 JSON；404 表示暂无缓存。再次点击刷新才重新读取，不在进入页面时自动下载缓存。\n\n“清空 Caches”确认后 DELETE /api/{module}/Caches，仅删除该节点，保留 Settings 及其它模块。成功后清空当前缓存视图，不追加 GET。\n\n“重置模块”确认后 DELETE /api/{module}/，删除模块的 Settings、Caches 和其它全部持久化键，保留同根的其它模块。成功后清除页面覆盖值、使用已加载 BoxJS 的默认值，隐藏旧缓存内容，不重新读取设置。再次进入页面时按正常打开流程读取。\n\n~~~http\nDELETE /api/Enhanced/\nX-Settings-Client: 1\n~~~\n\n## 代理存储操作\n\nHEAD 仅确认本处理器接管合法模块路径，不读取存储，也不证明已有值。GET 读取一次根；POST/DELETE 写入前读取最新根，使用 util Lodash 修改对应节点并写回一次。API 不发送网络请求。\n\n历史 JSON 字符串中间节点会在路径遍历时解码；GET 直接指向字符串叶子时保留字符串。无法继续遍历标量父节点返回 500，不悄悄覆盖原数据。DELETE 数组元素采用删除键语义，不移动其它索引。\n\nAPI 响应带 Cache-Control: no-store。默认需要 X-Settings-Client: 1，Origin 存在时须与安装来源一致；该请求头是页面标记，不是认证凭据。POST 正文上限为 65536 个 UTF-16 code units。多个代理脚本同时写同一根仍没有事务隔离保证。\n\n| 状态码 | 含义 |\n| --- | --- |\n| 200 | 探测或读写成功；HEAD 无正文 |\n| 400 | 路径或 JSON 正文格式无效 |\n| 403 | 缺少页面标记，或请求来源不符 |\n| 404 | 模块不由当前处理器接管，或 GET 目标不存在 |\n| 405 | 不支持的 HTTP 方法 |\n| 413 | POST 正文过长 |\n| 415 | POST 正文不是 application/json |\n| 500 | 存储读取、路径遍历或写入失败 |\n\nAPI 不再返回 BoxJS 配置加载错误 502。配置 Mock 失败的格式仍由代理或原站决定。\n\n## BoxJS 仅用于 WebView\n\n支持 settings 数组、单 app 和 apps 订阅。字段 ID 仍使用 @根.模块.路径；名称、type、val、items、desc 生成控件，placeholder/rows/autoGrow 控制文本输入展示。app 元数据用于页面标题、说明和图标，script 只保留不执行；icons[0]/icons[1] 是透明/彩色变体，不是亮暗顺序。\n\n浏览器解析的根名仅为配置信息；代理不会因此改变固定 storageKey。插件作者应让 BoxJS 路径与安装映射一致。设置默认值、类型与枚举都由 WebView 处理，API 本身与 BoxJS 无关。\n\nGitHub main/dev 分别绑定 Apifox 同名分支。修改 apifox/preference-panes.apifox.json 后由已绑定数据源导入，并按分支回读验证。\n",
                 "parameters": {
                   "path": [
                     {
@@ -849,9 +849,29 @@
                     "headers": [],
                     "contentType": "json",
                     "jsonSchema": {
-                      "type": "object",
-                      "additionalProperties": true,
-                      "description": "动态子树：仅包含 BoxJS 声明且已有持久化值的字段；键名、层级和类型由模块配置决定。"
+                      "description": "任意 JSON 值；API 不按 BoxJS 校验类型或枚举，POST 替换路径处的完整值。",
+                      "oneOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "array",
+                          "items": {}
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": true
+                        }
+                      ]
                     },
                     "description": "JSON 响应"
                   },
@@ -896,7 +916,7 @@
                   {
                     "id": "pp-pp-subtree-get-404",
                     "code": 404,
-                    "name": "未知字段、无覆盖值或模块未启用",
+                    "name": "存储路径不存在、非接管模块或 Mock 不可用",
                     "headers": [],
                     "contentType": "json",
                     "jsonSchema": {
@@ -932,9 +952,9 @@
                     "description": "JSON 响应"
                   },
                   {
-                    "id": "pp-pp-subtree-get-502",
-                    "code": 502,
-                    "name": "BoxJS 配置加载或解析失败",
+                    "id": "pp-pp-subtree-get-500",
+                    "code": 500,
+                    "name": "存储写入或执行失败",
                     "headers": [],
                     "contentType": "json",
                     "jsonSchema": {
@@ -984,7 +1004,7 @@
                 ],
                 "operationId": "preference_panes_pp-module-head",
                 "sourceUrl": "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/guide.md",
-                "description": "## 接口用途\n\n通用脚本加载 BoxJS 确认模块具有声明字段，不读取存储；主菜单仍使用 HEAD /configs/{module} 探测配置 Mock。\n\n## 请求契约\n\n`HEAD /api/{module}/`\n\nmodule 是必填路径参数，与配置文件中字段所属模块一致。路径参数不预填业务示例值；具体取值由接入项目决定。请求需携带 X-Settings-Client: 1；该标记不是认证凭据。\n\n请求没有正文。\n\n## 调用流程与具体示例\n\n# PreferencePanes：从入口探测到单键读写\n\n当前已发布版本为 0.2.0，包含 SettingsHandler class 和 BoxJS 元数据兼容增强。下面的 Enhanced 只是路径示例，example.org 没有部署接口；各项目复用相同代码，从自己的 BoxJS JSON 生成设置界面。\n\n## 通用路径契约\n\n| 方法 | 相对路径定义 | 用途 |\n| --- | --- | --- |\n| GET | `/settings/{module}` | 通用 HTML 页面，按路径中的模块生成界面 |\n| HEAD、GET | `/configs/{module}` | 探测配置 Mock、读取 BoxJS JSON |\n| HEAD、GET | `/api/{module}/` | 探测读写路由、读取模块公开子树 |\n| HEAD、GET | `/api/{module}/{path}` | 探测、读取模块内的键或子树 |\n| POST、DELETE | `/api/{module}/{path}` | 修改、删除声明的单个键 |\n\n`module` 是动态模块标识；`path` 是模块内的相对 database 路径，允许多级，用 `/` 分隔。`Settings/Home/Top_left` 只是 path 示例，Settings、Home 和键名都不固定。路径逐段编码，不能把分隔用的 `/` 整体编码为 `%2F`。页面、配置资源、持久化读写使用同一个 module；不是三个各自指定的模块参数，也不使用 query 参数。\n\n### 在 Apifox 中调试\n\n接口路径保留 Apifox 的 `{module}`、`{path}` 路径参数，不使用固定业务 URL，也不把 `*` 当作真实请求路径。调试前在 Path 参数区填写目标模块与模块内路径；参数值和 POST 正文默认留空，不预置任何项目或待写入值。服务地址由使用者的环境配置提供。\n\nPOST 的 Body 为原始 JSON，须按目标字段类型填写字符串、数字、布尔值或数组。响应 Schema 描述通用结构；下面各节的实际 URL、请求值、返回对象只是文档中的示例，不会作为调试请求或 Mock 的默认数据。路径每段仅允许英文字母、数字、下划线和连字符，不接受空段、点号或 __proto__/prototype/constructor。\n\n例如 module=Enhanced、path=Settings/Home/Top_left 时，实际请求才是 `/api/Enhanced/Settings/Home/Top_left`。以下具体 URL、BoxJS 字段和返回值均为使用示例，不能当作通用接口的固定路径或枚举。\n\n## 页面通过 module 选择配置\n\n```http\nGET /settings/Enhanced\n```\n\n通用页面从 `/settings/{module}` 路径读取模块标识，不读取 module 或 config 查询参数。渲染器按固定约定 GET `/configs/Enhanced`，读取返回的 BoxJS JSON，再动态生成设置项。改为 `/settings/Global` 就 GET `/configs/Global`，不修改 HTML。\n\nmodule 必须与 BoxJS ID `@BiliBili.Enhanced.Settings.…` 中的 Enhanced 一致；它也对应持久化 `/api/` 后第一段。实际 BoxJS 文件地址由模块模板的 Mock 规则指定。页面路径只允许一个非空模块段，可带结尾斜线；模块名只允许英文字母、数字、下划线、连字符，禁止 __proto__/prototype/constructor。缺失模块段、多余路径段或非法模块名在页面显示错误，不发送配置或存储请求。\n\n| 请求 | 响应方 | 内容 |\n| --- | --- | --- |\n| GET /settings/{module} | 公共 HTML Mock | 同一份通用设置页 |\n| HEAD、GET /configs/{module} | 对应模块的配置 Mock | 配置可用性、BoxJS 静态 JSON |\n| GET /api/{module}/ 或 /api/{module}/{path} | 通用代理读写脚本 | 当前持久化设置的公开子树或叶子值 |\n| POST、DELETE /api/{module}/{path} | 同一个通用代理读写脚本 | 单键修改、删除 |\n\n配置资源使用 `/configs/`，持久化接口使用 `/api/`，两种模板正则互不重叠，不依赖执行优先级。各业务项目用现有 argument config 生成器生成 BoxJS JSON。模块的 Mock 规则引用生成文件的下载源；通用读写脚本参数 configURL 引用同一版本资源进行校验。configURL 是代理脚本的模板参数，不是页面参数；页面仅用 module 按约定寻找配置 Mock。\n\n业务主菜单独立于通用设置页，由调用项目提供模块链接；Biliverse 主菜单归 Enhanced。通用 JS 不包含 Enhanced/Global 等目录或字段，Enhanced 已通过包的公开接口接入。\n\n## 一、主菜单只探测配置 Mock\n\n每次进入业务主菜单，用通用 client.probe(module) 并发发送：\n\n```http\nHEAD /configs/Enhanced\nHEAD /configs/Global\n```\n\n这些地址由各模块的 BoxJS Mock 提供。200 才启用入口；非 200、无响应或超时则禁用。HEAD 无正文，不读持久化存储、不执行通用读写脚本，也不证明读写脚本运行正常。\n\n配置 Mock 地址不部署同名在线静态文件，下载源在另一个地址。页面只请求约定的配置 Mock 地址。\n\n## 二、每次真正进入或刷新设置页\n\n先 GET 根据 module 生成的 `/configs/Enhanced`，取得 BoxJS。可使用 settings 数组、单 app 或 apps 订阅。示例：\n\n```json\n[\n  {\n    \"id\": \"@BiliBili.Enhanced.Settings.Home.Top_left\",\n    \"name\": \"顶栏左侧\", \"type\": \"selects\", \"val\": \"mine\",\n    \"items\": [{ \"key\": \"mine\", \"label\": \"我的\" }, { \"key\": \"videoshortcut\", \"label\": \"短视频\" }]\n  },\n  { \"id\": \"@BiliBili.Enhanced.Settings.enabled\", \"name\": \"启用\", \"type\": \"boolean\", \"val\": true }\n]\n```\n\n通用组件由 ID 解析出存储根 BiliBili 和公共子树 Enhanced.Settings，再读取一次：\n\n```http\nGET /api/Enhanced/Settings/\nX-Settings-Client: 1\n```\n\n返回 HTTP 200 和公开字段的持久化覆盖值，例如：\n\n```json\n{ \"Home\": { \"Top_left\": \"videoshortcut\" } }\n```\n\n只返回 BoxJS 声明的字段，不泄露同根下的缓存和其它模块。没有任何覆盖值时返回 `{}`。页面用 BoxJS val 补充未设置字段，并创建新的内存缓存；不使用 localStorage/sessionStorage。返回主菜单不 GET，再次进入重新执行上述两次 GET。刷新当前模块页也重新读取；浏览器前进、后退恢复缓存页面时会重新读取当前 URL 的模块。\n\n只有 `/api/` 固定；其它组织可以使用 `/api/Weather/Preferences/Units`。同模块必须使用一个存储根，并具有模块根以下的公共父路径，才能一次读取设置子树。控件支持 boolean/selects/checkboxes/text/textarea/number，不执行 BoxJS 脚本。\n\n## 三、修改单个键\n\n```http\nPOST /api/Enhanced/Settings/Home/Top_left\nContent-Type: application/json\nX-Settings-Client: 1\n\n\"mine\"\n```\n\n正文就是 JSON 值本身，没有 values 包装。成功返回 HTTP 200：\n\n```json\n{ \"saved\": true }\n```\n\n组件显示“修改成功”，只更新内存中的该键。不会随后 GET 整个模块。非 200（包括 204）或网络错误显示“操作失败”，缓存保留原值，其它控件的未保存输入也保留。\n\n代理执行端运行时读取 BoxJS 校验字段，然后读取最新存储根，通过 util set 修改该键并写回。不会把浏览器的整棵旧缓存覆盖回存储；只修改持久化数据，不修改源码 database.mjs 或 argument 配置。\n\n## 四、删除覆盖值\n\n```http\nDELETE /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n```\n\n没有正文。成功返回 HTTP 200：\n\n```json\n{ \"deleted\": true }\n```\n\n重复删除仍成功。代理通过 util unset 删除单键，保留同级字段、其它模块和缓存；不递归删除空父对象。浏览器显示“删除成功”，移除该键缓存的覆盖值，改用 BoxJS val；不追加 GET。删除覆盖值不等于关闭功能。\n\n## 五、需要时直接查询单键\n\n```http\nGET /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n```\n\n有覆盖值则返回 HTTP 200，正文直接为 `\"mine\"`；无值时 404。默认 GET 不返回 BoxJS 默认值。也支持 HEAD 完整叶子路径：声明过则 200，否则 404；不读取存储。主菜单应 HEAD 配置 Mock 地址，不是持久化叶子探测。\n\n## 通用脚本参数与读取时机\n\n### BoxJS 页面属性\n\n本地 dev 优化：WebView 使用原生对象访问，不再打包 util Lodash。代理每次仍从自己的 configURL 下载配置并校验字段，只提取存储根、字段路径、类型、默认值和枚举约束；不处理标题、描述、图标、占位文字、rows/autoGrow 等展示属性。展示属性由 WebView 校验，非法展示属性不会影响默认代理对合法字段的访问。自定义 GET resolver 仍收到完整 ModuleDefinition，保留其既有契约。HTTP 路径、状态码、访问范围与存储读写次数不变，未取消代理端配置请求。\n\n配置可以是 settings 数组、单个 app 或 apps 订阅。字段的 name/val/type/desc/items 决定控件，placeholder 设置输入提示；textarea 保持字符串类型，rows 为正整数基础行数，autoGrow 为布尔值。首次显示、输入及删除覆盖值后都会按内容调整高度。\n\n如果模块字段只属于一个 app，definition.metadata 保留它的 id/name/author/repo/script/icon/icons/desc/descs/description。页面使用 name 作为显示标题，author/desc/descs 作为纯文本，repo 作为项目链接。模块路由和存储根仍由字段的 @根.模块.路径 决定，不能由 app.id/name 推断。多个 app 分别声明同一模块的字段时合并字段，不任意选择一个 app 的展示元数据。\n\nicon 优先于 icons；原版 icons[0] 是透明版，icons[1] 是彩色版，并非亮暗顺序。默认使用彩色版，只有一个图标时使用该图标。页面图片与链接仅接受 HTTP(S) 或同源相对地址。script 只保留元数据，不请求或执行；不渲染 desc_html/descs_html，不使用 keys 推导额外可读写字段。\n\n| 参数或数据 | 来源与作用 |\n| --- | --- |\n| origin | 调用方的 HTTPS 页面来源，不带路径 |\n| configURL | 传给 SettingsHandler 的 HTTPS BoxJS 下载地址；类内部每次通过 util fetch 加载，按请求中的 module 选择字段 |\n| storageKey | 从 BoxJS 的 @根键.模块.路径 提取，不通过 header 传递 |\n| requestHeader | 默认 X-Settings-Client，值为 1；同源页面标记，不是认证凭据 |\n| resolveSettings(stored, definition) | 可选 GET 有效配置解析器，返回完整 database 形状的对象；不参与 HEAD/POST/DELETE |\n\n独立打包脚本通过 argument 的 origin/configURL 接收地址，用 util fetch 下载 BoxJS，用 util Storage/Lodash 读写。不同模块引用同一份脚本，分别配置自己的 /api/ 正则与校验 BoxJS 地址；/configs/ Mock 不经过此脚本。原生配置 Mock 与脚本应使用同一版本的配置源；代理自己的 Mock 资源缓存需要按代理机制更新。\n\n0.2.0 的代理调用方式为 `new SettingsHandler({ origin, configURL }).handle(request)`。配置下载、HTTP 200 检查、JSON 解析及字段归一化均由这个 class 完成，调用方不再提供 loadConfig 回调。网络异常、非 200、非法 JSON 或模块配置解析失败统一返回 502；不会继续读写持久化存储。0.1.0 使用旧工厂函数；HTTP 路径、方法和返回契约不变。\n\n每次 GET 持久化设置读根一次。每次 POST/DELETE 写入前重新读根，再单键修改、写回一次。浏览器缓存不触发额外 GET，但不能取消代理端保证保留其它数据所需的读改写。不同代理脚本同时写同一根键不具备事务隔离保证。\n\nresolveSettings 可由模块按已有规则合并 database、argument、持久化值。默认不传时只读持久化值，页面使用 BoxJS 默认值补缺。本包不自动修改模块现有配置优先级；删除后不调用 resolver，下次进入/刷新才重新读取。\n\n## 错误与限制\n\n| 状态码 | 持久化接口语义 |\n| --- | --- |\n| 200 | HEAD 路径受支持；GET 返回值或子树；POST/DELETE 操作成功 |\n| 400 | 路径非法、JSON 无法解析或值不满足 BoxJS 类型/枚举约束 |\n| 403 | 缺少页面标记头，或请求 Origin 与代理配置不符 |\n| 404 | 路径未声明；或 GET 叶子尚无持久化值 |\n| 405 | 对子树执行 POST/DELETE，或使用不支持的方法 |\n| 413 | POST 正文超过 65536 个 UTF-16 code units |\n| 415 | POST Content-Type 不是 application/json |\n| 500 | 持久化写入或代理执行失败 |\n| 502 | BoxJS 配置源加载、解析或模块定义校验失败 |\n\nGET 子树无覆盖值返回 200 和空对象，GET 叶子无覆盖值返回 404；两者不同。HEAD 成功不代表已有值。POST 字符串上限 2048，选择项与数组项按 BoxJS 校验；不接受 null 或对象作为叶子写入值。持久化响应 no-store；HEAD 始终无正文。配置资源由原生 Mock 管理，其失败响应格式由代理或原站决定，不能套用持久化接口的 JSON 错误结构。\n\nGitHub main/dev 分别绑定 Apifox 同名分支，JSON 路径为 apifox/preference-panes.apifox.json。提交 JSON 后仍需客户端执行数据源导入，并按分支回读确认结果。npm/GitHub Packages 未发布，Biliverse 消费端本轮未迁移。\n",
+                "description": "## 接口用途\n\n确认安装配置接管此模块路由，不访问网络或存储，不表示数据已存在；主菜单仍通过 HEAD /configs/{module} 探测配置 Mock。\n\n## 请求契约\n\n`HEAD /api/{module}/`\n\nmodule 是必填路径参数，必须属于插件安装配置中的模块。路径参数不预填业务示例值；具体取值由接入项目决定。请求需携带 X-Settings-Client: 1；该标记不是认证凭据。\n\n请求没有正文。\n\n## 调用流程与具体示例\n\n# PreferencePanes 0.3.0 接口契约\n\n前端负责 BoxJS 解析、控件生成和字段输入校验。API 只桥接安装配置指定的持久化根与模块，不下载 BoxJS，不校验字段声明、枚举或控件类型。\n\n## 路径和参数\n\n| 方法 | 路径 | 行为 |\n| --- | --- | --- |\n| GET | /settings/{module} | 同一个 WebView 页面，按路径选择模块 |\n| HEAD、GET | /configs/{module} | 模块配置 Mock：探测、加载 BoxJS |\n| HEAD、GET、POST、DELETE | /api/{module}/ | 探测路由、读取、替换或删除整个模块 |\n| HEAD、GET、POST、DELETE | /api/{module}/{path} | 探测路由、读取、替换或删除任意键或子树 |\n| GET、DELETE | /api/{module}/Caches | 查看、清空模块缓存，使用相同的通用存储处理器 |\n\nmodule 和 path 使用 Apifox 路径参数，不预填业务示例。path 以 / 分隔层级，每段独立编码；不能把分隔斜线编码为 %2F。片段允许字母、数字、下划线、连字符，拒绝空片段及 __proto__/prototype/constructor。这些是路径结构校验，不是 BoxJS 字段校验。API 接受不存在于 BoxJS 中的新键。\n\n## 安装配置决定存储映射\n\n代理入口构造：\n\n~~~js\nconst handler = new SettingsHandler({\n  origin: \"https://biliverse.github.io\",\n  storageKey: \"BiliBili\",\n  module: \"Enhanced\"\n});\nconst response = await handler.handle($request);\n~~~\n\n此处由已安装插件提供可信配置，不经浏览器 header/body 提供。API 从 /api/ 后第一段确认模块，再将路径映射到固定存储根：\n\n~~~text\n/api/Enhanced/Settings/Home/Top_left → BiliBili.Enhanced.Settings.Home.Top_left\n/api/Enhanced/Caches                → BiliBili.Enhanced.Caches\n/api/Enhanced/                      → BiliBili.Enhanced\n~~~\n\nEnhanced 处理器不能访问 BiliBili.Global；重置 Enhanced 也保留 Global。类不接受 configURL、loadConfig 或 resolveSettings。通用独立代理脚本的 argument 为 origin、storageKey、module。配置 Mock 的实际下载源仍由模块模板指定，与 API 无关。\n\n## 前端读取与缓存\n\n每次进入主菜单，并发 HEAD /configs/{module}，仅 200 启用按钮；此时不 GET 设置。配置 Mock 地址不部署同名线上文件，静态下载源另设路径。\n\n每次打开、再次进入或刷新设置页面：\n1. GET /configs/{module} 一次，由前端解析 BoxJS、生成控件和默认值。\n2. GET BoxJS 字段公共子树一次，例如 /api/Enhanced/Settings/。\n3. 在当前页面建立内存缓存。若子树缺失返回 404，则用空覆盖值加 BoxJS 默认值绘制；兼容旧存储中以 JSON 字符串编码的设置子树。\n\n保存或删除只按目标路径发送一次请求，根据是否返回 200 显示短暂通知；失败保留缓存及未保存输入。成功后仅更新内存，不 GET 整个模块。仅前端校验控件类型和选项；直接调用 API 可写入任何合法 JSON 值。\n\n## 读写示例\n\n~~~http\nGET /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n已有值返回 200，正文是该值本身。GET 父路径返回全部子树，包括未在页面展示的键；不存在返回 404。不会自动合并 BoxJS 默认值。\n\n~~~http\nPOST /api/Enhanced/Settings/Home/Top_left\nContent-Type: application/json\nX-Settings-Client: 1\n\n\"mine\"\n~~~\n\n正文允许字符串、数字、布尔值、null、任意数组和对象；没有 values 包装。POST 替换指定位置的值而非合并对象。未存在的父节点会创建，JSON 数组元素可通过数字路径访问。路径之外的数据保持不变。\n\n~~~json\n{ \"saved\": true }\n~~~\n\n~~~http\nDELETE /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n删除键或整棵子树，不存在时也返回 200。前端删除设置覆盖值后显示当前 BoxJS 默认值。\n\n~~~json\n{ \"deleted\": true }\n~~~\n\n## Caches 与模块重置\n\n“查看 Caches”按需 GET /api/{module}/Caches，显示全部缓存 JSON；404 表示暂无缓存。再次点击刷新才重新读取，不在进入页面时自动下载缓存。\n\n“清空 Caches”确认后 DELETE /api/{module}/Caches，仅删除该节点，保留 Settings 及其它模块。成功后清空当前缓存视图，不追加 GET。\n\n“重置模块”确认后 DELETE /api/{module}/，删除模块的 Settings、Caches 和其它全部持久化键，保留同根的其它模块。成功后清除页面覆盖值、使用已加载 BoxJS 的默认值，隐藏旧缓存内容，不重新读取设置。再次进入页面时按正常打开流程读取。\n\n~~~http\nDELETE /api/Enhanced/\nX-Settings-Client: 1\n~~~\n\n## 代理存储操作\n\nHEAD 仅确认本处理器接管合法模块路径，不读取存储，也不证明已有值。GET 读取一次根；POST/DELETE 写入前读取最新根，使用 util Lodash 修改对应节点并写回一次。API 不发送网络请求。\n\n历史 JSON 字符串中间节点会在路径遍历时解码；GET 直接指向字符串叶子时保留字符串。无法继续遍历标量父节点返回 500，不悄悄覆盖原数据。DELETE 数组元素采用删除键语义，不移动其它索引。\n\nAPI 响应带 Cache-Control: no-store。默认需要 X-Settings-Client: 1，Origin 存在时须与安装来源一致；该请求头是页面标记，不是认证凭据。POST 正文上限为 65536 个 UTF-16 code units。多个代理脚本同时写同一根仍没有事务隔离保证。\n\n| 状态码 | 含义 |\n| --- | --- |\n| 200 | 探测或读写成功；HEAD 无正文 |\n| 400 | 路径或 JSON 正文格式无效 |\n| 403 | 缺少页面标记，或请求来源不符 |\n| 404 | 模块不由当前处理器接管，或 GET 目标不存在 |\n| 405 | 不支持的 HTTP 方法 |\n| 413 | POST 正文过长 |\n| 415 | POST 正文不是 application/json |\n| 500 | 存储读取、路径遍历或写入失败 |\n\nAPI 不再返回 BoxJS 配置加载错误 502。配置 Mock 失败的格式仍由代理或原站决定。\n\n## BoxJS 仅用于 WebView\n\n支持 settings 数组、单 app 和 apps 订阅。字段 ID 仍使用 @根.模块.路径；名称、type、val、items、desc 生成控件，placeholder/rows/autoGrow 控制文本输入展示。app 元数据用于页面标题、说明和图标，script 只保留不执行；icons[0]/icons[1] 是透明/彩色变体，不是亮暗顺序。\n\n浏览器解析的根名仅为配置信息；代理不会因此改变固定 storageKey。插件作者应让 BoxJS 路径与安装映射一致。设置默认值、类型与枚举都由 WebView 处理，API 本身与 BoxJS 无关。\n\nGitHub main/dev 分别绑定 Apifox 同名分支。修改 apifox/preference-panes.apifox.json 后由已绑定数据源导入，并按分支回读验证。\n",
                 "parameters": {
                   "path": [
                     {
@@ -1067,7 +1087,7 @@
                   {
                     "id": "pp-pp-module-head-404",
                     "code": 404,
-                    "name": "未知字段、无覆盖值或模块未启用",
+                    "name": "存储路径不存在、非接管模块或 Mock 不可用",
                     "headers": [],
                     "contentType": "noContent",
                     "jsonSchema": {},
@@ -1077,15 +1097,6 @@
                     "id": "pp-pp-module-head-405",
                     "code": 405,
                     "name": "不支持的操作",
-                    "headers": [],
-                    "contentType": "noContent",
-                    "jsonSchema": {},
-                    "description": "无正文"
-                  },
-                  {
-                    "id": "pp-pp-module-head-502",
-                    "code": 502,
-                    "name": "BoxJS 配置加载或解析失败",
                     "headers": [],
                     "contentType": "noContent",
                     "jsonSchema": {},
@@ -1125,7 +1136,7 @@
                 ],
                 "operationId": "preference_panes_511372916",
                 "sourceUrl": "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/guide.md",
-                "description": "## 接口用途\n\n加载 BoxJS，确认 path 是已声明叶子或具有已声明后代字段的父路径。200 仅表示路径受支持，不表示已有持久化值；不读写存储。主菜单使用 HEAD /configs/{module}。\n\n## 请求契约\n\n`HEAD /api/{module}/{path}`\n\nmodule 是必填路径参数，与配置文件中字段所属模块一致。path 是模块内的相对路径，可包含以 / 分隔的多级目录。路径参数不预填业务示例值；具体取值由接入项目决定。请求需携带 X-Settings-Client: 1；该标记不是认证凭据。\n\n请求没有正文。\n\n## 调用流程与具体示例\n\n# PreferencePanes：从入口探测到单键读写\n\n当前已发布版本为 0.2.0，包含 SettingsHandler class 和 BoxJS 元数据兼容增强。下面的 Enhanced 只是路径示例，example.org 没有部署接口；各项目复用相同代码，从自己的 BoxJS JSON 生成设置界面。\n\n## 通用路径契约\n\n| 方法 | 相对路径定义 | 用途 |\n| --- | --- | --- |\n| GET | `/settings/{module}` | 通用 HTML 页面，按路径中的模块生成界面 |\n| HEAD、GET | `/configs/{module}` | 探测配置 Mock、读取 BoxJS JSON |\n| HEAD、GET | `/api/{module}/` | 探测读写路由、读取模块公开子树 |\n| HEAD、GET | `/api/{module}/{path}` | 探测、读取模块内的键或子树 |\n| POST、DELETE | `/api/{module}/{path}` | 修改、删除声明的单个键 |\n\n`module` 是动态模块标识；`path` 是模块内的相对 database 路径，允许多级，用 `/` 分隔。`Settings/Home/Top_left` 只是 path 示例，Settings、Home 和键名都不固定。路径逐段编码，不能把分隔用的 `/` 整体编码为 `%2F`。页面、配置资源、持久化读写使用同一个 module；不是三个各自指定的模块参数，也不使用 query 参数。\n\n### 在 Apifox 中调试\n\n接口路径保留 Apifox 的 `{module}`、`{path}` 路径参数，不使用固定业务 URL，也不把 `*` 当作真实请求路径。调试前在 Path 参数区填写目标模块与模块内路径；参数值和 POST 正文默认留空，不预置任何项目或待写入值。服务地址由使用者的环境配置提供。\n\nPOST 的 Body 为原始 JSON，须按目标字段类型填写字符串、数字、布尔值或数组。响应 Schema 描述通用结构；下面各节的实际 URL、请求值、返回对象只是文档中的示例，不会作为调试请求或 Mock 的默认数据。路径每段仅允许英文字母、数字、下划线和连字符，不接受空段、点号或 __proto__/prototype/constructor。\n\n例如 module=Enhanced、path=Settings/Home/Top_left 时，实际请求才是 `/api/Enhanced/Settings/Home/Top_left`。以下具体 URL、BoxJS 字段和返回值均为使用示例，不能当作通用接口的固定路径或枚举。\n\n## 页面通过 module 选择配置\n\n```http\nGET /settings/Enhanced\n```\n\n通用页面从 `/settings/{module}` 路径读取模块标识，不读取 module 或 config 查询参数。渲染器按固定约定 GET `/configs/Enhanced`，读取返回的 BoxJS JSON，再动态生成设置项。改为 `/settings/Global` 就 GET `/configs/Global`，不修改 HTML。\n\nmodule 必须与 BoxJS ID `@BiliBili.Enhanced.Settings.…` 中的 Enhanced 一致；它也对应持久化 `/api/` 后第一段。实际 BoxJS 文件地址由模块模板的 Mock 规则指定。页面路径只允许一个非空模块段，可带结尾斜线；模块名只允许英文字母、数字、下划线、连字符，禁止 __proto__/prototype/constructor。缺失模块段、多余路径段或非法模块名在页面显示错误，不发送配置或存储请求。\n\n| 请求 | 响应方 | 内容 |\n| --- | --- | --- |\n| GET /settings/{module} | 公共 HTML Mock | 同一份通用设置页 |\n| HEAD、GET /configs/{module} | 对应模块的配置 Mock | 配置可用性、BoxJS 静态 JSON |\n| GET /api/{module}/ 或 /api/{module}/{path} | 通用代理读写脚本 | 当前持久化设置的公开子树或叶子值 |\n| POST、DELETE /api/{module}/{path} | 同一个通用代理读写脚本 | 单键修改、删除 |\n\n配置资源使用 `/configs/`，持久化接口使用 `/api/`，两种模板正则互不重叠，不依赖执行优先级。各业务项目用现有 argument config 生成器生成 BoxJS JSON。模块的 Mock 规则引用生成文件的下载源；通用读写脚本参数 configURL 引用同一版本资源进行校验。configURL 是代理脚本的模板参数，不是页面参数；页面仅用 module 按约定寻找配置 Mock。\n\n业务主菜单独立于通用设置页，由调用项目提供模块链接；Biliverse 主菜单归 Enhanced。通用 JS 不包含 Enhanced/Global 等目录或字段，Enhanced 已通过包的公开接口接入。\n\n## 一、主菜单只探测配置 Mock\n\n每次进入业务主菜单，用通用 client.probe(module) 并发发送：\n\n```http\nHEAD /configs/Enhanced\nHEAD /configs/Global\n```\n\n这些地址由各模块的 BoxJS Mock 提供。200 才启用入口；非 200、无响应或超时则禁用。HEAD 无正文，不读持久化存储、不执行通用读写脚本，也不证明读写脚本运行正常。\n\n配置 Mock 地址不部署同名在线静态文件，下载源在另一个地址。页面只请求约定的配置 Mock 地址。\n\n## 二、每次真正进入或刷新设置页\n\n先 GET 根据 module 生成的 `/configs/Enhanced`，取得 BoxJS。可使用 settings 数组、单 app 或 apps 订阅。示例：\n\n```json\n[\n  {\n    \"id\": \"@BiliBili.Enhanced.Settings.Home.Top_left\",\n    \"name\": \"顶栏左侧\", \"type\": \"selects\", \"val\": \"mine\",\n    \"items\": [{ \"key\": \"mine\", \"label\": \"我的\" }, { \"key\": \"videoshortcut\", \"label\": \"短视频\" }]\n  },\n  { \"id\": \"@BiliBili.Enhanced.Settings.enabled\", \"name\": \"启用\", \"type\": \"boolean\", \"val\": true }\n]\n```\n\n通用组件由 ID 解析出存储根 BiliBili 和公共子树 Enhanced.Settings，再读取一次：\n\n```http\nGET /api/Enhanced/Settings/\nX-Settings-Client: 1\n```\n\n返回 HTTP 200 和公开字段的持久化覆盖值，例如：\n\n```json\n{ \"Home\": { \"Top_left\": \"videoshortcut\" } }\n```\n\n只返回 BoxJS 声明的字段，不泄露同根下的缓存和其它模块。没有任何覆盖值时返回 `{}`。页面用 BoxJS val 补充未设置字段，并创建新的内存缓存；不使用 localStorage/sessionStorage。返回主菜单不 GET，再次进入重新执行上述两次 GET。刷新当前模块页也重新读取；浏览器前进、后退恢复缓存页面时会重新读取当前 URL 的模块。\n\n只有 `/api/` 固定；其它组织可以使用 `/api/Weather/Preferences/Units`。同模块必须使用一个存储根，并具有模块根以下的公共父路径，才能一次读取设置子树。控件支持 boolean/selects/checkboxes/text/textarea/number，不执行 BoxJS 脚本。\n\n## 三、修改单个键\n\n```http\nPOST /api/Enhanced/Settings/Home/Top_left\nContent-Type: application/json\nX-Settings-Client: 1\n\n\"mine\"\n```\n\n正文就是 JSON 值本身，没有 values 包装。成功返回 HTTP 200：\n\n```json\n{ \"saved\": true }\n```\n\n组件显示“修改成功”，只更新内存中的该键。不会随后 GET 整个模块。非 200（包括 204）或网络错误显示“操作失败”，缓存保留原值，其它控件的未保存输入也保留。\n\n代理执行端运行时读取 BoxJS 校验字段，然后读取最新存储根，通过 util set 修改该键并写回。不会把浏览器的整棵旧缓存覆盖回存储；只修改持久化数据，不修改源码 database.mjs 或 argument 配置。\n\n## 四、删除覆盖值\n\n```http\nDELETE /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n```\n\n没有正文。成功返回 HTTP 200：\n\n```json\n{ \"deleted\": true }\n```\n\n重复删除仍成功。代理通过 util unset 删除单键，保留同级字段、其它模块和缓存；不递归删除空父对象。浏览器显示“删除成功”，移除该键缓存的覆盖值，改用 BoxJS val；不追加 GET。删除覆盖值不等于关闭功能。\n\n## 五、需要时直接查询单键\n\n```http\nGET /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n```\n\n有覆盖值则返回 HTTP 200，正文直接为 `\"mine\"`；无值时 404。默认 GET 不返回 BoxJS 默认值。也支持 HEAD 完整叶子路径：声明过则 200，否则 404；不读取存储。主菜单应 HEAD 配置 Mock 地址，不是持久化叶子探测。\n\n## 通用脚本参数与读取时机\n\n### BoxJS 页面属性\n\n本地 dev 优化：WebView 使用原生对象访问，不再打包 util Lodash。代理每次仍从自己的 configURL 下载配置并校验字段，只提取存储根、字段路径、类型、默认值和枚举约束；不处理标题、描述、图标、占位文字、rows/autoGrow 等展示属性。展示属性由 WebView 校验，非法展示属性不会影响默认代理对合法字段的访问。自定义 GET resolver 仍收到完整 ModuleDefinition，保留其既有契约。HTTP 路径、状态码、访问范围与存储读写次数不变，未取消代理端配置请求。\n\n配置可以是 settings 数组、单个 app 或 apps 订阅。字段的 name/val/type/desc/items 决定控件，placeholder 设置输入提示；textarea 保持字符串类型，rows 为正整数基础行数，autoGrow 为布尔值。首次显示、输入及删除覆盖值后都会按内容调整高度。\n\n如果模块字段只属于一个 app，definition.metadata 保留它的 id/name/author/repo/script/icon/icons/desc/descs/description。页面使用 name 作为显示标题，author/desc/descs 作为纯文本，repo 作为项目链接。模块路由和存储根仍由字段的 @根.模块.路径 决定，不能由 app.id/name 推断。多个 app 分别声明同一模块的字段时合并字段，不任意选择一个 app 的展示元数据。\n\nicon 优先于 icons；原版 icons[0] 是透明版，icons[1] 是彩色版，并非亮暗顺序。默认使用彩色版，只有一个图标时使用该图标。页面图片与链接仅接受 HTTP(S) 或同源相对地址。script 只保留元数据，不请求或执行；不渲染 desc_html/descs_html，不使用 keys 推导额外可读写字段。\n\n| 参数或数据 | 来源与作用 |\n| --- | --- |\n| origin | 调用方的 HTTPS 页面来源，不带路径 |\n| configURL | 传给 SettingsHandler 的 HTTPS BoxJS 下载地址；类内部每次通过 util fetch 加载，按请求中的 module 选择字段 |\n| storageKey | 从 BoxJS 的 @根键.模块.路径 提取，不通过 header 传递 |\n| requestHeader | 默认 X-Settings-Client，值为 1；同源页面标记，不是认证凭据 |\n| resolveSettings(stored, definition) | 可选 GET 有效配置解析器，返回完整 database 形状的对象；不参与 HEAD/POST/DELETE |\n\n独立打包脚本通过 argument 的 origin/configURL 接收地址，用 util fetch 下载 BoxJS，用 util Storage/Lodash 读写。不同模块引用同一份脚本，分别配置自己的 /api/ 正则与校验 BoxJS 地址；/configs/ Mock 不经过此脚本。原生配置 Mock 与脚本应使用同一版本的配置源；代理自己的 Mock 资源缓存需要按代理机制更新。\n\n0.2.0 的代理调用方式为 `new SettingsHandler({ origin, configURL }).handle(request)`。配置下载、HTTP 200 检查、JSON 解析及字段归一化均由这个 class 完成，调用方不再提供 loadConfig 回调。网络异常、非 200、非法 JSON 或模块配置解析失败统一返回 502；不会继续读写持久化存储。0.1.0 使用旧工厂函数；HTTP 路径、方法和返回契约不变。\n\n每次 GET 持久化设置读根一次。每次 POST/DELETE 写入前重新读根，再单键修改、写回一次。浏览器缓存不触发额外 GET，但不能取消代理端保证保留其它数据所需的读改写。不同代理脚本同时写同一根键不具备事务隔离保证。\n\nresolveSettings 可由模块按已有规则合并 database、argument、持久化值。默认不传时只读持久化值，页面使用 BoxJS 默认值补缺。本包不自动修改模块现有配置优先级；删除后不调用 resolver，下次进入/刷新才重新读取。\n\n## 错误与限制\n\n| 状态码 | 持久化接口语义 |\n| --- | --- |\n| 200 | HEAD 路径受支持；GET 返回值或子树；POST/DELETE 操作成功 |\n| 400 | 路径非法、JSON 无法解析或值不满足 BoxJS 类型/枚举约束 |\n| 403 | 缺少页面标记头，或请求 Origin 与代理配置不符 |\n| 404 | 路径未声明；或 GET 叶子尚无持久化值 |\n| 405 | 对子树执行 POST/DELETE，或使用不支持的方法 |\n| 413 | POST 正文超过 65536 个 UTF-16 code units |\n| 415 | POST Content-Type 不是 application/json |\n| 500 | 持久化写入或代理执行失败 |\n| 502 | BoxJS 配置源加载、解析或模块定义校验失败 |\n\nGET 子树无覆盖值返回 200 和空对象，GET 叶子无覆盖值返回 404；两者不同。HEAD 成功不代表已有值。POST 字符串上限 2048，选择项与数组项按 BoxJS 校验；不接受 null 或对象作为叶子写入值。持久化响应 no-store；HEAD 始终无正文。配置资源由原生 Mock 管理，其失败响应格式由代理或原站决定，不能套用持久化接口的 JSON 错误结构。\n\nGitHub main/dev 分别绑定 Apifox 同名分支，JSON 路径为 apifox/preference-panes.apifox.json。提交 JSON 后仍需客户端执行数据源导入，并按分支回读确认结果。npm/GitHub Packages 未发布，Biliverse 消费端本轮未迁移。\n",
+                "description": "## 接口用途\n\n确认路径属于安装配置的模块且路径格式合法，不读取存储或 BoxJS；不保证该路径已有值。\n\n## 请求契约\n\n`HEAD /api/{module}/{path}`\n\nmodule 是必填路径参数，必须属于插件安装配置中的模块。path 是模块内的相对路径，可包含以 / 分隔的多级目录。路径参数不预填业务示例值；具体取值由接入项目决定。请求需携带 X-Settings-Client: 1；该标记不是认证凭据。\n\n请求没有正文。\n\n## 调用流程与具体示例\n\n# PreferencePanes 0.3.0 接口契约\n\n前端负责 BoxJS 解析、控件生成和字段输入校验。API 只桥接安装配置指定的持久化根与模块，不下载 BoxJS，不校验字段声明、枚举或控件类型。\n\n## 路径和参数\n\n| 方法 | 路径 | 行为 |\n| --- | --- | --- |\n| GET | /settings/{module} | 同一个 WebView 页面，按路径选择模块 |\n| HEAD、GET | /configs/{module} | 模块配置 Mock：探测、加载 BoxJS |\n| HEAD、GET、POST、DELETE | /api/{module}/ | 探测路由、读取、替换或删除整个模块 |\n| HEAD、GET、POST、DELETE | /api/{module}/{path} | 探测路由、读取、替换或删除任意键或子树 |\n| GET、DELETE | /api/{module}/Caches | 查看、清空模块缓存，使用相同的通用存储处理器 |\n\nmodule 和 path 使用 Apifox 路径参数，不预填业务示例。path 以 / 分隔层级，每段独立编码；不能把分隔斜线编码为 %2F。片段允许字母、数字、下划线、连字符，拒绝空片段及 __proto__/prototype/constructor。这些是路径结构校验，不是 BoxJS 字段校验。API 接受不存在于 BoxJS 中的新键。\n\n## 安装配置决定存储映射\n\n代理入口构造：\n\n~~~js\nconst handler = new SettingsHandler({\n  origin: \"https://biliverse.github.io\",\n  storageKey: \"BiliBili\",\n  module: \"Enhanced\"\n});\nconst response = await handler.handle($request);\n~~~\n\n此处由已安装插件提供可信配置，不经浏览器 header/body 提供。API 从 /api/ 后第一段确认模块，再将路径映射到固定存储根：\n\n~~~text\n/api/Enhanced/Settings/Home/Top_left → BiliBili.Enhanced.Settings.Home.Top_left\n/api/Enhanced/Caches                → BiliBili.Enhanced.Caches\n/api/Enhanced/                      → BiliBili.Enhanced\n~~~\n\nEnhanced 处理器不能访问 BiliBili.Global；重置 Enhanced 也保留 Global。类不接受 configURL、loadConfig 或 resolveSettings。通用独立代理脚本的 argument 为 origin、storageKey、module。配置 Mock 的实际下载源仍由模块模板指定，与 API 无关。\n\n## 前端读取与缓存\n\n每次进入主菜单，并发 HEAD /configs/{module}，仅 200 启用按钮；此时不 GET 设置。配置 Mock 地址不部署同名线上文件，静态下载源另设路径。\n\n每次打开、再次进入或刷新设置页面：\n1. GET /configs/{module} 一次，由前端解析 BoxJS、生成控件和默认值。\n2. GET BoxJS 字段公共子树一次，例如 /api/Enhanced/Settings/。\n3. 在当前页面建立内存缓存。若子树缺失返回 404，则用空覆盖值加 BoxJS 默认值绘制；兼容旧存储中以 JSON 字符串编码的设置子树。\n\n保存或删除只按目标路径发送一次请求，根据是否返回 200 显示短暂通知；失败保留缓存及未保存输入。成功后仅更新内存，不 GET 整个模块。仅前端校验控件类型和选项；直接调用 API 可写入任何合法 JSON 值。\n\n## 读写示例\n\n~~~http\nGET /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n已有值返回 200，正文是该值本身。GET 父路径返回全部子树，包括未在页面展示的键；不存在返回 404。不会自动合并 BoxJS 默认值。\n\n~~~http\nPOST /api/Enhanced/Settings/Home/Top_left\nContent-Type: application/json\nX-Settings-Client: 1\n\n\"mine\"\n~~~\n\n正文允许字符串、数字、布尔值、null、任意数组和对象；没有 values 包装。POST 替换指定位置的值而非合并对象。未存在的父节点会创建，JSON 数组元素可通过数字路径访问。路径之外的数据保持不变。\n\n~~~json\n{ \"saved\": true }\n~~~\n\n~~~http\nDELETE /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n删除键或整棵子树，不存在时也返回 200。前端删除设置覆盖值后显示当前 BoxJS 默认值。\n\n~~~json\n{ \"deleted\": true }\n~~~\n\n## Caches 与模块重置\n\n“查看 Caches”按需 GET /api/{module}/Caches，显示全部缓存 JSON；404 表示暂无缓存。再次点击刷新才重新读取，不在进入页面时自动下载缓存。\n\n“清空 Caches”确认后 DELETE /api/{module}/Caches，仅删除该节点，保留 Settings 及其它模块。成功后清空当前缓存视图，不追加 GET。\n\n“重置模块”确认后 DELETE /api/{module}/，删除模块的 Settings、Caches 和其它全部持久化键，保留同根的其它模块。成功后清除页面覆盖值、使用已加载 BoxJS 的默认值，隐藏旧缓存内容，不重新读取设置。再次进入页面时按正常打开流程读取。\n\n~~~http\nDELETE /api/Enhanced/\nX-Settings-Client: 1\n~~~\n\n## 代理存储操作\n\nHEAD 仅确认本处理器接管合法模块路径，不读取存储，也不证明已有值。GET 读取一次根；POST/DELETE 写入前读取最新根，使用 util Lodash 修改对应节点并写回一次。API 不发送网络请求。\n\n历史 JSON 字符串中间节点会在路径遍历时解码；GET 直接指向字符串叶子时保留字符串。无法继续遍历标量父节点返回 500，不悄悄覆盖原数据。DELETE 数组元素采用删除键语义，不移动其它索引。\n\nAPI 响应带 Cache-Control: no-store。默认需要 X-Settings-Client: 1，Origin 存在时须与安装来源一致；该请求头是页面标记，不是认证凭据。POST 正文上限为 65536 个 UTF-16 code units。多个代理脚本同时写同一根仍没有事务隔离保证。\n\n| 状态码 | 含义 |\n| --- | --- |\n| 200 | 探测或读写成功；HEAD 无正文 |\n| 400 | 路径或 JSON 正文格式无效 |\n| 403 | 缺少页面标记，或请求来源不符 |\n| 404 | 模块不由当前处理器接管，或 GET 目标不存在 |\n| 405 | 不支持的 HTTP 方法 |\n| 413 | POST 正文过长 |\n| 415 | POST 正文不是 application/json |\n| 500 | 存储读取、路径遍历或写入失败 |\n\nAPI 不再返回 BoxJS 配置加载错误 502。配置 Mock 失败的格式仍由代理或原站决定。\n\n## BoxJS 仅用于 WebView\n\n支持 settings 数组、单 app 和 apps 订阅。字段 ID 仍使用 @根.模块.路径；名称、type、val、items、desc 生成控件，placeholder/rows/autoGrow 控制文本输入展示。app 元数据用于页面标题、说明和图标，script 只保留不执行；icons[0]/icons[1] 是透明/彩色变体，不是亮暗顺序。\n\n浏览器解析的根名仅为配置信息；代理不会因此改变固定 storageKey。插件作者应让 BoxJS 路径与安装映射一致。设置默认值、类型与枚举都由 WebView 处理，API 本身与 BoxJS 无关。\n\nGitHub main/dev 分别绑定 Apifox 同名分支。修改 apifox/preference-panes.apifox.json 后由已绑定数据源导入，并按分支回读验证。\n",
                 "parameters": {
                   "path": [
                     {
@@ -1153,7 +1164,7 @@
                       "required": true,
                       "enable": true,
                       "example": "",
-                      "description": "模块内的相对 database 路径，可有多级，用 / 连接各段。逐段编码，不要把分隔斜线编码为 %2F；POST/DELETE 必须指向 BoxJS 声明的叶子，GET/HEAD 也支持父路径。Settings 和 Home 均不是固定层级。"
+                      "description": "模块内的相对 database 路径，可有多级，用 / 连接各段。逐段编码，不要把分隔斜线编码为 %2F；GET/POST/DELETE 均支持键或子树，不要求字段在 BoxJS 中声明。Settings 和 Home 均不是固定层级。"
                     }
                   ],
                   "query": [],
@@ -1221,7 +1232,7 @@
                   {
                     "id": "pp-511372916-404",
                     "code": 404,
-                    "name": "未知字段、无覆盖值或模块未启用",
+                    "name": "存储路径不存在、非接管模块或 Mock 不可用",
                     "headers": [],
                     "contentType": "noContent",
                     "jsonSchema": {},
@@ -1231,15 +1242,6 @@
                     "id": "pp-511372916-405",
                     "code": 405,
                     "name": "不支持的操作",
-                    "headers": [],
-                    "contentType": "noContent",
-                    "jsonSchema": {},
-                    "description": "无正文"
-                  },
-                  {
-                    "id": "pp-511372916-502",
-                    "code": 502,
-                    "name": "BoxJS 配置加载或解析失败",
                     "headers": [],
                     "contentType": "noContent",
                     "jsonSchema": {},
@@ -1279,7 +1281,7 @@
                 ],
                 "operationId": "preference_panes_511372917",
                 "sourceUrl": "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/guide.md",
-                "description": "## 接口用途\n\npath 是模块内以 / 分隔的相对路径。叶子直接返回键值，无持久化值且未提供 resolver 时为 404；父路径返回已声明字段的覆盖值子树，无覆盖值返回 {}。不返回 BoxJS 默认值。\n\n## 请求契约\n\n`GET /api/{module}/{path}`\n\nmodule 是必填路径参数，与配置文件中字段所属模块一致。path 是模块内的相对路径，可包含以 / 分隔的多级目录。路径参数不预填业务示例值；具体取值由接入项目决定。请求需携带 X-Settings-Client: 1；该标记不是认证凭据。\n\n请求没有正文。\n\n## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n```json\n\"mine\"\n```\n\n## 调用流程与具体示例\n\n# PreferencePanes：从入口探测到单键读写\n\n当前已发布版本为 0.2.0，包含 SettingsHandler class 和 BoxJS 元数据兼容增强。下面的 Enhanced 只是路径示例，example.org 没有部署接口；各项目复用相同代码，从自己的 BoxJS JSON 生成设置界面。\n\n## 通用路径契约\n\n| 方法 | 相对路径定义 | 用途 |\n| --- | --- | --- |\n| GET | `/settings/{module}` | 通用 HTML 页面，按路径中的模块生成界面 |\n| HEAD、GET | `/configs/{module}` | 探测配置 Mock、读取 BoxJS JSON |\n| HEAD、GET | `/api/{module}/` | 探测读写路由、读取模块公开子树 |\n| HEAD、GET | `/api/{module}/{path}` | 探测、读取模块内的键或子树 |\n| POST、DELETE | `/api/{module}/{path}` | 修改、删除声明的单个键 |\n\n`module` 是动态模块标识；`path` 是模块内的相对 database 路径，允许多级，用 `/` 分隔。`Settings/Home/Top_left` 只是 path 示例，Settings、Home 和键名都不固定。路径逐段编码，不能把分隔用的 `/` 整体编码为 `%2F`。页面、配置资源、持久化读写使用同一个 module；不是三个各自指定的模块参数，也不使用 query 参数。\n\n### 在 Apifox 中调试\n\n接口路径保留 Apifox 的 `{module}`、`{path}` 路径参数，不使用固定业务 URL，也不把 `*` 当作真实请求路径。调试前在 Path 参数区填写目标模块与模块内路径；参数值和 POST 正文默认留空，不预置任何项目或待写入值。服务地址由使用者的环境配置提供。\n\nPOST 的 Body 为原始 JSON，须按目标字段类型填写字符串、数字、布尔值或数组。响应 Schema 描述通用结构；下面各节的实际 URL、请求值、返回对象只是文档中的示例，不会作为调试请求或 Mock 的默认数据。路径每段仅允许英文字母、数字、下划线和连字符，不接受空段、点号或 __proto__/prototype/constructor。\n\n例如 module=Enhanced、path=Settings/Home/Top_left 时，实际请求才是 `/api/Enhanced/Settings/Home/Top_left`。以下具体 URL、BoxJS 字段和返回值均为使用示例，不能当作通用接口的固定路径或枚举。\n\n## 页面通过 module 选择配置\n\n```http\nGET /settings/Enhanced\n```\n\n通用页面从 `/settings/{module}` 路径读取模块标识，不读取 module 或 config 查询参数。渲染器按固定约定 GET `/configs/Enhanced`，读取返回的 BoxJS JSON，再动态生成设置项。改为 `/settings/Global` 就 GET `/configs/Global`，不修改 HTML。\n\nmodule 必须与 BoxJS ID `@BiliBili.Enhanced.Settings.…` 中的 Enhanced 一致；它也对应持久化 `/api/` 后第一段。实际 BoxJS 文件地址由模块模板的 Mock 规则指定。页面路径只允许一个非空模块段，可带结尾斜线；模块名只允许英文字母、数字、下划线、连字符，禁止 __proto__/prototype/constructor。缺失模块段、多余路径段或非法模块名在页面显示错误，不发送配置或存储请求。\n\n| 请求 | 响应方 | 内容 |\n| --- | --- | --- |\n| GET /settings/{module} | 公共 HTML Mock | 同一份通用设置页 |\n| HEAD、GET /configs/{module} | 对应模块的配置 Mock | 配置可用性、BoxJS 静态 JSON |\n| GET /api/{module}/ 或 /api/{module}/{path} | 通用代理读写脚本 | 当前持久化设置的公开子树或叶子值 |\n| POST、DELETE /api/{module}/{path} | 同一个通用代理读写脚本 | 单键修改、删除 |\n\n配置资源使用 `/configs/`，持久化接口使用 `/api/`，两种模板正则互不重叠，不依赖执行优先级。各业务项目用现有 argument config 生成器生成 BoxJS JSON。模块的 Mock 规则引用生成文件的下载源；通用读写脚本参数 configURL 引用同一版本资源进行校验。configURL 是代理脚本的模板参数，不是页面参数；页面仅用 module 按约定寻找配置 Mock。\n\n业务主菜单独立于通用设置页，由调用项目提供模块链接；Biliverse 主菜单归 Enhanced。通用 JS 不包含 Enhanced/Global 等目录或字段，Enhanced 已通过包的公开接口接入。\n\n## 一、主菜单只探测配置 Mock\n\n每次进入业务主菜单，用通用 client.probe(module) 并发发送：\n\n```http\nHEAD /configs/Enhanced\nHEAD /configs/Global\n```\n\n这些地址由各模块的 BoxJS Mock 提供。200 才启用入口；非 200、无响应或超时则禁用。HEAD 无正文，不读持久化存储、不执行通用读写脚本，也不证明读写脚本运行正常。\n\n配置 Mock 地址不部署同名在线静态文件，下载源在另一个地址。页面只请求约定的配置 Mock 地址。\n\n## 二、每次真正进入或刷新设置页\n\n先 GET 根据 module 生成的 `/configs/Enhanced`，取得 BoxJS。可使用 settings 数组、单 app 或 apps 订阅。示例：\n\n```json\n[\n  {\n    \"id\": \"@BiliBili.Enhanced.Settings.Home.Top_left\",\n    \"name\": \"顶栏左侧\", \"type\": \"selects\", \"val\": \"mine\",\n    \"items\": [{ \"key\": \"mine\", \"label\": \"我的\" }, { \"key\": \"videoshortcut\", \"label\": \"短视频\" }]\n  },\n  { \"id\": \"@BiliBili.Enhanced.Settings.enabled\", \"name\": \"启用\", \"type\": \"boolean\", \"val\": true }\n]\n```\n\n通用组件由 ID 解析出存储根 BiliBili 和公共子树 Enhanced.Settings，再读取一次：\n\n```http\nGET /api/Enhanced/Settings/\nX-Settings-Client: 1\n```\n\n返回 HTTP 200 和公开字段的持久化覆盖值，例如：\n\n```json\n{ \"Home\": { \"Top_left\": \"videoshortcut\" } }\n```\n\n只返回 BoxJS 声明的字段，不泄露同根下的缓存和其它模块。没有任何覆盖值时返回 `{}`。页面用 BoxJS val 补充未设置字段，并创建新的内存缓存；不使用 localStorage/sessionStorage。返回主菜单不 GET，再次进入重新执行上述两次 GET。刷新当前模块页也重新读取；浏览器前进、后退恢复缓存页面时会重新读取当前 URL 的模块。\n\n只有 `/api/` 固定；其它组织可以使用 `/api/Weather/Preferences/Units`。同模块必须使用一个存储根，并具有模块根以下的公共父路径，才能一次读取设置子树。控件支持 boolean/selects/checkboxes/text/textarea/number，不执行 BoxJS 脚本。\n\n## 三、修改单个键\n\n```http\nPOST /api/Enhanced/Settings/Home/Top_left\nContent-Type: application/json\nX-Settings-Client: 1\n\n\"mine\"\n```\n\n正文就是 JSON 值本身，没有 values 包装。成功返回 HTTP 200：\n\n```json\n{ \"saved\": true }\n```\n\n组件显示“修改成功”，只更新内存中的该键。不会随后 GET 整个模块。非 200（包括 204）或网络错误显示“操作失败”，缓存保留原值，其它控件的未保存输入也保留。\n\n代理执行端运行时读取 BoxJS 校验字段，然后读取最新存储根，通过 util set 修改该键并写回。不会把浏览器的整棵旧缓存覆盖回存储；只修改持久化数据，不修改源码 database.mjs 或 argument 配置。\n\n## 四、删除覆盖值\n\n```http\nDELETE /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n```\n\n没有正文。成功返回 HTTP 200：\n\n```json\n{ \"deleted\": true }\n```\n\n重复删除仍成功。代理通过 util unset 删除单键，保留同级字段、其它模块和缓存；不递归删除空父对象。浏览器显示“删除成功”，移除该键缓存的覆盖值，改用 BoxJS val；不追加 GET。删除覆盖值不等于关闭功能。\n\n## 五、需要时直接查询单键\n\n```http\nGET /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n```\n\n有覆盖值则返回 HTTP 200，正文直接为 `\"mine\"`；无值时 404。默认 GET 不返回 BoxJS 默认值。也支持 HEAD 完整叶子路径：声明过则 200，否则 404；不读取存储。主菜单应 HEAD 配置 Mock 地址，不是持久化叶子探测。\n\n## 通用脚本参数与读取时机\n\n### BoxJS 页面属性\n\n本地 dev 优化：WebView 使用原生对象访问，不再打包 util Lodash。代理每次仍从自己的 configURL 下载配置并校验字段，只提取存储根、字段路径、类型、默认值和枚举约束；不处理标题、描述、图标、占位文字、rows/autoGrow 等展示属性。展示属性由 WebView 校验，非法展示属性不会影响默认代理对合法字段的访问。自定义 GET resolver 仍收到完整 ModuleDefinition，保留其既有契约。HTTP 路径、状态码、访问范围与存储读写次数不变，未取消代理端配置请求。\n\n配置可以是 settings 数组、单个 app 或 apps 订阅。字段的 name/val/type/desc/items 决定控件，placeholder 设置输入提示；textarea 保持字符串类型，rows 为正整数基础行数，autoGrow 为布尔值。首次显示、输入及删除覆盖值后都会按内容调整高度。\n\n如果模块字段只属于一个 app，definition.metadata 保留它的 id/name/author/repo/script/icon/icons/desc/descs/description。页面使用 name 作为显示标题，author/desc/descs 作为纯文本，repo 作为项目链接。模块路由和存储根仍由字段的 @根.模块.路径 决定，不能由 app.id/name 推断。多个 app 分别声明同一模块的字段时合并字段，不任意选择一个 app 的展示元数据。\n\nicon 优先于 icons；原版 icons[0] 是透明版，icons[1] 是彩色版，并非亮暗顺序。默认使用彩色版，只有一个图标时使用该图标。页面图片与链接仅接受 HTTP(S) 或同源相对地址。script 只保留元数据，不请求或执行；不渲染 desc_html/descs_html，不使用 keys 推导额外可读写字段。\n\n| 参数或数据 | 来源与作用 |\n| --- | --- |\n| origin | 调用方的 HTTPS 页面来源，不带路径 |\n| configURL | 传给 SettingsHandler 的 HTTPS BoxJS 下载地址；类内部每次通过 util fetch 加载，按请求中的 module 选择字段 |\n| storageKey | 从 BoxJS 的 @根键.模块.路径 提取，不通过 header 传递 |\n| requestHeader | 默认 X-Settings-Client，值为 1；同源页面标记，不是认证凭据 |\n| resolveSettings(stored, definition) | 可选 GET 有效配置解析器，返回完整 database 形状的对象；不参与 HEAD/POST/DELETE |\n\n独立打包脚本通过 argument 的 origin/configURL 接收地址，用 util fetch 下载 BoxJS，用 util Storage/Lodash 读写。不同模块引用同一份脚本，分别配置自己的 /api/ 正则与校验 BoxJS 地址；/configs/ Mock 不经过此脚本。原生配置 Mock 与脚本应使用同一版本的配置源；代理自己的 Mock 资源缓存需要按代理机制更新。\n\n0.2.0 的代理调用方式为 `new SettingsHandler({ origin, configURL }).handle(request)`。配置下载、HTTP 200 检查、JSON 解析及字段归一化均由这个 class 完成，调用方不再提供 loadConfig 回调。网络异常、非 200、非法 JSON 或模块配置解析失败统一返回 502；不会继续读写持久化存储。0.1.0 使用旧工厂函数；HTTP 路径、方法和返回契约不变。\n\n每次 GET 持久化设置读根一次。每次 POST/DELETE 写入前重新读根，再单键修改、写回一次。浏览器缓存不触发额外 GET，但不能取消代理端保证保留其它数据所需的读改写。不同代理脚本同时写同一根键不具备事务隔离保证。\n\nresolveSettings 可由模块按已有规则合并 database、argument、持久化值。默认不传时只读持久化值，页面使用 BoxJS 默认值补缺。本包不自动修改模块现有配置优先级；删除后不调用 resolver，下次进入/刷新才重新读取。\n\n## 错误与限制\n\n| 状态码 | 持久化接口语义 |\n| --- | --- |\n| 200 | HEAD 路径受支持；GET 返回值或子树；POST/DELETE 操作成功 |\n| 400 | 路径非法、JSON 无法解析或值不满足 BoxJS 类型/枚举约束 |\n| 403 | 缺少页面标记头，或请求 Origin 与代理配置不符 |\n| 404 | 路径未声明；或 GET 叶子尚无持久化值 |\n| 405 | 对子树执行 POST/DELETE，或使用不支持的方法 |\n| 413 | POST 正文超过 65536 个 UTF-16 code units |\n| 415 | POST Content-Type 不是 application/json |\n| 500 | 持久化写入或代理执行失败 |\n| 502 | BoxJS 配置源加载、解析或模块定义校验失败 |\n\nGET 子树无覆盖值返回 200 和空对象，GET 叶子无覆盖值返回 404；两者不同。HEAD 成功不代表已有值。POST 字符串上限 2048，选择项与数组项按 BoxJS 校验；不接受 null 或对象作为叶子写入值。持久化响应 no-store；HEAD 始终无正文。配置资源由原生 Mock 管理，其失败响应格式由代理或原站决定，不能套用持久化接口的 JSON 错误结构。\n\nGitHub main/dev 分别绑定 Apifox 同名分支，JSON 路径为 apifox/preference-panes.apifox.json。提交 JSON 后仍需客户端执行数据源导入，并按分支回读确认结果。npm/GitHub Packages 未发布，Biliverse 消费端本轮未迁移。\n",
+                "description": "## 接口用途\n\n直接返回路径处的任意 JSON 值。父路径返回全部子树，缺失路径返回 404；不计算 BoxJS 默认值，也不执行 resolver。\n\n## 请求契约\n\n`GET /api/{module}/{path}`\n\nmodule 是必填路径参数，必须属于插件安装配置中的模块。path 是模块内的相对路径，可包含以 / 分隔的多级目录。路径参数不预填业务示例值；具体取值由接入项目决定。请求需携带 X-Settings-Client: 1；该标记不是认证凭据。\n\n请求没有正文。\n\n## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n```json\n\"mine\"\n```\n\n## 调用流程与具体示例\n\n# PreferencePanes 0.3.0 接口契约\n\n前端负责 BoxJS 解析、控件生成和字段输入校验。API 只桥接安装配置指定的持久化根与模块，不下载 BoxJS，不校验字段声明、枚举或控件类型。\n\n## 路径和参数\n\n| 方法 | 路径 | 行为 |\n| --- | --- | --- |\n| GET | /settings/{module} | 同一个 WebView 页面，按路径选择模块 |\n| HEAD、GET | /configs/{module} | 模块配置 Mock：探测、加载 BoxJS |\n| HEAD、GET、POST、DELETE | /api/{module}/ | 探测路由、读取、替换或删除整个模块 |\n| HEAD、GET、POST、DELETE | /api/{module}/{path} | 探测路由、读取、替换或删除任意键或子树 |\n| GET、DELETE | /api/{module}/Caches | 查看、清空模块缓存，使用相同的通用存储处理器 |\n\nmodule 和 path 使用 Apifox 路径参数，不预填业务示例。path 以 / 分隔层级，每段独立编码；不能把分隔斜线编码为 %2F。片段允许字母、数字、下划线、连字符，拒绝空片段及 __proto__/prototype/constructor。这些是路径结构校验，不是 BoxJS 字段校验。API 接受不存在于 BoxJS 中的新键。\n\n## 安装配置决定存储映射\n\n代理入口构造：\n\n~~~js\nconst handler = new SettingsHandler({\n  origin: \"https://biliverse.github.io\",\n  storageKey: \"BiliBili\",\n  module: \"Enhanced\"\n});\nconst response = await handler.handle($request);\n~~~\n\n此处由已安装插件提供可信配置，不经浏览器 header/body 提供。API 从 /api/ 后第一段确认模块，再将路径映射到固定存储根：\n\n~~~text\n/api/Enhanced/Settings/Home/Top_left → BiliBili.Enhanced.Settings.Home.Top_left\n/api/Enhanced/Caches                → BiliBili.Enhanced.Caches\n/api/Enhanced/                      → BiliBili.Enhanced\n~~~\n\nEnhanced 处理器不能访问 BiliBili.Global；重置 Enhanced 也保留 Global。类不接受 configURL、loadConfig 或 resolveSettings。通用独立代理脚本的 argument 为 origin、storageKey、module。配置 Mock 的实际下载源仍由模块模板指定，与 API 无关。\n\n## 前端读取与缓存\n\n每次进入主菜单，并发 HEAD /configs/{module}，仅 200 启用按钮；此时不 GET 设置。配置 Mock 地址不部署同名线上文件，静态下载源另设路径。\n\n每次打开、再次进入或刷新设置页面：\n1. GET /configs/{module} 一次，由前端解析 BoxJS、生成控件和默认值。\n2. GET BoxJS 字段公共子树一次，例如 /api/Enhanced/Settings/。\n3. 在当前页面建立内存缓存。若子树缺失返回 404，则用空覆盖值加 BoxJS 默认值绘制；兼容旧存储中以 JSON 字符串编码的设置子树。\n\n保存或删除只按目标路径发送一次请求，根据是否返回 200 显示短暂通知；失败保留缓存及未保存输入。成功后仅更新内存，不 GET 整个模块。仅前端校验控件类型和选项；直接调用 API 可写入任何合法 JSON 值。\n\n## 读写示例\n\n~~~http\nGET /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n已有值返回 200，正文是该值本身。GET 父路径返回全部子树，包括未在页面展示的键；不存在返回 404。不会自动合并 BoxJS 默认值。\n\n~~~http\nPOST /api/Enhanced/Settings/Home/Top_left\nContent-Type: application/json\nX-Settings-Client: 1\n\n\"mine\"\n~~~\n\n正文允许字符串、数字、布尔值、null、任意数组和对象；没有 values 包装。POST 替换指定位置的值而非合并对象。未存在的父节点会创建，JSON 数组元素可通过数字路径访问。路径之外的数据保持不变。\n\n~~~json\n{ \"saved\": true }\n~~~\n\n~~~http\nDELETE /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n删除键或整棵子树，不存在时也返回 200。前端删除设置覆盖值后显示当前 BoxJS 默认值。\n\n~~~json\n{ \"deleted\": true }\n~~~\n\n## Caches 与模块重置\n\n“查看 Caches”按需 GET /api/{module}/Caches，显示全部缓存 JSON；404 表示暂无缓存。再次点击刷新才重新读取，不在进入页面时自动下载缓存。\n\n“清空 Caches”确认后 DELETE /api/{module}/Caches，仅删除该节点，保留 Settings 及其它模块。成功后清空当前缓存视图，不追加 GET。\n\n“重置模块”确认后 DELETE /api/{module}/，删除模块的 Settings、Caches 和其它全部持久化键，保留同根的其它模块。成功后清除页面覆盖值、使用已加载 BoxJS 的默认值，隐藏旧缓存内容，不重新读取设置。再次进入页面时按正常打开流程读取。\n\n~~~http\nDELETE /api/Enhanced/\nX-Settings-Client: 1\n~~~\n\n## 代理存储操作\n\nHEAD 仅确认本处理器接管合法模块路径，不读取存储，也不证明已有值。GET 读取一次根；POST/DELETE 写入前读取最新根，使用 util Lodash 修改对应节点并写回一次。API 不发送网络请求。\n\n历史 JSON 字符串中间节点会在路径遍历时解码；GET 直接指向字符串叶子时保留字符串。无法继续遍历标量父节点返回 500，不悄悄覆盖原数据。DELETE 数组元素采用删除键语义，不移动其它索引。\n\nAPI 响应带 Cache-Control: no-store。默认需要 X-Settings-Client: 1，Origin 存在时须与安装来源一致；该请求头是页面标记，不是认证凭据。POST 正文上限为 65536 个 UTF-16 code units。多个代理脚本同时写同一根仍没有事务隔离保证。\n\n| 状态码 | 含义 |\n| --- | --- |\n| 200 | 探测或读写成功；HEAD 无正文 |\n| 400 | 路径或 JSON 正文格式无效 |\n| 403 | 缺少页面标记，或请求来源不符 |\n| 404 | 模块不由当前处理器接管，或 GET 目标不存在 |\n| 405 | 不支持的 HTTP 方法 |\n| 413 | POST 正文过长 |\n| 415 | POST 正文不是 application/json |\n| 500 | 存储读取、路径遍历或写入失败 |\n\nAPI 不再返回 BoxJS 配置加载错误 502。配置 Mock 失败的格式仍由代理或原站决定。\n\n## BoxJS 仅用于 WebView\n\n支持 settings 数组、单 app 和 apps 订阅。字段 ID 仍使用 @根.模块.路径；名称、type、val、items、desc 生成控件，placeholder/rows/autoGrow 控制文本输入展示。app 元数据用于页面标题、说明和图标，script 只保留不执行；icons[0]/icons[1] 是透明/彩色变体，不是亮暗顺序。\n\n浏览器解析的根名仅为配置信息；代理不会因此改变固定 storageKey。插件作者应让 BoxJS 路径与安装映射一致。设置默认值、类型与枚举都由 WebView 处理，API 本身与 BoxJS 无关。\n\nGitHub main/dev 分别绑定 Apifox 同名分支。修改 apifox/preference-panes.apifox.json 后由已绑定数据源导入，并按分支回读验证。\n",
                 "parameters": {
                   "path": [
                     {
@@ -1307,7 +1309,7 @@
                       "required": true,
                       "enable": true,
                       "example": "",
-                      "description": "模块内的相对 database 路径，可有多级，用 / 连接各段。逐段编码，不要把分隔斜线编码为 %2F；POST/DELETE 必须指向 BoxJS 声明的叶子，GET/HEAD 也支持父路径。Settings 和 Home 均不是固定层级。"
+                      "description": "模块内的相对 database 路径，可有多级，用 / 连接各段。逐段编码，不要把分隔斜线编码为 %2F；GET/POST/DELETE 均支持键或子树，不要求字段在 BoxJS 中声明。Settings 和 Home 均不是固定层级。"
                     }
                   ],
                   "query": [],
@@ -1352,10 +1354,10 @@
                     "headers": [],
                     "contentType": "json",
                     "jsonSchema": {
+                      "description": "任意 JSON 值；API 不按 BoxJS 校验类型或枚举，POST 替换路径处的完整值。",
                       "oneOf": [
                         {
-                          "type": "string",
-                          "maxLength": 2048
+                          "type": "string"
                         },
                         {
                           "type": "number"
@@ -1364,27 +1366,15 @@
                           "type": "boolean"
                         },
                         {
+                          "type": "null"
+                        },
+                        {
                           "type": "array",
-                          "items": {
-                            "oneOf": [
-                              {
-                                "type": "string",
-                                "maxLength": 2048
-                              },
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "boolean"
-                              }
-                            ]
-                          },
-                          "uniqueItems": true
+                          "items": {}
                         },
                         {
                           "type": "object",
-                          "additionalProperties": true,
-                          "description": "动态子树：仅包含 BoxJS 声明且已有持久化值的字段；键名、层级和类型由模块配置决定。"
+                          "additionalProperties": true
                         }
                       ]
                     },
@@ -1431,7 +1421,7 @@
                   {
                     "id": "pp-511372917-404",
                     "code": 404,
-                    "name": "未知字段、无覆盖值或模块未启用",
+                    "name": "存储路径不存在、非接管模块或 Mock 不可用",
                     "headers": [],
                     "contentType": "json",
                     "jsonSchema": {
@@ -1467,9 +1457,9 @@
                     "description": "JSON 响应"
                   },
                   {
-                    "id": "pp-511372917-502",
-                    "code": 502,
-                    "name": "BoxJS 配置加载或解析失败",
+                    "id": "pp-511372917-500",
+                    "code": 500,
+                    "name": "存储写入或执行失败",
                     "headers": [],
                     "contentType": "json",
                     "jsonSchema": {
@@ -1504,7 +1494,7 @@
               }
             },
             {
-              "name": "写入或修改指定配置键",
+              "name": "写入或替换指定值",
               "api": {
                 "id": "511372918",
                 "method": "post",
@@ -1519,7 +1509,7 @@
                 ],
                 "operationId": "preference_panes_511372918",
                 "sourceUrl": "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/guide.md",
-                "description": "## 接口用途\n\n正文直接是符合 BoxJS 字段类型的 JSON 值，例如 \"mine\"、true、42 或数组；不是补丁对象。仅允许写入完整叶子路径。成功返回 200 和 saved=true；客户端只更新该键缓存并显示通知，不追加 GET。\n\n## 请求契约\n\n`POST /api/{module}/{path}`\n\nmodule 是必填路径参数，与配置文件中字段所属模块一致。path 是模块内的相对路径，可包含以 / 分隔的多级目录。路径参数不预填业务示例值；具体取值由接入项目决定。请求需携带 X-Settings-Client: 1；该标记不是认证凭据。\n\n正文必须为 application/json，直接传字段值本身；不接受整树对象或 values 包装。实际类型、枚举范围由 BoxJS 校验。\n\n## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n```json\n{\n  \"saved\": true\n}\n```\n\n## 调用流程与具体示例\n\n# PreferencePanes：从入口探测到单键读写\n\n当前已发布版本为 0.2.0，包含 SettingsHandler class 和 BoxJS 元数据兼容增强。下面的 Enhanced 只是路径示例，example.org 没有部署接口；各项目复用相同代码，从自己的 BoxJS JSON 生成设置界面。\n\n## 通用路径契约\n\n| 方法 | 相对路径定义 | 用途 |\n| --- | --- | --- |\n| GET | `/settings/{module}` | 通用 HTML 页面，按路径中的模块生成界面 |\n| HEAD、GET | `/configs/{module}` | 探测配置 Mock、读取 BoxJS JSON |\n| HEAD、GET | `/api/{module}/` | 探测读写路由、读取模块公开子树 |\n| HEAD、GET | `/api/{module}/{path}` | 探测、读取模块内的键或子树 |\n| POST、DELETE | `/api/{module}/{path}` | 修改、删除声明的单个键 |\n\n`module` 是动态模块标识；`path` 是模块内的相对 database 路径，允许多级，用 `/` 分隔。`Settings/Home/Top_left` 只是 path 示例，Settings、Home 和键名都不固定。路径逐段编码，不能把分隔用的 `/` 整体编码为 `%2F`。页面、配置资源、持久化读写使用同一个 module；不是三个各自指定的模块参数，也不使用 query 参数。\n\n### 在 Apifox 中调试\n\n接口路径保留 Apifox 的 `{module}`、`{path}` 路径参数，不使用固定业务 URL，也不把 `*` 当作真实请求路径。调试前在 Path 参数区填写目标模块与模块内路径；参数值和 POST 正文默认留空，不预置任何项目或待写入值。服务地址由使用者的环境配置提供。\n\nPOST 的 Body 为原始 JSON，须按目标字段类型填写字符串、数字、布尔值或数组。响应 Schema 描述通用结构；下面各节的实际 URL、请求值、返回对象只是文档中的示例，不会作为调试请求或 Mock 的默认数据。路径每段仅允许英文字母、数字、下划线和连字符，不接受空段、点号或 __proto__/prototype/constructor。\n\n例如 module=Enhanced、path=Settings/Home/Top_left 时，实际请求才是 `/api/Enhanced/Settings/Home/Top_left`。以下具体 URL、BoxJS 字段和返回值均为使用示例，不能当作通用接口的固定路径或枚举。\n\n## 页面通过 module 选择配置\n\n```http\nGET /settings/Enhanced\n```\n\n通用页面从 `/settings/{module}` 路径读取模块标识，不读取 module 或 config 查询参数。渲染器按固定约定 GET `/configs/Enhanced`，读取返回的 BoxJS JSON，再动态生成设置项。改为 `/settings/Global` 就 GET `/configs/Global`，不修改 HTML。\n\nmodule 必须与 BoxJS ID `@BiliBili.Enhanced.Settings.…` 中的 Enhanced 一致；它也对应持久化 `/api/` 后第一段。实际 BoxJS 文件地址由模块模板的 Mock 规则指定。页面路径只允许一个非空模块段，可带结尾斜线；模块名只允许英文字母、数字、下划线、连字符，禁止 __proto__/prototype/constructor。缺失模块段、多余路径段或非法模块名在页面显示错误，不发送配置或存储请求。\n\n| 请求 | 响应方 | 内容 |\n| --- | --- | --- |\n| GET /settings/{module} | 公共 HTML Mock | 同一份通用设置页 |\n| HEAD、GET /configs/{module} | 对应模块的配置 Mock | 配置可用性、BoxJS 静态 JSON |\n| GET /api/{module}/ 或 /api/{module}/{path} | 通用代理读写脚本 | 当前持久化设置的公开子树或叶子值 |\n| POST、DELETE /api/{module}/{path} | 同一个通用代理读写脚本 | 单键修改、删除 |\n\n配置资源使用 `/configs/`，持久化接口使用 `/api/`，两种模板正则互不重叠，不依赖执行优先级。各业务项目用现有 argument config 生成器生成 BoxJS JSON。模块的 Mock 规则引用生成文件的下载源；通用读写脚本参数 configURL 引用同一版本资源进行校验。configURL 是代理脚本的模板参数，不是页面参数；页面仅用 module 按约定寻找配置 Mock。\n\n业务主菜单独立于通用设置页，由调用项目提供模块链接；Biliverse 主菜单归 Enhanced。通用 JS 不包含 Enhanced/Global 等目录或字段，Enhanced 已通过包的公开接口接入。\n\n## 一、主菜单只探测配置 Mock\n\n每次进入业务主菜单，用通用 client.probe(module) 并发发送：\n\n```http\nHEAD /configs/Enhanced\nHEAD /configs/Global\n```\n\n这些地址由各模块的 BoxJS Mock 提供。200 才启用入口；非 200、无响应或超时则禁用。HEAD 无正文，不读持久化存储、不执行通用读写脚本，也不证明读写脚本运行正常。\n\n配置 Mock 地址不部署同名在线静态文件，下载源在另一个地址。页面只请求约定的配置 Mock 地址。\n\n## 二、每次真正进入或刷新设置页\n\n先 GET 根据 module 生成的 `/configs/Enhanced`，取得 BoxJS。可使用 settings 数组、单 app 或 apps 订阅。示例：\n\n```json\n[\n  {\n    \"id\": \"@BiliBili.Enhanced.Settings.Home.Top_left\",\n    \"name\": \"顶栏左侧\", \"type\": \"selects\", \"val\": \"mine\",\n    \"items\": [{ \"key\": \"mine\", \"label\": \"我的\" }, { \"key\": \"videoshortcut\", \"label\": \"短视频\" }]\n  },\n  { \"id\": \"@BiliBili.Enhanced.Settings.enabled\", \"name\": \"启用\", \"type\": \"boolean\", \"val\": true }\n]\n```\n\n通用组件由 ID 解析出存储根 BiliBili 和公共子树 Enhanced.Settings，再读取一次：\n\n```http\nGET /api/Enhanced/Settings/\nX-Settings-Client: 1\n```\n\n返回 HTTP 200 和公开字段的持久化覆盖值，例如：\n\n```json\n{ \"Home\": { \"Top_left\": \"videoshortcut\" } }\n```\n\n只返回 BoxJS 声明的字段，不泄露同根下的缓存和其它模块。没有任何覆盖值时返回 `{}`。页面用 BoxJS val 补充未设置字段，并创建新的内存缓存；不使用 localStorage/sessionStorage。返回主菜单不 GET，再次进入重新执行上述两次 GET。刷新当前模块页也重新读取；浏览器前进、后退恢复缓存页面时会重新读取当前 URL 的模块。\n\n只有 `/api/` 固定；其它组织可以使用 `/api/Weather/Preferences/Units`。同模块必须使用一个存储根，并具有模块根以下的公共父路径，才能一次读取设置子树。控件支持 boolean/selects/checkboxes/text/textarea/number，不执行 BoxJS 脚本。\n\n## 三、修改单个键\n\n```http\nPOST /api/Enhanced/Settings/Home/Top_left\nContent-Type: application/json\nX-Settings-Client: 1\n\n\"mine\"\n```\n\n正文就是 JSON 值本身，没有 values 包装。成功返回 HTTP 200：\n\n```json\n{ \"saved\": true }\n```\n\n组件显示“修改成功”，只更新内存中的该键。不会随后 GET 整个模块。非 200（包括 204）或网络错误显示“操作失败”，缓存保留原值，其它控件的未保存输入也保留。\n\n代理执行端运行时读取 BoxJS 校验字段，然后读取最新存储根，通过 util set 修改该键并写回。不会把浏览器的整棵旧缓存覆盖回存储；只修改持久化数据，不修改源码 database.mjs 或 argument 配置。\n\n## 四、删除覆盖值\n\n```http\nDELETE /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n```\n\n没有正文。成功返回 HTTP 200：\n\n```json\n{ \"deleted\": true }\n```\n\n重复删除仍成功。代理通过 util unset 删除单键，保留同级字段、其它模块和缓存；不递归删除空父对象。浏览器显示“删除成功”，移除该键缓存的覆盖值，改用 BoxJS val；不追加 GET。删除覆盖值不等于关闭功能。\n\n## 五、需要时直接查询单键\n\n```http\nGET /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n```\n\n有覆盖值则返回 HTTP 200，正文直接为 `\"mine\"`；无值时 404。默认 GET 不返回 BoxJS 默认值。也支持 HEAD 完整叶子路径：声明过则 200，否则 404；不读取存储。主菜单应 HEAD 配置 Mock 地址，不是持久化叶子探测。\n\n## 通用脚本参数与读取时机\n\n### BoxJS 页面属性\n\n本地 dev 优化：WebView 使用原生对象访问，不再打包 util Lodash。代理每次仍从自己的 configURL 下载配置并校验字段，只提取存储根、字段路径、类型、默认值和枚举约束；不处理标题、描述、图标、占位文字、rows/autoGrow 等展示属性。展示属性由 WebView 校验，非法展示属性不会影响默认代理对合法字段的访问。自定义 GET resolver 仍收到完整 ModuleDefinition，保留其既有契约。HTTP 路径、状态码、访问范围与存储读写次数不变，未取消代理端配置请求。\n\n配置可以是 settings 数组、单个 app 或 apps 订阅。字段的 name/val/type/desc/items 决定控件，placeholder 设置输入提示；textarea 保持字符串类型，rows 为正整数基础行数，autoGrow 为布尔值。首次显示、输入及删除覆盖值后都会按内容调整高度。\n\n如果模块字段只属于一个 app，definition.metadata 保留它的 id/name/author/repo/script/icon/icons/desc/descs/description。页面使用 name 作为显示标题，author/desc/descs 作为纯文本，repo 作为项目链接。模块路由和存储根仍由字段的 @根.模块.路径 决定，不能由 app.id/name 推断。多个 app 分别声明同一模块的字段时合并字段，不任意选择一个 app 的展示元数据。\n\nicon 优先于 icons；原版 icons[0] 是透明版，icons[1] 是彩色版，并非亮暗顺序。默认使用彩色版，只有一个图标时使用该图标。页面图片与链接仅接受 HTTP(S) 或同源相对地址。script 只保留元数据，不请求或执行；不渲染 desc_html/descs_html，不使用 keys 推导额外可读写字段。\n\n| 参数或数据 | 来源与作用 |\n| --- | --- |\n| origin | 调用方的 HTTPS 页面来源，不带路径 |\n| configURL | 传给 SettingsHandler 的 HTTPS BoxJS 下载地址；类内部每次通过 util fetch 加载，按请求中的 module 选择字段 |\n| storageKey | 从 BoxJS 的 @根键.模块.路径 提取，不通过 header 传递 |\n| requestHeader | 默认 X-Settings-Client，值为 1；同源页面标记，不是认证凭据 |\n| resolveSettings(stored, definition) | 可选 GET 有效配置解析器，返回完整 database 形状的对象；不参与 HEAD/POST/DELETE |\n\n独立打包脚本通过 argument 的 origin/configURL 接收地址，用 util fetch 下载 BoxJS，用 util Storage/Lodash 读写。不同模块引用同一份脚本，分别配置自己的 /api/ 正则与校验 BoxJS 地址；/configs/ Mock 不经过此脚本。原生配置 Mock 与脚本应使用同一版本的配置源；代理自己的 Mock 资源缓存需要按代理机制更新。\n\n0.2.0 的代理调用方式为 `new SettingsHandler({ origin, configURL }).handle(request)`。配置下载、HTTP 200 检查、JSON 解析及字段归一化均由这个 class 完成，调用方不再提供 loadConfig 回调。网络异常、非 200、非法 JSON 或模块配置解析失败统一返回 502；不会继续读写持久化存储。0.1.0 使用旧工厂函数；HTTP 路径、方法和返回契约不变。\n\n每次 GET 持久化设置读根一次。每次 POST/DELETE 写入前重新读根，再单键修改、写回一次。浏览器缓存不触发额外 GET，但不能取消代理端保证保留其它数据所需的读改写。不同代理脚本同时写同一根键不具备事务隔离保证。\n\nresolveSettings 可由模块按已有规则合并 database、argument、持久化值。默认不传时只读持久化值，页面使用 BoxJS 默认值补缺。本包不自动修改模块现有配置优先级；删除后不调用 resolver，下次进入/刷新才重新读取。\n\n## 错误与限制\n\n| 状态码 | 持久化接口语义 |\n| --- | --- |\n| 200 | HEAD 路径受支持；GET 返回值或子树；POST/DELETE 操作成功 |\n| 400 | 路径非法、JSON 无法解析或值不满足 BoxJS 类型/枚举约束 |\n| 403 | 缺少页面标记头，或请求 Origin 与代理配置不符 |\n| 404 | 路径未声明；或 GET 叶子尚无持久化值 |\n| 405 | 对子树执行 POST/DELETE，或使用不支持的方法 |\n| 413 | POST 正文超过 65536 个 UTF-16 code units |\n| 415 | POST Content-Type 不是 application/json |\n| 500 | 持久化写入或代理执行失败 |\n| 502 | BoxJS 配置源加载、解析或模块定义校验失败 |\n\nGET 子树无覆盖值返回 200 和空对象，GET 叶子无覆盖值返回 404；两者不同。HEAD 成功不代表已有值。POST 字符串上限 2048，选择项与数组项按 BoxJS 校验；不接受 null 或对象作为叶子写入值。持久化响应 no-store；HEAD 始终无正文。配置资源由原生 Mock 管理，其失败响应格式由代理或原站决定，不能套用持久化接口的 JSON 错误结构。\n\nGitHub main/dev 分别绑定 Apifox 同名分支，JSON 路径为 apifox/preference-panes.apifox.json。提交 JSON 后仍需客户端执行数据源导入，并按分支回读确认结果。npm/GitHub Packages 未发布，Biliverse 消费端本轮未迁移。\n",
+                "description": "## 接口用途\n\n正文直接是 JSON 值，可为字符串、数字、布尔值、null、数组或对象；未声明的键也允许写入。替换路径处的值，不按 BoxJS 校验、不合并对象。成功返回 200 和 saved=true。\n\n## 请求契约\n\n`POST /api/{module}/{path}`\n\nmodule 是必填路径参数，必须属于插件安装配置中的模块。path 是模块内的相对路径，可包含以 / 分隔的多级目录。路径参数不预填业务示例值；具体取值由接入项目决定。请求需携带 X-Settings-Client: 1；该标记不是认证凭据。\n\n正文必须为 application/json，直接传路径处的 JSON 值本身，允许对象、数组和 null。API 不校验 BoxJS 类型或枚举。\n\n## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n```json\n{\n  \"saved\": true\n}\n```\n\n## 调用流程与具体示例\n\n# PreferencePanes 0.3.0 接口契约\n\n前端负责 BoxJS 解析、控件生成和字段输入校验。API 只桥接安装配置指定的持久化根与模块，不下载 BoxJS，不校验字段声明、枚举或控件类型。\n\n## 路径和参数\n\n| 方法 | 路径 | 行为 |\n| --- | --- | --- |\n| GET | /settings/{module} | 同一个 WebView 页面，按路径选择模块 |\n| HEAD、GET | /configs/{module} | 模块配置 Mock：探测、加载 BoxJS |\n| HEAD、GET、POST、DELETE | /api/{module}/ | 探测路由、读取、替换或删除整个模块 |\n| HEAD、GET、POST、DELETE | /api/{module}/{path} | 探测路由、读取、替换或删除任意键或子树 |\n| GET、DELETE | /api/{module}/Caches | 查看、清空模块缓存，使用相同的通用存储处理器 |\n\nmodule 和 path 使用 Apifox 路径参数，不预填业务示例。path 以 / 分隔层级，每段独立编码；不能把分隔斜线编码为 %2F。片段允许字母、数字、下划线、连字符，拒绝空片段及 __proto__/prototype/constructor。这些是路径结构校验，不是 BoxJS 字段校验。API 接受不存在于 BoxJS 中的新键。\n\n## 安装配置决定存储映射\n\n代理入口构造：\n\n~~~js\nconst handler = new SettingsHandler({\n  origin: \"https://biliverse.github.io\",\n  storageKey: \"BiliBili\",\n  module: \"Enhanced\"\n});\nconst response = await handler.handle($request);\n~~~\n\n此处由已安装插件提供可信配置，不经浏览器 header/body 提供。API 从 /api/ 后第一段确认模块，再将路径映射到固定存储根：\n\n~~~text\n/api/Enhanced/Settings/Home/Top_left → BiliBili.Enhanced.Settings.Home.Top_left\n/api/Enhanced/Caches                → BiliBili.Enhanced.Caches\n/api/Enhanced/                      → BiliBili.Enhanced\n~~~\n\nEnhanced 处理器不能访问 BiliBili.Global；重置 Enhanced 也保留 Global。类不接受 configURL、loadConfig 或 resolveSettings。通用独立代理脚本的 argument 为 origin、storageKey、module。配置 Mock 的实际下载源仍由模块模板指定，与 API 无关。\n\n## 前端读取与缓存\n\n每次进入主菜单，并发 HEAD /configs/{module}，仅 200 启用按钮；此时不 GET 设置。配置 Mock 地址不部署同名线上文件，静态下载源另设路径。\n\n每次打开、再次进入或刷新设置页面：\n1. GET /configs/{module} 一次，由前端解析 BoxJS、生成控件和默认值。\n2. GET BoxJS 字段公共子树一次，例如 /api/Enhanced/Settings/。\n3. 在当前页面建立内存缓存。若子树缺失返回 404，则用空覆盖值加 BoxJS 默认值绘制；兼容旧存储中以 JSON 字符串编码的设置子树。\n\n保存或删除只按目标路径发送一次请求，根据是否返回 200 显示短暂通知；失败保留缓存及未保存输入。成功后仅更新内存，不 GET 整个模块。仅前端校验控件类型和选项；直接调用 API 可写入任何合法 JSON 值。\n\n## 读写示例\n\n~~~http\nGET /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n已有值返回 200，正文是该值本身。GET 父路径返回全部子树，包括未在页面展示的键；不存在返回 404。不会自动合并 BoxJS 默认值。\n\n~~~http\nPOST /api/Enhanced/Settings/Home/Top_left\nContent-Type: application/json\nX-Settings-Client: 1\n\n\"mine\"\n~~~\n\n正文允许字符串、数字、布尔值、null、任意数组和对象；没有 values 包装。POST 替换指定位置的值而非合并对象。未存在的父节点会创建，JSON 数组元素可通过数字路径访问。路径之外的数据保持不变。\n\n~~~json\n{ \"saved\": true }\n~~~\n\n~~~http\nDELETE /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n删除键或整棵子树，不存在时也返回 200。前端删除设置覆盖值后显示当前 BoxJS 默认值。\n\n~~~json\n{ \"deleted\": true }\n~~~\n\n## Caches 与模块重置\n\n“查看 Caches”按需 GET /api/{module}/Caches，显示全部缓存 JSON；404 表示暂无缓存。再次点击刷新才重新读取，不在进入页面时自动下载缓存。\n\n“清空 Caches”确认后 DELETE /api/{module}/Caches，仅删除该节点，保留 Settings 及其它模块。成功后清空当前缓存视图，不追加 GET。\n\n“重置模块”确认后 DELETE /api/{module}/，删除模块的 Settings、Caches 和其它全部持久化键，保留同根的其它模块。成功后清除页面覆盖值、使用已加载 BoxJS 的默认值，隐藏旧缓存内容，不重新读取设置。再次进入页面时按正常打开流程读取。\n\n~~~http\nDELETE /api/Enhanced/\nX-Settings-Client: 1\n~~~\n\n## 代理存储操作\n\nHEAD 仅确认本处理器接管合法模块路径，不读取存储，也不证明已有值。GET 读取一次根；POST/DELETE 写入前读取最新根，使用 util Lodash 修改对应节点并写回一次。API 不发送网络请求。\n\n历史 JSON 字符串中间节点会在路径遍历时解码；GET 直接指向字符串叶子时保留字符串。无法继续遍历标量父节点返回 500，不悄悄覆盖原数据。DELETE 数组元素采用删除键语义，不移动其它索引。\n\nAPI 响应带 Cache-Control: no-store。默认需要 X-Settings-Client: 1，Origin 存在时须与安装来源一致；该请求头是页面标记，不是认证凭据。POST 正文上限为 65536 个 UTF-16 code units。多个代理脚本同时写同一根仍没有事务隔离保证。\n\n| 状态码 | 含义 |\n| --- | --- |\n| 200 | 探测或读写成功；HEAD 无正文 |\n| 400 | 路径或 JSON 正文格式无效 |\n| 403 | 缺少页面标记，或请求来源不符 |\n| 404 | 模块不由当前处理器接管，或 GET 目标不存在 |\n| 405 | 不支持的 HTTP 方法 |\n| 413 | POST 正文过长 |\n| 415 | POST 正文不是 application/json |\n| 500 | 存储读取、路径遍历或写入失败 |\n\nAPI 不再返回 BoxJS 配置加载错误 502。配置 Mock 失败的格式仍由代理或原站决定。\n\n## BoxJS 仅用于 WebView\n\n支持 settings 数组、单 app 和 apps 订阅。字段 ID 仍使用 @根.模块.路径；名称、type、val、items、desc 生成控件，placeholder/rows/autoGrow 控制文本输入展示。app 元数据用于页面标题、说明和图标，script 只保留不执行；icons[0]/icons[1] 是透明/彩色变体，不是亮暗顺序。\n\n浏览器解析的根名仅为配置信息；代理不会因此改变固定 storageKey。插件作者应让 BoxJS 路径与安装映射一致。设置默认值、类型与枚举都由 WebView 处理，API 本身与 BoxJS 无关。\n\nGitHub main/dev 分别绑定 Apifox 同名分支。修改 apifox/preference-panes.apifox.json 后由已绑定数据源导入，并按分支回读验证。\n",
                 "parameters": {
                   "path": [
                     {
@@ -1547,7 +1537,7 @@
                       "required": true,
                       "enable": true,
                       "example": "",
-                      "description": "模块内的相对 database 路径，可有多级，用 / 连接各段。逐段编码，不要把分隔斜线编码为 %2F；POST/DELETE 必须指向 BoxJS 声明的叶子，GET/HEAD 也支持父路径。Settings 和 Home 均不是固定层级。"
+                      "description": "模块内的相对 database 路径，可有多级，用 / 连接各段。逐段编码，不要把分隔斜线编码为 %2F；GET/POST/DELETE 均支持键或子树，不要求字段在 BoxJS 中声明。Settings 和 Home 均不是固定层级。"
                     }
                   ],
                   "query": [],
@@ -1584,10 +1574,10 @@
                   "required": true,
                   "parameters": [],
                   "jsonSchema": {
+                    "description": "任意 JSON 值；API 不按 BoxJS 校验类型或枚举，POST 替换路径处的完整值。",
                     "oneOf": [
                       {
-                        "type": "string",
-                        "maxLength": 2048
+                        "type": "string"
                       },
                       {
                         "type": "number"
@@ -1596,25 +1586,17 @@
                         "type": "boolean"
                       },
                       {
+                        "type": "null"
+                      },
+                      {
                         "type": "array",
-                        "items": {
-                          "oneOf": [
-                            {
-                              "type": "string",
-                              "maxLength": 2048
-                            },
-                            {
-                              "type": "number"
-                            },
-                            {
-                              "type": "boolean"
-                            }
-                          ]
-                        },
-                        "uniqueItems": true
+                        "items": {}
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
                       }
-                    ],
-                    "description": "值的具体类型及可选值由运行时 BoxJS 字段约束；不固定为字符串或某个模块的枚举。"
+                    ]
                   },
                   "data": ""
                 },
@@ -1682,7 +1664,7 @@
                   {
                     "id": "pp-511372918-404",
                     "code": 404,
-                    "name": "未知字段、无覆盖值或模块未启用",
+                    "name": "存储路径不存在、非接管模块或 Mock 不可用",
                     "headers": [],
                     "contentType": "json",
                     "jsonSchema": {
@@ -1702,25 +1684,6 @@
                     "id": "pp-511372918-405",
                     "code": 405,
                     "name": "不支持的操作",
-                    "headers": [],
-                    "contentType": "json",
-                    "jsonSchema": {
-                      "type": "object",
-                      "required": [
-                        "error"
-                      ],
-                      "properties": {
-                        "error": {
-                          "type": "string"
-                        }
-                      }
-                    },
-                    "description": "JSON 响应"
-                  },
-                  {
-                    "id": "pp-511372918-502",
-                    "code": 502,
-                    "name": "BoxJS 配置加载或解析失败",
                     "headers": [],
                     "contentType": "json",
                     "jsonSchema": {
@@ -1827,7 +1790,7 @@
                 ],
                 "operationId": "preference_panes_511372919",
                 "sourceUrl": "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/guide.md",
-                "description": "## 接口用途\n\n无正文，删除该持久化覆盖值。成功 200，重复删除幂等；客户端显示 BoxJS 默认值，不追加 GET。\n\n## 请求契约\n\n`DELETE /api/{module}/{path}`\n\nmodule 是必填路径参数，与配置文件中字段所属模块一致。path 是模块内的相对路径，可包含以 / 分隔的多级目录。路径参数不预填业务示例值；具体取值由接入项目决定。请求需携带 X-Settings-Client: 1；该标记不是认证凭据。\n\n请求没有正文。\n\n## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n```json\n{\n  \"deleted\": true\n}\n```\n\n## 调用流程与具体示例\n\n# PreferencePanes：从入口探测到单键读写\n\n当前已发布版本为 0.2.0，包含 SettingsHandler class 和 BoxJS 元数据兼容增强。下面的 Enhanced 只是路径示例，example.org 没有部署接口；各项目复用相同代码，从自己的 BoxJS JSON 生成设置界面。\n\n## 通用路径契约\n\n| 方法 | 相对路径定义 | 用途 |\n| --- | --- | --- |\n| GET | `/settings/{module}` | 通用 HTML 页面，按路径中的模块生成界面 |\n| HEAD、GET | `/configs/{module}` | 探测配置 Mock、读取 BoxJS JSON |\n| HEAD、GET | `/api/{module}/` | 探测读写路由、读取模块公开子树 |\n| HEAD、GET | `/api/{module}/{path}` | 探测、读取模块内的键或子树 |\n| POST、DELETE | `/api/{module}/{path}` | 修改、删除声明的单个键 |\n\n`module` 是动态模块标识；`path` 是模块内的相对 database 路径，允许多级，用 `/` 分隔。`Settings/Home/Top_left` 只是 path 示例，Settings、Home 和键名都不固定。路径逐段编码，不能把分隔用的 `/` 整体编码为 `%2F`。页面、配置资源、持久化读写使用同一个 module；不是三个各自指定的模块参数，也不使用 query 参数。\n\n### 在 Apifox 中调试\n\n接口路径保留 Apifox 的 `{module}`、`{path}` 路径参数，不使用固定业务 URL，也不把 `*` 当作真实请求路径。调试前在 Path 参数区填写目标模块与模块内路径；参数值和 POST 正文默认留空，不预置任何项目或待写入值。服务地址由使用者的环境配置提供。\n\nPOST 的 Body 为原始 JSON，须按目标字段类型填写字符串、数字、布尔值或数组。响应 Schema 描述通用结构；下面各节的实际 URL、请求值、返回对象只是文档中的示例，不会作为调试请求或 Mock 的默认数据。路径每段仅允许英文字母、数字、下划线和连字符，不接受空段、点号或 __proto__/prototype/constructor。\n\n例如 module=Enhanced、path=Settings/Home/Top_left 时，实际请求才是 `/api/Enhanced/Settings/Home/Top_left`。以下具体 URL、BoxJS 字段和返回值均为使用示例，不能当作通用接口的固定路径或枚举。\n\n## 页面通过 module 选择配置\n\n```http\nGET /settings/Enhanced\n```\n\n通用页面从 `/settings/{module}` 路径读取模块标识，不读取 module 或 config 查询参数。渲染器按固定约定 GET `/configs/Enhanced`，读取返回的 BoxJS JSON，再动态生成设置项。改为 `/settings/Global` 就 GET `/configs/Global`，不修改 HTML。\n\nmodule 必须与 BoxJS ID `@BiliBili.Enhanced.Settings.…` 中的 Enhanced 一致；它也对应持久化 `/api/` 后第一段。实际 BoxJS 文件地址由模块模板的 Mock 规则指定。页面路径只允许一个非空模块段，可带结尾斜线；模块名只允许英文字母、数字、下划线、连字符，禁止 __proto__/prototype/constructor。缺失模块段、多余路径段或非法模块名在页面显示错误，不发送配置或存储请求。\n\n| 请求 | 响应方 | 内容 |\n| --- | --- | --- |\n| GET /settings/{module} | 公共 HTML Mock | 同一份通用设置页 |\n| HEAD、GET /configs/{module} | 对应模块的配置 Mock | 配置可用性、BoxJS 静态 JSON |\n| GET /api/{module}/ 或 /api/{module}/{path} | 通用代理读写脚本 | 当前持久化设置的公开子树或叶子值 |\n| POST、DELETE /api/{module}/{path} | 同一个通用代理读写脚本 | 单键修改、删除 |\n\n配置资源使用 `/configs/`，持久化接口使用 `/api/`，两种模板正则互不重叠，不依赖执行优先级。各业务项目用现有 argument config 生成器生成 BoxJS JSON。模块的 Mock 规则引用生成文件的下载源；通用读写脚本参数 configURL 引用同一版本资源进行校验。configURL 是代理脚本的模板参数，不是页面参数；页面仅用 module 按约定寻找配置 Mock。\n\n业务主菜单独立于通用设置页，由调用项目提供模块链接；Biliverse 主菜单归 Enhanced。通用 JS 不包含 Enhanced/Global 等目录或字段，Enhanced 已通过包的公开接口接入。\n\n## 一、主菜单只探测配置 Mock\n\n每次进入业务主菜单，用通用 client.probe(module) 并发发送：\n\n```http\nHEAD /configs/Enhanced\nHEAD /configs/Global\n```\n\n这些地址由各模块的 BoxJS Mock 提供。200 才启用入口；非 200、无响应或超时则禁用。HEAD 无正文，不读持久化存储、不执行通用读写脚本，也不证明读写脚本运行正常。\n\n配置 Mock 地址不部署同名在线静态文件，下载源在另一个地址。页面只请求约定的配置 Mock 地址。\n\n## 二、每次真正进入或刷新设置页\n\n先 GET 根据 module 生成的 `/configs/Enhanced`，取得 BoxJS。可使用 settings 数组、单 app 或 apps 订阅。示例：\n\n```json\n[\n  {\n    \"id\": \"@BiliBili.Enhanced.Settings.Home.Top_left\",\n    \"name\": \"顶栏左侧\", \"type\": \"selects\", \"val\": \"mine\",\n    \"items\": [{ \"key\": \"mine\", \"label\": \"我的\" }, { \"key\": \"videoshortcut\", \"label\": \"短视频\" }]\n  },\n  { \"id\": \"@BiliBili.Enhanced.Settings.enabled\", \"name\": \"启用\", \"type\": \"boolean\", \"val\": true }\n]\n```\n\n通用组件由 ID 解析出存储根 BiliBili 和公共子树 Enhanced.Settings，再读取一次：\n\n```http\nGET /api/Enhanced/Settings/\nX-Settings-Client: 1\n```\n\n返回 HTTP 200 和公开字段的持久化覆盖值，例如：\n\n```json\n{ \"Home\": { \"Top_left\": \"videoshortcut\" } }\n```\n\n只返回 BoxJS 声明的字段，不泄露同根下的缓存和其它模块。没有任何覆盖值时返回 `{}`。页面用 BoxJS val 补充未设置字段，并创建新的内存缓存；不使用 localStorage/sessionStorage。返回主菜单不 GET，再次进入重新执行上述两次 GET。刷新当前模块页也重新读取；浏览器前进、后退恢复缓存页面时会重新读取当前 URL 的模块。\n\n只有 `/api/` 固定；其它组织可以使用 `/api/Weather/Preferences/Units`。同模块必须使用一个存储根，并具有模块根以下的公共父路径，才能一次读取设置子树。控件支持 boolean/selects/checkboxes/text/textarea/number，不执行 BoxJS 脚本。\n\n## 三、修改单个键\n\n```http\nPOST /api/Enhanced/Settings/Home/Top_left\nContent-Type: application/json\nX-Settings-Client: 1\n\n\"mine\"\n```\n\n正文就是 JSON 值本身，没有 values 包装。成功返回 HTTP 200：\n\n```json\n{ \"saved\": true }\n```\n\n组件显示“修改成功”，只更新内存中的该键。不会随后 GET 整个模块。非 200（包括 204）或网络错误显示“操作失败”，缓存保留原值，其它控件的未保存输入也保留。\n\n代理执行端运行时读取 BoxJS 校验字段，然后读取最新存储根，通过 util set 修改该键并写回。不会把浏览器的整棵旧缓存覆盖回存储；只修改持久化数据，不修改源码 database.mjs 或 argument 配置。\n\n## 四、删除覆盖值\n\n```http\nDELETE /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n```\n\n没有正文。成功返回 HTTP 200：\n\n```json\n{ \"deleted\": true }\n```\n\n重复删除仍成功。代理通过 util unset 删除单键，保留同级字段、其它模块和缓存；不递归删除空父对象。浏览器显示“删除成功”，移除该键缓存的覆盖值，改用 BoxJS val；不追加 GET。删除覆盖值不等于关闭功能。\n\n## 五、需要时直接查询单键\n\n```http\nGET /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n```\n\n有覆盖值则返回 HTTP 200，正文直接为 `\"mine\"`；无值时 404。默认 GET 不返回 BoxJS 默认值。也支持 HEAD 完整叶子路径：声明过则 200，否则 404；不读取存储。主菜单应 HEAD 配置 Mock 地址，不是持久化叶子探测。\n\n## 通用脚本参数与读取时机\n\n### BoxJS 页面属性\n\n本地 dev 优化：WebView 使用原生对象访问，不再打包 util Lodash。代理每次仍从自己的 configURL 下载配置并校验字段，只提取存储根、字段路径、类型、默认值和枚举约束；不处理标题、描述、图标、占位文字、rows/autoGrow 等展示属性。展示属性由 WebView 校验，非法展示属性不会影响默认代理对合法字段的访问。自定义 GET resolver 仍收到完整 ModuleDefinition，保留其既有契约。HTTP 路径、状态码、访问范围与存储读写次数不变，未取消代理端配置请求。\n\n配置可以是 settings 数组、单个 app 或 apps 订阅。字段的 name/val/type/desc/items 决定控件，placeholder 设置输入提示；textarea 保持字符串类型，rows 为正整数基础行数，autoGrow 为布尔值。首次显示、输入及删除覆盖值后都会按内容调整高度。\n\n如果模块字段只属于一个 app，definition.metadata 保留它的 id/name/author/repo/script/icon/icons/desc/descs/description。页面使用 name 作为显示标题，author/desc/descs 作为纯文本，repo 作为项目链接。模块路由和存储根仍由字段的 @根.模块.路径 决定，不能由 app.id/name 推断。多个 app 分别声明同一模块的字段时合并字段，不任意选择一个 app 的展示元数据。\n\nicon 优先于 icons；原版 icons[0] 是透明版，icons[1] 是彩色版，并非亮暗顺序。默认使用彩色版，只有一个图标时使用该图标。页面图片与链接仅接受 HTTP(S) 或同源相对地址。script 只保留元数据，不请求或执行；不渲染 desc_html/descs_html，不使用 keys 推导额外可读写字段。\n\n| 参数或数据 | 来源与作用 |\n| --- | --- |\n| origin | 调用方的 HTTPS 页面来源，不带路径 |\n| configURL | 传给 SettingsHandler 的 HTTPS BoxJS 下载地址；类内部每次通过 util fetch 加载，按请求中的 module 选择字段 |\n| storageKey | 从 BoxJS 的 @根键.模块.路径 提取，不通过 header 传递 |\n| requestHeader | 默认 X-Settings-Client，值为 1；同源页面标记，不是认证凭据 |\n| resolveSettings(stored, definition) | 可选 GET 有效配置解析器，返回完整 database 形状的对象；不参与 HEAD/POST/DELETE |\n\n独立打包脚本通过 argument 的 origin/configURL 接收地址，用 util fetch 下载 BoxJS，用 util Storage/Lodash 读写。不同模块引用同一份脚本，分别配置自己的 /api/ 正则与校验 BoxJS 地址；/configs/ Mock 不经过此脚本。原生配置 Mock 与脚本应使用同一版本的配置源；代理自己的 Mock 资源缓存需要按代理机制更新。\n\n0.2.0 的代理调用方式为 `new SettingsHandler({ origin, configURL }).handle(request)`。配置下载、HTTP 200 检查、JSON 解析及字段归一化均由这个 class 完成，调用方不再提供 loadConfig 回调。网络异常、非 200、非法 JSON 或模块配置解析失败统一返回 502；不会继续读写持久化存储。0.1.0 使用旧工厂函数；HTTP 路径、方法和返回契约不变。\n\n每次 GET 持久化设置读根一次。每次 POST/DELETE 写入前重新读根，再单键修改、写回一次。浏览器缓存不触发额外 GET，但不能取消代理端保证保留其它数据所需的读改写。不同代理脚本同时写同一根键不具备事务隔离保证。\n\nresolveSettings 可由模块按已有规则合并 database、argument、持久化值。默认不传时只读持久化值，页面使用 BoxJS 默认值补缺。本包不自动修改模块现有配置优先级；删除后不调用 resolver，下次进入/刷新才重新读取。\n\n## 错误与限制\n\n| 状态码 | 持久化接口语义 |\n| --- | --- |\n| 200 | HEAD 路径受支持；GET 返回值或子树；POST/DELETE 操作成功 |\n| 400 | 路径非法、JSON 无法解析或值不满足 BoxJS 类型/枚举约束 |\n| 403 | 缺少页面标记头，或请求 Origin 与代理配置不符 |\n| 404 | 路径未声明；或 GET 叶子尚无持久化值 |\n| 405 | 对子树执行 POST/DELETE，或使用不支持的方法 |\n| 413 | POST 正文超过 65536 个 UTF-16 code units |\n| 415 | POST Content-Type 不是 application/json |\n| 500 | 持久化写入或代理执行失败 |\n| 502 | BoxJS 配置源加载、解析或模块定义校验失败 |\n\nGET 子树无覆盖值返回 200 和空对象，GET 叶子无覆盖值返回 404；两者不同。HEAD 成功不代表已有值。POST 字符串上限 2048，选择项与数组项按 BoxJS 校验；不接受 null 或对象作为叶子写入值。持久化响应 no-store；HEAD 始终无正文。配置资源由原生 Mock 管理，其失败响应格式由代理或原站决定，不能套用持久化接口的 JSON 错误结构。\n\nGitHub main/dev 分别绑定 Apifox 同名分支，JSON 路径为 apifox/preference-panes.apifox.json。提交 JSON 后仍需客户端执行数据源导入，并按分支回读确认结果。npm/GitHub Packages 未发布，Biliverse 消费端本轮未迁移。\n",
+                "description": "## 接口用途\n\n无正文，删除指定键或整个子树。路径不存在仍为 200；其它路径不受影响。前端删除设置覆盖值后使用 BoxJS 默认值，不追加 GET。\n\n## 请求契约\n\n`DELETE /api/{module}/{path}`\n\nmodule 是必填路径参数，必须属于插件安装配置中的模块。path 是模块内的相对路径，可包含以 / 分隔的多级目录。路径参数不预填业务示例值；具体取值由接入项目决定。请求需携带 X-Settings-Client: 1；该标记不是认证凭据。\n\n请求没有正文。\n\n## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n```json\n{\n  \"deleted\": true\n}\n```\n\n## 调用流程与具体示例\n\n# PreferencePanes 0.3.0 接口契约\n\n前端负责 BoxJS 解析、控件生成和字段输入校验。API 只桥接安装配置指定的持久化根与模块，不下载 BoxJS，不校验字段声明、枚举或控件类型。\n\n## 路径和参数\n\n| 方法 | 路径 | 行为 |\n| --- | --- | --- |\n| GET | /settings/{module} | 同一个 WebView 页面，按路径选择模块 |\n| HEAD、GET | /configs/{module} | 模块配置 Mock：探测、加载 BoxJS |\n| HEAD、GET、POST、DELETE | /api/{module}/ | 探测路由、读取、替换或删除整个模块 |\n| HEAD、GET、POST、DELETE | /api/{module}/{path} | 探测路由、读取、替换或删除任意键或子树 |\n| GET、DELETE | /api/{module}/Caches | 查看、清空模块缓存，使用相同的通用存储处理器 |\n\nmodule 和 path 使用 Apifox 路径参数，不预填业务示例。path 以 / 分隔层级，每段独立编码；不能把分隔斜线编码为 %2F。片段允许字母、数字、下划线、连字符，拒绝空片段及 __proto__/prototype/constructor。这些是路径结构校验，不是 BoxJS 字段校验。API 接受不存在于 BoxJS 中的新键。\n\n## 安装配置决定存储映射\n\n代理入口构造：\n\n~~~js\nconst handler = new SettingsHandler({\n  origin: \"https://biliverse.github.io\",\n  storageKey: \"BiliBili\",\n  module: \"Enhanced\"\n});\nconst response = await handler.handle($request);\n~~~\n\n此处由已安装插件提供可信配置，不经浏览器 header/body 提供。API 从 /api/ 后第一段确认模块，再将路径映射到固定存储根：\n\n~~~text\n/api/Enhanced/Settings/Home/Top_left → BiliBili.Enhanced.Settings.Home.Top_left\n/api/Enhanced/Caches                → BiliBili.Enhanced.Caches\n/api/Enhanced/                      → BiliBili.Enhanced\n~~~\n\nEnhanced 处理器不能访问 BiliBili.Global；重置 Enhanced 也保留 Global。类不接受 configURL、loadConfig 或 resolveSettings。通用独立代理脚本的 argument 为 origin、storageKey、module。配置 Mock 的实际下载源仍由模块模板指定，与 API 无关。\n\n## 前端读取与缓存\n\n每次进入主菜单，并发 HEAD /configs/{module}，仅 200 启用按钮；此时不 GET 设置。配置 Mock 地址不部署同名线上文件，静态下载源另设路径。\n\n每次打开、再次进入或刷新设置页面：\n1. GET /configs/{module} 一次，由前端解析 BoxJS、生成控件和默认值。\n2. GET BoxJS 字段公共子树一次，例如 /api/Enhanced/Settings/。\n3. 在当前页面建立内存缓存。若子树缺失返回 404，则用空覆盖值加 BoxJS 默认值绘制；兼容旧存储中以 JSON 字符串编码的设置子树。\n\n保存或删除只按目标路径发送一次请求，根据是否返回 200 显示短暂通知；失败保留缓存及未保存输入。成功后仅更新内存，不 GET 整个模块。仅前端校验控件类型和选项；直接调用 API 可写入任何合法 JSON 值。\n\n## 读写示例\n\n~~~http\nGET /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n已有值返回 200，正文是该值本身。GET 父路径返回全部子树，包括未在页面展示的键；不存在返回 404。不会自动合并 BoxJS 默认值。\n\n~~~http\nPOST /api/Enhanced/Settings/Home/Top_left\nContent-Type: application/json\nX-Settings-Client: 1\n\n\"mine\"\n~~~\n\n正文允许字符串、数字、布尔值、null、任意数组和对象；没有 values 包装。POST 替换指定位置的值而非合并对象。未存在的父节点会创建，JSON 数组元素可通过数字路径访问。路径之外的数据保持不变。\n\n~~~json\n{ \"saved\": true }\n~~~\n\n~~~http\nDELETE /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n删除键或整棵子树，不存在时也返回 200。前端删除设置覆盖值后显示当前 BoxJS 默认值。\n\n~~~json\n{ \"deleted\": true }\n~~~\n\n## Caches 与模块重置\n\n“查看 Caches”按需 GET /api/{module}/Caches，显示全部缓存 JSON；404 表示暂无缓存。再次点击刷新才重新读取，不在进入页面时自动下载缓存。\n\n“清空 Caches”确认后 DELETE /api/{module}/Caches，仅删除该节点，保留 Settings 及其它模块。成功后清空当前缓存视图，不追加 GET。\n\n“重置模块”确认后 DELETE /api/{module}/，删除模块的 Settings、Caches 和其它全部持久化键，保留同根的其它模块。成功后清除页面覆盖值、使用已加载 BoxJS 的默认值，隐藏旧缓存内容，不重新读取设置。再次进入页面时按正常打开流程读取。\n\n~~~http\nDELETE /api/Enhanced/\nX-Settings-Client: 1\n~~~\n\n## 代理存储操作\n\nHEAD 仅确认本处理器接管合法模块路径，不读取存储，也不证明已有值。GET 读取一次根；POST/DELETE 写入前读取最新根，使用 util Lodash 修改对应节点并写回一次。API 不发送网络请求。\n\n历史 JSON 字符串中间节点会在路径遍历时解码；GET 直接指向字符串叶子时保留字符串。无法继续遍历标量父节点返回 500，不悄悄覆盖原数据。DELETE 数组元素采用删除键语义，不移动其它索引。\n\nAPI 响应带 Cache-Control: no-store。默认需要 X-Settings-Client: 1，Origin 存在时须与安装来源一致；该请求头是页面标记，不是认证凭据。POST 正文上限为 65536 个 UTF-16 code units。多个代理脚本同时写同一根仍没有事务隔离保证。\n\n| 状态码 | 含义 |\n| --- | --- |\n| 200 | 探测或读写成功；HEAD 无正文 |\n| 400 | 路径或 JSON 正文格式无效 |\n| 403 | 缺少页面标记，或请求来源不符 |\n| 404 | 模块不由当前处理器接管，或 GET 目标不存在 |\n| 405 | 不支持的 HTTP 方法 |\n| 413 | POST 正文过长 |\n| 415 | POST 正文不是 application/json |\n| 500 | 存储读取、路径遍历或写入失败 |\n\nAPI 不再返回 BoxJS 配置加载错误 502。配置 Mock 失败的格式仍由代理或原站决定。\n\n## BoxJS 仅用于 WebView\n\n支持 settings 数组、单 app 和 apps 订阅。字段 ID 仍使用 @根.模块.路径；名称、type、val、items、desc 生成控件，placeholder/rows/autoGrow 控制文本输入展示。app 元数据用于页面标题、说明和图标，script 只保留不执行；icons[0]/icons[1] 是透明/彩色变体，不是亮暗顺序。\n\n浏览器解析的根名仅为配置信息；代理不会因此改变固定 storageKey。插件作者应让 BoxJS 路径与安装映射一致。设置默认值、类型与枚举都由 WebView 处理，API 本身与 BoxJS 无关。\n\nGitHub main/dev 分别绑定 Apifox 同名分支。修改 apifox/preference-panes.apifox.json 后由已绑定数据源导入，并按分支回读验证。\n",
                 "parameters": {
                   "path": [
                     {
@@ -1855,7 +1818,7 @@
                       "required": true,
                       "enable": true,
                       "example": "",
-                      "description": "模块内的相对 database 路径，可有多级，用 / 连接各段。逐段编码，不要把分隔斜线编码为 %2F；POST/DELETE 必须指向 BoxJS 声明的叶子，GET/HEAD 也支持父路径。Settings 和 Home 均不是固定层级。"
+                      "description": "模块内的相对 database 路径，可有多级，用 / 连接各段。逐段编码，不要把分隔斜线编码为 %2F；GET/POST/DELETE 均支持键或子树，不要求字段在 BoxJS 中声明。Settings 和 Home 均不是固定层级。"
                     }
                   ],
                   "query": [],
@@ -1956,7 +1919,7 @@
                   {
                     "id": "pp-511372919-404",
                     "code": 404,
-                    "name": "未知字段、无覆盖值或模块未启用",
+                    "name": "存储路径不存在、非接管模块或 Mock 不可用",
                     "headers": [],
                     "contentType": "json",
                     "jsonSchema": {
@@ -1992,9 +1955,163 @@
                     "description": "JSON 响应"
                   },
                   {
-                    "id": "pp-511372919-502",
-                    "code": 502,
-                    "name": "BoxJS 配置加载或解析失败",
+                    "id": "pp-511372919-500",
+                    "code": 500,
+                    "name": "存储写入或执行失败",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  }
+                ],
+                "responseExamples": [],
+                "auth": {},
+                "securityScheme": {},
+                "commonParameters": {},
+                "preProcessors": [],
+                "postProcessors": [],
+                "inheritPreProcessors": {},
+                "inheritPostProcessors": {},
+                "cases": [],
+                "mocks": [],
+                "customApiFields": "{}",
+                "advancedSettings": {
+                  "disabledSystemHeaders": {}
+                },
+                "oasExtensions": "{}"
+              }
+            },
+            {
+              "name": "替换模块全部数据",
+              "api": {
+                "id": "pp-module-post",
+                "method": "post",
+                "path": "/api/{module}/",
+                "type": "http",
+                "moduleId": 8522462,
+                "serverId": "default",
+                "visibility": "SHARED",
+                "status": "testing",
+                "tags": [
+                  "持久化读写"
+                ],
+                "operationId": "preference_panes_pp-module-post",
+                "sourceUrl": "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/guide.md",
+                "description": "## 接口用途\n\n用正文 JSON 完整替换此模块数据，不合并旧值；同一存储根中的其它模块保持不变。\n\n## 请求契约\n\n`POST /api/{module}/`\n\nmodule 是必填路径参数，必须属于插件安装配置中的模块。路径参数不预填业务示例值；具体取值由接入项目决定。请求需携带 X-Settings-Client: 1；该标记不是认证凭据。\n\n正文必须为 application/json，直接传路径处的 JSON 值本身，允许对象、数组和 null。API 不校验 BoxJS 类型或枚举。\n\n## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n```json\n{\n  \"saved\": true\n}\n```\n\n## 调用流程与具体示例\n\n# PreferencePanes 0.3.0 接口契约\n\n前端负责 BoxJS 解析、控件生成和字段输入校验。API 只桥接安装配置指定的持久化根与模块，不下载 BoxJS，不校验字段声明、枚举或控件类型。\n\n## 路径和参数\n\n| 方法 | 路径 | 行为 |\n| --- | --- | --- |\n| GET | /settings/{module} | 同一个 WebView 页面，按路径选择模块 |\n| HEAD、GET | /configs/{module} | 模块配置 Mock：探测、加载 BoxJS |\n| HEAD、GET、POST、DELETE | /api/{module}/ | 探测路由、读取、替换或删除整个模块 |\n| HEAD、GET、POST、DELETE | /api/{module}/{path} | 探测路由、读取、替换或删除任意键或子树 |\n| GET、DELETE | /api/{module}/Caches | 查看、清空模块缓存，使用相同的通用存储处理器 |\n\nmodule 和 path 使用 Apifox 路径参数，不预填业务示例。path 以 / 分隔层级，每段独立编码；不能把分隔斜线编码为 %2F。片段允许字母、数字、下划线、连字符，拒绝空片段及 __proto__/prototype/constructor。这些是路径结构校验，不是 BoxJS 字段校验。API 接受不存在于 BoxJS 中的新键。\n\n## 安装配置决定存储映射\n\n代理入口构造：\n\n~~~js\nconst handler = new SettingsHandler({\n  origin: \"https://biliverse.github.io\",\n  storageKey: \"BiliBili\",\n  module: \"Enhanced\"\n});\nconst response = await handler.handle($request);\n~~~\n\n此处由已安装插件提供可信配置，不经浏览器 header/body 提供。API 从 /api/ 后第一段确认模块，再将路径映射到固定存储根：\n\n~~~text\n/api/Enhanced/Settings/Home/Top_left → BiliBili.Enhanced.Settings.Home.Top_left\n/api/Enhanced/Caches                → BiliBili.Enhanced.Caches\n/api/Enhanced/                      → BiliBili.Enhanced\n~~~\n\nEnhanced 处理器不能访问 BiliBili.Global；重置 Enhanced 也保留 Global。类不接受 configURL、loadConfig 或 resolveSettings。通用独立代理脚本的 argument 为 origin、storageKey、module。配置 Mock 的实际下载源仍由模块模板指定，与 API 无关。\n\n## 前端读取与缓存\n\n每次进入主菜单，并发 HEAD /configs/{module}，仅 200 启用按钮；此时不 GET 设置。配置 Mock 地址不部署同名线上文件，静态下载源另设路径。\n\n每次打开、再次进入或刷新设置页面：\n1. GET /configs/{module} 一次，由前端解析 BoxJS、生成控件和默认值。\n2. GET BoxJS 字段公共子树一次，例如 /api/Enhanced/Settings/。\n3. 在当前页面建立内存缓存。若子树缺失返回 404，则用空覆盖值加 BoxJS 默认值绘制；兼容旧存储中以 JSON 字符串编码的设置子树。\n\n保存或删除只按目标路径发送一次请求，根据是否返回 200 显示短暂通知；失败保留缓存及未保存输入。成功后仅更新内存，不 GET 整个模块。仅前端校验控件类型和选项；直接调用 API 可写入任何合法 JSON 值。\n\n## 读写示例\n\n~~~http\nGET /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n已有值返回 200，正文是该值本身。GET 父路径返回全部子树，包括未在页面展示的键；不存在返回 404。不会自动合并 BoxJS 默认值。\n\n~~~http\nPOST /api/Enhanced/Settings/Home/Top_left\nContent-Type: application/json\nX-Settings-Client: 1\n\n\"mine\"\n~~~\n\n正文允许字符串、数字、布尔值、null、任意数组和对象；没有 values 包装。POST 替换指定位置的值而非合并对象。未存在的父节点会创建，JSON 数组元素可通过数字路径访问。路径之外的数据保持不变。\n\n~~~json\n{ \"saved\": true }\n~~~\n\n~~~http\nDELETE /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n删除键或整棵子树，不存在时也返回 200。前端删除设置覆盖值后显示当前 BoxJS 默认值。\n\n~~~json\n{ \"deleted\": true }\n~~~\n\n## Caches 与模块重置\n\n“查看 Caches”按需 GET /api/{module}/Caches，显示全部缓存 JSON；404 表示暂无缓存。再次点击刷新才重新读取，不在进入页面时自动下载缓存。\n\n“清空 Caches”确认后 DELETE /api/{module}/Caches，仅删除该节点，保留 Settings 及其它模块。成功后清空当前缓存视图，不追加 GET。\n\n“重置模块”确认后 DELETE /api/{module}/，删除模块的 Settings、Caches 和其它全部持久化键，保留同根的其它模块。成功后清除页面覆盖值、使用已加载 BoxJS 的默认值，隐藏旧缓存内容，不重新读取设置。再次进入页面时按正常打开流程读取。\n\n~~~http\nDELETE /api/Enhanced/\nX-Settings-Client: 1\n~~~\n\n## 代理存储操作\n\nHEAD 仅确认本处理器接管合法模块路径，不读取存储，也不证明已有值。GET 读取一次根；POST/DELETE 写入前读取最新根，使用 util Lodash 修改对应节点并写回一次。API 不发送网络请求。\n\n历史 JSON 字符串中间节点会在路径遍历时解码；GET 直接指向字符串叶子时保留字符串。无法继续遍历标量父节点返回 500，不悄悄覆盖原数据。DELETE 数组元素采用删除键语义，不移动其它索引。\n\nAPI 响应带 Cache-Control: no-store。默认需要 X-Settings-Client: 1，Origin 存在时须与安装来源一致；该请求头是页面标记，不是认证凭据。POST 正文上限为 65536 个 UTF-16 code units。多个代理脚本同时写同一根仍没有事务隔离保证。\n\n| 状态码 | 含义 |\n| --- | --- |\n| 200 | 探测或读写成功；HEAD 无正文 |\n| 400 | 路径或 JSON 正文格式无效 |\n| 403 | 缺少页面标记，或请求来源不符 |\n| 404 | 模块不由当前处理器接管，或 GET 目标不存在 |\n| 405 | 不支持的 HTTP 方法 |\n| 413 | POST 正文过长 |\n| 415 | POST 正文不是 application/json |\n| 500 | 存储读取、路径遍历或写入失败 |\n\nAPI 不再返回 BoxJS 配置加载错误 502。配置 Mock 失败的格式仍由代理或原站决定。\n\n## BoxJS 仅用于 WebView\n\n支持 settings 数组、单 app 和 apps 订阅。字段 ID 仍使用 @根.模块.路径；名称、type、val、items、desc 生成控件，placeholder/rows/autoGrow 控制文本输入展示。app 元数据用于页面标题、说明和图标，script 只保留不执行；icons[0]/icons[1] 是透明/彩色变体，不是亮暗顺序。\n\n浏览器解析的根名仅为配置信息；代理不会因此改变固定 storageKey。插件作者应让 BoxJS 路径与安装映射一致。设置默认值、类型与枚举都由 WebView 处理，API 本身与 BoxJS 无关。\n\nGitHub main/dev 分别绑定 Apifox 同名分支。修改 apifox/preference-panes.apifox.json 后由已绑定数据源导入，并按分支回读验证。\n",
+                "parameters": {
+                  "path": [
+                    {
+                      "id": "module#0",
+                      "name": "module",
+                      "type": "string",
+                      "schema": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z0-9_-]+$",
+                        "minLength": 1
+                      },
+                      "required": true,
+                      "enable": true,
+                      "example": "",
+                      "description": "模块标识：同一值用于 /settings/{module}、/configs/{module}、/api/{module}/…。对应 BoxJS ID 的 @存储根.模块.路径 中的模块段；Enhanced 仅为示例。"
+                    }
+                  ],
+                  "query": [],
+                  "cookie": [],
+                  "header": [
+                    {
+                      "id": "X-Settings-Client#0",
+                      "name": "X-Settings-Client",
+                      "type": "string",
+                      "schema": {
+                        "type": "string"
+                      },
+                      "required": true,
+                      "enable": true,
+                      "example": "1",
+                      "description": "默认页面标记，不是认证凭据；调用方可通过 requestHeader 改名。"
+                    },
+                    {
+                      "id": "Origin#0",
+                      "name": "Origin",
+                      "type": "string",
+                      "schema": {
+                        "type": "string"
+                      },
+                      "required": false,
+                      "enable": true,
+                      "example": "",
+                      "description": "浏览器请求来源；存在时必须与代理脚本配置的 origin 相同，不预设项目域名。"
+                    }
+                  ]
+                },
+                "requestBody": {
+                  "type": "application/json",
+                  "required": true,
+                  "parameters": [],
+                  "jsonSchema": {
+                    "description": "任意 JSON 值；API 不按 BoxJS 校验类型或枚举，POST 替换路径处的完整值。",
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "array",
+                        "items": {}
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  },
+                  "data": ""
+                },
+                "responses": [
+                  {
+                    "id": "pp-pp-module-post-200",
+                    "code": 200,
+                    "name": "成功",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "saved"
+                      ],
+                      "properties": {
+                        "saved": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  },
+                  {
+                    "id": "pp-pp-module-post-400",
+                    "code": 400,
+                    "name": "非法路径或 JSON 值",
                     "headers": [],
                     "contentType": "json",
                     "jsonSchema": {
@@ -2011,7 +2128,725 @@
                     "description": "JSON 响应"
                   },
                   {
-                    "id": "pp-511372919-500",
+                    "id": "pp-pp-module-post-403",
+                    "code": 403,
+                    "name": "缺标记或异源",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  },
+                  {
+                    "id": "pp-pp-module-post-404",
+                    "code": 404,
+                    "name": "存储路径不存在、非接管模块或 Mock 不可用",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  },
+                  {
+                    "id": "pp-pp-module-post-405",
+                    "code": 405,
+                    "name": "不支持的操作",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  },
+                  {
+                    "id": "pp-pp-module-post-413",
+                    "code": 413,
+                    "name": "正文过长",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  },
+                  {
+                    "id": "pp-pp-module-post-415",
+                    "code": 415,
+                    "name": "非 JSON 正文",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  },
+                  {
+                    "id": "pp-pp-module-post-500",
+                    "code": 500,
+                    "name": "存储写入或执行失败",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  }
+                ],
+                "responseExamples": [],
+                "auth": {},
+                "securityScheme": {},
+                "commonParameters": {},
+                "preProcessors": [],
+                "postProcessors": [],
+                "inheritPreProcessors": {},
+                "inheritPostProcessors": {},
+                "cases": [],
+                "mocks": [],
+                "customApiFields": "{}",
+                "advancedSettings": {
+                  "disabledSystemHeaders": {}
+                },
+                "oasExtensions": "{}"
+              }
+            },
+            {
+              "name": "重置模块",
+              "api": {
+                "id": "pp-module-delete",
+                "method": "delete",
+                "path": "/api/{module}/",
+                "type": "http",
+                "moduleId": 8522462,
+                "serverId": "default",
+                "visibility": "SHARED",
+                "status": "testing",
+                "tags": [
+                  "持久化读写"
+                ],
+                "operationId": "preference_panes_pp-module-delete",
+                "sourceUrl": "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/guide.md",
+                "description": "## 接口用途\n\n删除整个模块节点，包含 Settings、Caches 和其它数据；保留同根的其它模块。页面重置按钮使用此接口，成功后仅重置页面缓存，不追加 GET。\n\n## 请求契约\n\n`DELETE /api/{module}/`\n\nmodule 是必填路径参数，必须属于插件安装配置中的模块。路径参数不预填业务示例值；具体取值由接入项目决定。请求需携带 X-Settings-Client: 1；该标记不是认证凭据。\n\n请求没有正文。\n\n## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n```json\n{\n  \"deleted\": true\n}\n```\n\n## 调用流程与具体示例\n\n# PreferencePanes 0.3.0 接口契约\n\n前端负责 BoxJS 解析、控件生成和字段输入校验。API 只桥接安装配置指定的持久化根与模块，不下载 BoxJS，不校验字段声明、枚举或控件类型。\n\n## 路径和参数\n\n| 方法 | 路径 | 行为 |\n| --- | --- | --- |\n| GET | /settings/{module} | 同一个 WebView 页面，按路径选择模块 |\n| HEAD、GET | /configs/{module} | 模块配置 Mock：探测、加载 BoxJS |\n| HEAD、GET、POST、DELETE | /api/{module}/ | 探测路由、读取、替换或删除整个模块 |\n| HEAD、GET、POST、DELETE | /api/{module}/{path} | 探测路由、读取、替换或删除任意键或子树 |\n| GET、DELETE | /api/{module}/Caches | 查看、清空模块缓存，使用相同的通用存储处理器 |\n\nmodule 和 path 使用 Apifox 路径参数，不预填业务示例。path 以 / 分隔层级，每段独立编码；不能把分隔斜线编码为 %2F。片段允许字母、数字、下划线、连字符，拒绝空片段及 __proto__/prototype/constructor。这些是路径结构校验，不是 BoxJS 字段校验。API 接受不存在于 BoxJS 中的新键。\n\n## 安装配置决定存储映射\n\n代理入口构造：\n\n~~~js\nconst handler = new SettingsHandler({\n  origin: \"https://biliverse.github.io\",\n  storageKey: \"BiliBili\",\n  module: \"Enhanced\"\n});\nconst response = await handler.handle($request);\n~~~\n\n此处由已安装插件提供可信配置，不经浏览器 header/body 提供。API 从 /api/ 后第一段确认模块，再将路径映射到固定存储根：\n\n~~~text\n/api/Enhanced/Settings/Home/Top_left → BiliBili.Enhanced.Settings.Home.Top_left\n/api/Enhanced/Caches                → BiliBili.Enhanced.Caches\n/api/Enhanced/                      → BiliBili.Enhanced\n~~~\n\nEnhanced 处理器不能访问 BiliBili.Global；重置 Enhanced 也保留 Global。类不接受 configURL、loadConfig 或 resolveSettings。通用独立代理脚本的 argument 为 origin、storageKey、module。配置 Mock 的实际下载源仍由模块模板指定，与 API 无关。\n\n## 前端读取与缓存\n\n每次进入主菜单，并发 HEAD /configs/{module}，仅 200 启用按钮；此时不 GET 设置。配置 Mock 地址不部署同名线上文件，静态下载源另设路径。\n\n每次打开、再次进入或刷新设置页面：\n1. GET /configs/{module} 一次，由前端解析 BoxJS、生成控件和默认值。\n2. GET BoxJS 字段公共子树一次，例如 /api/Enhanced/Settings/。\n3. 在当前页面建立内存缓存。若子树缺失返回 404，则用空覆盖值加 BoxJS 默认值绘制；兼容旧存储中以 JSON 字符串编码的设置子树。\n\n保存或删除只按目标路径发送一次请求，根据是否返回 200 显示短暂通知；失败保留缓存及未保存输入。成功后仅更新内存，不 GET 整个模块。仅前端校验控件类型和选项；直接调用 API 可写入任何合法 JSON 值。\n\n## 读写示例\n\n~~~http\nGET /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n已有值返回 200，正文是该值本身。GET 父路径返回全部子树，包括未在页面展示的键；不存在返回 404。不会自动合并 BoxJS 默认值。\n\n~~~http\nPOST /api/Enhanced/Settings/Home/Top_left\nContent-Type: application/json\nX-Settings-Client: 1\n\n\"mine\"\n~~~\n\n正文允许字符串、数字、布尔值、null、任意数组和对象；没有 values 包装。POST 替换指定位置的值而非合并对象。未存在的父节点会创建，JSON 数组元素可通过数字路径访问。路径之外的数据保持不变。\n\n~~~json\n{ \"saved\": true }\n~~~\n\n~~~http\nDELETE /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n删除键或整棵子树，不存在时也返回 200。前端删除设置覆盖值后显示当前 BoxJS 默认值。\n\n~~~json\n{ \"deleted\": true }\n~~~\n\n## Caches 与模块重置\n\n“查看 Caches”按需 GET /api/{module}/Caches，显示全部缓存 JSON；404 表示暂无缓存。再次点击刷新才重新读取，不在进入页面时自动下载缓存。\n\n“清空 Caches”确认后 DELETE /api/{module}/Caches，仅删除该节点，保留 Settings 及其它模块。成功后清空当前缓存视图，不追加 GET。\n\n“重置模块”确认后 DELETE /api/{module}/，删除模块的 Settings、Caches 和其它全部持久化键，保留同根的其它模块。成功后清除页面覆盖值、使用已加载 BoxJS 的默认值，隐藏旧缓存内容，不重新读取设置。再次进入页面时按正常打开流程读取。\n\n~~~http\nDELETE /api/Enhanced/\nX-Settings-Client: 1\n~~~\n\n## 代理存储操作\n\nHEAD 仅确认本处理器接管合法模块路径，不读取存储，也不证明已有值。GET 读取一次根；POST/DELETE 写入前读取最新根，使用 util Lodash 修改对应节点并写回一次。API 不发送网络请求。\n\n历史 JSON 字符串中间节点会在路径遍历时解码；GET 直接指向字符串叶子时保留字符串。无法继续遍历标量父节点返回 500，不悄悄覆盖原数据。DELETE 数组元素采用删除键语义，不移动其它索引。\n\nAPI 响应带 Cache-Control: no-store。默认需要 X-Settings-Client: 1，Origin 存在时须与安装来源一致；该请求头是页面标记，不是认证凭据。POST 正文上限为 65536 个 UTF-16 code units。多个代理脚本同时写同一根仍没有事务隔离保证。\n\n| 状态码 | 含义 |\n| --- | --- |\n| 200 | 探测或读写成功；HEAD 无正文 |\n| 400 | 路径或 JSON 正文格式无效 |\n| 403 | 缺少页面标记，或请求来源不符 |\n| 404 | 模块不由当前处理器接管，或 GET 目标不存在 |\n| 405 | 不支持的 HTTP 方法 |\n| 413 | POST 正文过长 |\n| 415 | POST 正文不是 application/json |\n| 500 | 存储读取、路径遍历或写入失败 |\n\nAPI 不再返回 BoxJS 配置加载错误 502。配置 Mock 失败的格式仍由代理或原站决定。\n\n## BoxJS 仅用于 WebView\n\n支持 settings 数组、单 app 和 apps 订阅。字段 ID 仍使用 @根.模块.路径；名称、type、val、items、desc 生成控件，placeholder/rows/autoGrow 控制文本输入展示。app 元数据用于页面标题、说明和图标，script 只保留不执行；icons[0]/icons[1] 是透明/彩色变体，不是亮暗顺序。\n\n浏览器解析的根名仅为配置信息；代理不会因此改变固定 storageKey。插件作者应让 BoxJS 路径与安装映射一致。设置默认值、类型与枚举都由 WebView 处理，API 本身与 BoxJS 无关。\n\nGitHub main/dev 分别绑定 Apifox 同名分支。修改 apifox/preference-panes.apifox.json 后由已绑定数据源导入，并按分支回读验证。\n",
+                "parameters": {
+                  "path": [
+                    {
+                      "id": "module#0",
+                      "name": "module",
+                      "type": "string",
+                      "schema": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z0-9_-]+$",
+                        "minLength": 1
+                      },
+                      "required": true,
+                      "enable": true,
+                      "example": "",
+                      "description": "模块标识：同一值用于 /settings/{module}、/configs/{module}、/api/{module}/…。对应 BoxJS ID 的 @存储根.模块.路径 中的模块段；Enhanced 仅为示例。"
+                    }
+                  ],
+                  "query": [],
+                  "cookie": [],
+                  "header": [
+                    {
+                      "id": "X-Settings-Client#0",
+                      "name": "X-Settings-Client",
+                      "type": "string",
+                      "schema": {
+                        "type": "string"
+                      },
+                      "required": true,
+                      "enable": true,
+                      "example": "1",
+                      "description": "默认页面标记，不是认证凭据；调用方可通过 requestHeader 改名。"
+                    },
+                    {
+                      "id": "Origin#0",
+                      "name": "Origin",
+                      "type": "string",
+                      "schema": {
+                        "type": "string"
+                      },
+                      "required": false,
+                      "enable": true,
+                      "example": "",
+                      "description": "浏览器请求来源；存在时必须与代理脚本配置的 origin 相同，不预设项目域名。"
+                    }
+                  ]
+                },
+                "requestBody": {
+                  "type": "none",
+                  "required": false,
+                  "parameters": []
+                },
+                "responses": [
+                  {
+                    "id": "pp-pp-module-delete-200",
+                    "code": 200,
+                    "name": "成功",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "deleted"
+                      ],
+                      "properties": {
+                        "deleted": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  },
+                  {
+                    "id": "pp-pp-module-delete-400",
+                    "code": 400,
+                    "name": "非法路径或 JSON 值",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  },
+                  {
+                    "id": "pp-pp-module-delete-403",
+                    "code": 403,
+                    "name": "缺标记或异源",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  },
+                  {
+                    "id": "pp-pp-module-delete-404",
+                    "code": 404,
+                    "name": "存储路径不存在、非接管模块或 Mock 不可用",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  },
+                  {
+                    "id": "pp-pp-module-delete-405",
+                    "code": 405,
+                    "name": "不支持的操作",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  },
+                  {
+                    "id": "pp-pp-module-delete-500",
+                    "code": 500,
+                    "name": "存储写入或执行失败",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  }
+                ],
+                "responseExamples": [],
+                "auth": {},
+                "securityScheme": {},
+                "commonParameters": {},
+                "preProcessors": [],
+                "postProcessors": [],
+                "inheritPreProcessors": {},
+                "inheritPostProcessors": {},
+                "cases": [],
+                "mocks": [],
+                "customApiFields": "{}",
+                "advancedSettings": {
+                  "disabledSystemHeaders": {}
+                },
+                "oasExtensions": "{}"
+              }
+            },
+            {
+              "name": "查看模块 Caches",
+              "api": {
+                "id": "pp-caches-get",
+                "method": "get",
+                "path": "/api/{module}/Caches",
+                "type": "http",
+                "moduleId": 8522462,
+                "serverId": "default",
+                "visibility": "SHARED",
+                "status": "testing",
+                "tags": [
+                  "持久化读写"
+                ],
+                "operationId": "preference_panes_pp-caches-get",
+                "sourceUrl": "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/guide.md",
+                "description": "## 接口用途\n\n读取模块 Caches 的全部内容；缺失返回 404。页面仅在用户点击查看或刷新时请求。此路径是通用 path 接口的具体用途，不需要专用存储处理器。\n\n## 请求契约\n\n`GET /api/{module}/Caches`\n\nmodule 是必填路径参数，必须属于插件安装配置中的模块。路径参数不预填业务示例值；具体取值由接入项目决定。请求需携带 X-Settings-Client: 1；该标记不是认证凭据。\n\n请求没有正文。\n\n## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n```json\n{\n  \"items\": [\n    1,\n    2\n  ]\n}\n```\n\n## 调用流程与具体示例\n\n# PreferencePanes 0.3.0 接口契约\n\n前端负责 BoxJS 解析、控件生成和字段输入校验。API 只桥接安装配置指定的持久化根与模块，不下载 BoxJS，不校验字段声明、枚举或控件类型。\n\n## 路径和参数\n\n| 方法 | 路径 | 行为 |\n| --- | --- | --- |\n| GET | /settings/{module} | 同一个 WebView 页面，按路径选择模块 |\n| HEAD、GET | /configs/{module} | 模块配置 Mock：探测、加载 BoxJS |\n| HEAD、GET、POST、DELETE | /api/{module}/ | 探测路由、读取、替换或删除整个模块 |\n| HEAD、GET、POST、DELETE | /api/{module}/{path} | 探测路由、读取、替换或删除任意键或子树 |\n| GET、DELETE | /api/{module}/Caches | 查看、清空模块缓存，使用相同的通用存储处理器 |\n\nmodule 和 path 使用 Apifox 路径参数，不预填业务示例。path 以 / 分隔层级，每段独立编码；不能把分隔斜线编码为 %2F。片段允许字母、数字、下划线、连字符，拒绝空片段及 __proto__/prototype/constructor。这些是路径结构校验，不是 BoxJS 字段校验。API 接受不存在于 BoxJS 中的新键。\n\n## 安装配置决定存储映射\n\n代理入口构造：\n\n~~~js\nconst handler = new SettingsHandler({\n  origin: \"https://biliverse.github.io\",\n  storageKey: \"BiliBili\",\n  module: \"Enhanced\"\n});\nconst response = await handler.handle($request);\n~~~\n\n此处由已安装插件提供可信配置，不经浏览器 header/body 提供。API 从 /api/ 后第一段确认模块，再将路径映射到固定存储根：\n\n~~~text\n/api/Enhanced/Settings/Home/Top_left → BiliBili.Enhanced.Settings.Home.Top_left\n/api/Enhanced/Caches                → BiliBili.Enhanced.Caches\n/api/Enhanced/                      → BiliBili.Enhanced\n~~~\n\nEnhanced 处理器不能访问 BiliBili.Global；重置 Enhanced 也保留 Global。类不接受 configURL、loadConfig 或 resolveSettings。通用独立代理脚本的 argument 为 origin、storageKey、module。配置 Mock 的实际下载源仍由模块模板指定，与 API 无关。\n\n## 前端读取与缓存\n\n每次进入主菜单，并发 HEAD /configs/{module}，仅 200 启用按钮；此时不 GET 设置。配置 Mock 地址不部署同名线上文件，静态下载源另设路径。\n\n每次打开、再次进入或刷新设置页面：\n1. GET /configs/{module} 一次，由前端解析 BoxJS、生成控件和默认值。\n2. GET BoxJS 字段公共子树一次，例如 /api/Enhanced/Settings/。\n3. 在当前页面建立内存缓存。若子树缺失返回 404，则用空覆盖值加 BoxJS 默认值绘制；兼容旧存储中以 JSON 字符串编码的设置子树。\n\n保存或删除只按目标路径发送一次请求，根据是否返回 200 显示短暂通知；失败保留缓存及未保存输入。成功后仅更新内存，不 GET 整个模块。仅前端校验控件类型和选项；直接调用 API 可写入任何合法 JSON 值。\n\n## 读写示例\n\n~~~http\nGET /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n已有值返回 200，正文是该值本身。GET 父路径返回全部子树，包括未在页面展示的键；不存在返回 404。不会自动合并 BoxJS 默认值。\n\n~~~http\nPOST /api/Enhanced/Settings/Home/Top_left\nContent-Type: application/json\nX-Settings-Client: 1\n\n\"mine\"\n~~~\n\n正文允许字符串、数字、布尔值、null、任意数组和对象；没有 values 包装。POST 替换指定位置的值而非合并对象。未存在的父节点会创建，JSON 数组元素可通过数字路径访问。路径之外的数据保持不变。\n\n~~~json\n{ \"saved\": true }\n~~~\n\n~~~http\nDELETE /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n删除键或整棵子树，不存在时也返回 200。前端删除设置覆盖值后显示当前 BoxJS 默认值。\n\n~~~json\n{ \"deleted\": true }\n~~~\n\n## Caches 与模块重置\n\n“查看 Caches”按需 GET /api/{module}/Caches，显示全部缓存 JSON；404 表示暂无缓存。再次点击刷新才重新读取，不在进入页面时自动下载缓存。\n\n“清空 Caches”确认后 DELETE /api/{module}/Caches，仅删除该节点，保留 Settings 及其它模块。成功后清空当前缓存视图，不追加 GET。\n\n“重置模块”确认后 DELETE /api/{module}/，删除模块的 Settings、Caches 和其它全部持久化键，保留同根的其它模块。成功后清除页面覆盖值、使用已加载 BoxJS 的默认值，隐藏旧缓存内容，不重新读取设置。再次进入页面时按正常打开流程读取。\n\n~~~http\nDELETE /api/Enhanced/\nX-Settings-Client: 1\n~~~\n\n## 代理存储操作\n\nHEAD 仅确认本处理器接管合法模块路径，不读取存储，也不证明已有值。GET 读取一次根；POST/DELETE 写入前读取最新根，使用 util Lodash 修改对应节点并写回一次。API 不发送网络请求。\n\n历史 JSON 字符串中间节点会在路径遍历时解码；GET 直接指向字符串叶子时保留字符串。无法继续遍历标量父节点返回 500，不悄悄覆盖原数据。DELETE 数组元素采用删除键语义，不移动其它索引。\n\nAPI 响应带 Cache-Control: no-store。默认需要 X-Settings-Client: 1，Origin 存在时须与安装来源一致；该请求头是页面标记，不是认证凭据。POST 正文上限为 65536 个 UTF-16 code units。多个代理脚本同时写同一根仍没有事务隔离保证。\n\n| 状态码 | 含义 |\n| --- | --- |\n| 200 | 探测或读写成功；HEAD 无正文 |\n| 400 | 路径或 JSON 正文格式无效 |\n| 403 | 缺少页面标记，或请求来源不符 |\n| 404 | 模块不由当前处理器接管，或 GET 目标不存在 |\n| 405 | 不支持的 HTTP 方法 |\n| 413 | POST 正文过长 |\n| 415 | POST 正文不是 application/json |\n| 500 | 存储读取、路径遍历或写入失败 |\n\nAPI 不再返回 BoxJS 配置加载错误 502。配置 Mock 失败的格式仍由代理或原站决定。\n\n## BoxJS 仅用于 WebView\n\n支持 settings 数组、单 app 和 apps 订阅。字段 ID 仍使用 @根.模块.路径；名称、type、val、items、desc 生成控件，placeholder/rows/autoGrow 控制文本输入展示。app 元数据用于页面标题、说明和图标，script 只保留不执行；icons[0]/icons[1] 是透明/彩色变体，不是亮暗顺序。\n\n浏览器解析的根名仅为配置信息；代理不会因此改变固定 storageKey。插件作者应让 BoxJS 路径与安装映射一致。设置默认值、类型与枚举都由 WebView 处理，API 本身与 BoxJS 无关。\n\nGitHub main/dev 分别绑定 Apifox 同名分支。修改 apifox/preference-panes.apifox.json 后由已绑定数据源导入，并按分支回读验证。\n",
+                "parameters": {
+                  "path": [
+                    {
+                      "id": "module#0",
+                      "name": "module",
+                      "type": "string",
+                      "schema": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z0-9_-]+$",
+                        "minLength": 1
+                      },
+                      "required": true,
+                      "enable": true,
+                      "example": "",
+                      "description": "模块标识：同一值用于 /settings/{module}、/configs/{module}、/api/{module}/…。对应 BoxJS ID 的 @存储根.模块.路径 中的模块段；Enhanced 仅为示例。"
+                    }
+                  ],
+                  "query": [],
+                  "cookie": [],
+                  "header": [
+                    {
+                      "id": "X-Settings-Client#0",
+                      "name": "X-Settings-Client",
+                      "type": "string",
+                      "schema": {
+                        "type": "string"
+                      },
+                      "required": true,
+                      "enable": true,
+                      "example": "1",
+                      "description": "默认页面标记，不是认证凭据；调用方可通过 requestHeader 改名。"
+                    },
+                    {
+                      "id": "Origin#0",
+                      "name": "Origin",
+                      "type": "string",
+                      "schema": {
+                        "type": "string"
+                      },
+                      "required": false,
+                      "enable": true,
+                      "example": "",
+                      "description": "浏览器请求来源；存在时必须与代理脚本配置的 origin 相同，不预设项目域名。"
+                    }
+                  ]
+                },
+                "requestBody": {
+                  "type": "none",
+                  "required": false,
+                  "parameters": []
+                },
+                "responses": [
+                  {
+                    "id": "pp-pp-caches-get-200",
+                    "code": 200,
+                    "name": "成功",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "description": "任意 JSON 值；API 不按 BoxJS 校验类型或枚举，POST 替换路径处的完整值。",
+                      "oneOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "array",
+                          "items": {}
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": true
+                        }
+                      ]
+                    },
+                    "description": "JSON 响应"
+                  },
+                  {
+                    "id": "pp-pp-caches-get-400",
+                    "code": 400,
+                    "name": "非法路径或 JSON 值",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  },
+                  {
+                    "id": "pp-pp-caches-get-403",
+                    "code": 403,
+                    "name": "缺标记或异源",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  },
+                  {
+                    "id": "pp-pp-caches-get-404",
+                    "code": 404,
+                    "name": "存储路径不存在、非接管模块或 Mock 不可用",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  },
+                  {
+                    "id": "pp-pp-caches-get-405",
+                    "code": 405,
+                    "name": "不支持的操作",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  },
+                  {
+                    "id": "pp-pp-caches-get-500",
+                    "code": 500,
+                    "name": "存储写入或执行失败",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  }
+                ],
+                "responseExamples": [],
+                "auth": {},
+                "securityScheme": {},
+                "commonParameters": {},
+                "preProcessors": [],
+                "postProcessors": [],
+                "inheritPreProcessors": {},
+                "inheritPostProcessors": {},
+                "cases": [],
+                "mocks": [],
+                "customApiFields": "{}",
+                "advancedSettings": {
+                  "disabledSystemHeaders": {}
+                },
+                "oasExtensions": "{}"
+              }
+            },
+            {
+              "name": "清空模块 Caches",
+              "api": {
+                "id": "pp-caches-delete",
+                "method": "delete",
+                "path": "/api/{module}/Caches",
+                "type": "http",
+                "moduleId": 8522462,
+                "serverId": "default",
+                "visibility": "SHARED",
+                "status": "testing",
+                "tags": [
+                  "持久化读写"
+                ],
+                "operationId": "preference_panes_pp-caches-delete",
+                "sourceUrl": "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/guide.md",
+                "description": "## 接口用途\n\n删除 Caches 节点，保留模块 Settings 和同根其它模块；不存在也返回 200。成功后页面清空缓存显示，不重新读取。\n\n## 请求契约\n\n`DELETE /api/{module}/Caches`\n\nmodule 是必填路径参数，必须属于插件安装配置中的模块。路径参数不预填业务示例值；具体取值由接入项目决定。请求需携带 X-Settings-Client: 1；该标记不是认证凭据。\n\n请求没有正文。\n\n## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n```json\n{\n  \"deleted\": true\n}\n```\n\n## 调用流程与具体示例\n\n# PreferencePanes 0.3.0 接口契约\n\n前端负责 BoxJS 解析、控件生成和字段输入校验。API 只桥接安装配置指定的持久化根与模块，不下载 BoxJS，不校验字段声明、枚举或控件类型。\n\n## 路径和参数\n\n| 方法 | 路径 | 行为 |\n| --- | --- | --- |\n| GET | /settings/{module} | 同一个 WebView 页面，按路径选择模块 |\n| HEAD、GET | /configs/{module} | 模块配置 Mock：探测、加载 BoxJS |\n| HEAD、GET、POST、DELETE | /api/{module}/ | 探测路由、读取、替换或删除整个模块 |\n| HEAD、GET、POST、DELETE | /api/{module}/{path} | 探测路由、读取、替换或删除任意键或子树 |\n| GET、DELETE | /api/{module}/Caches | 查看、清空模块缓存，使用相同的通用存储处理器 |\n\nmodule 和 path 使用 Apifox 路径参数，不预填业务示例。path 以 / 分隔层级，每段独立编码；不能把分隔斜线编码为 %2F。片段允许字母、数字、下划线、连字符，拒绝空片段及 __proto__/prototype/constructor。这些是路径结构校验，不是 BoxJS 字段校验。API 接受不存在于 BoxJS 中的新键。\n\n## 安装配置决定存储映射\n\n代理入口构造：\n\n~~~js\nconst handler = new SettingsHandler({\n  origin: \"https://biliverse.github.io\",\n  storageKey: \"BiliBili\",\n  module: \"Enhanced\"\n});\nconst response = await handler.handle($request);\n~~~\n\n此处由已安装插件提供可信配置，不经浏览器 header/body 提供。API 从 /api/ 后第一段确认模块，再将路径映射到固定存储根：\n\n~~~text\n/api/Enhanced/Settings/Home/Top_left → BiliBili.Enhanced.Settings.Home.Top_left\n/api/Enhanced/Caches                → BiliBili.Enhanced.Caches\n/api/Enhanced/                      → BiliBili.Enhanced\n~~~\n\nEnhanced 处理器不能访问 BiliBili.Global；重置 Enhanced 也保留 Global。类不接受 configURL、loadConfig 或 resolveSettings。通用独立代理脚本的 argument 为 origin、storageKey、module。配置 Mock 的实际下载源仍由模块模板指定，与 API 无关。\n\n## 前端读取与缓存\n\n每次进入主菜单，并发 HEAD /configs/{module}，仅 200 启用按钮；此时不 GET 设置。配置 Mock 地址不部署同名线上文件，静态下载源另设路径。\n\n每次打开、再次进入或刷新设置页面：\n1. GET /configs/{module} 一次，由前端解析 BoxJS、生成控件和默认值。\n2. GET BoxJS 字段公共子树一次，例如 /api/Enhanced/Settings/。\n3. 在当前页面建立内存缓存。若子树缺失返回 404，则用空覆盖值加 BoxJS 默认值绘制；兼容旧存储中以 JSON 字符串编码的设置子树。\n\n保存或删除只按目标路径发送一次请求，根据是否返回 200 显示短暂通知；失败保留缓存及未保存输入。成功后仅更新内存，不 GET 整个模块。仅前端校验控件类型和选项；直接调用 API 可写入任何合法 JSON 值。\n\n## 读写示例\n\n~~~http\nGET /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n已有值返回 200，正文是该值本身。GET 父路径返回全部子树，包括未在页面展示的键；不存在返回 404。不会自动合并 BoxJS 默认值。\n\n~~~http\nPOST /api/Enhanced/Settings/Home/Top_left\nContent-Type: application/json\nX-Settings-Client: 1\n\n\"mine\"\n~~~\n\n正文允许字符串、数字、布尔值、null、任意数组和对象；没有 values 包装。POST 替换指定位置的值而非合并对象。未存在的父节点会创建，JSON 数组元素可通过数字路径访问。路径之外的数据保持不变。\n\n~~~json\n{ \"saved\": true }\n~~~\n\n~~~http\nDELETE /api/Enhanced/Settings/Home/Top_left\nX-Settings-Client: 1\n~~~\n\n删除键或整棵子树，不存在时也返回 200。前端删除设置覆盖值后显示当前 BoxJS 默认值。\n\n~~~json\n{ \"deleted\": true }\n~~~\n\n## Caches 与模块重置\n\n“查看 Caches”按需 GET /api/{module}/Caches，显示全部缓存 JSON；404 表示暂无缓存。再次点击刷新才重新读取，不在进入页面时自动下载缓存。\n\n“清空 Caches”确认后 DELETE /api/{module}/Caches，仅删除该节点，保留 Settings 及其它模块。成功后清空当前缓存视图，不追加 GET。\n\n“重置模块”确认后 DELETE /api/{module}/，删除模块的 Settings、Caches 和其它全部持久化键，保留同根的其它模块。成功后清除页面覆盖值、使用已加载 BoxJS 的默认值，隐藏旧缓存内容，不重新读取设置。再次进入页面时按正常打开流程读取。\n\n~~~http\nDELETE /api/Enhanced/\nX-Settings-Client: 1\n~~~\n\n## 代理存储操作\n\nHEAD 仅确认本处理器接管合法模块路径，不读取存储，也不证明已有值。GET 读取一次根；POST/DELETE 写入前读取最新根，使用 util Lodash 修改对应节点并写回一次。API 不发送网络请求。\n\n历史 JSON 字符串中间节点会在路径遍历时解码；GET 直接指向字符串叶子时保留字符串。无法继续遍历标量父节点返回 500，不悄悄覆盖原数据。DELETE 数组元素采用删除键语义，不移动其它索引。\n\nAPI 响应带 Cache-Control: no-store。默认需要 X-Settings-Client: 1，Origin 存在时须与安装来源一致；该请求头是页面标记，不是认证凭据。POST 正文上限为 65536 个 UTF-16 code units。多个代理脚本同时写同一根仍没有事务隔离保证。\n\n| 状态码 | 含义 |\n| --- | --- |\n| 200 | 探测或读写成功；HEAD 无正文 |\n| 400 | 路径或 JSON 正文格式无效 |\n| 403 | 缺少页面标记，或请求来源不符 |\n| 404 | 模块不由当前处理器接管，或 GET 目标不存在 |\n| 405 | 不支持的 HTTP 方法 |\n| 413 | POST 正文过长 |\n| 415 | POST 正文不是 application/json |\n| 500 | 存储读取、路径遍历或写入失败 |\n\nAPI 不再返回 BoxJS 配置加载错误 502。配置 Mock 失败的格式仍由代理或原站决定。\n\n## BoxJS 仅用于 WebView\n\n支持 settings 数组、单 app 和 apps 订阅。字段 ID 仍使用 @根.模块.路径；名称、type、val、items、desc 生成控件，placeholder/rows/autoGrow 控制文本输入展示。app 元数据用于页面标题、说明和图标，script 只保留不执行；icons[0]/icons[1] 是透明/彩色变体，不是亮暗顺序。\n\n浏览器解析的根名仅为配置信息；代理不会因此改变固定 storageKey。插件作者应让 BoxJS 路径与安装映射一致。设置默认值、类型与枚举都由 WebView 处理，API 本身与 BoxJS 无关。\n\nGitHub main/dev 分别绑定 Apifox 同名分支。修改 apifox/preference-panes.apifox.json 后由已绑定数据源导入，并按分支回读验证。\n",
+                "parameters": {
+                  "path": [
+                    {
+                      "id": "module#0",
+                      "name": "module",
+                      "type": "string",
+                      "schema": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z0-9_-]+$",
+                        "minLength": 1
+                      },
+                      "required": true,
+                      "enable": true,
+                      "example": "",
+                      "description": "模块标识：同一值用于 /settings/{module}、/configs/{module}、/api/{module}/…。对应 BoxJS ID 的 @存储根.模块.路径 中的模块段；Enhanced 仅为示例。"
+                    }
+                  ],
+                  "query": [],
+                  "cookie": [],
+                  "header": [
+                    {
+                      "id": "X-Settings-Client#0",
+                      "name": "X-Settings-Client",
+                      "type": "string",
+                      "schema": {
+                        "type": "string"
+                      },
+                      "required": true,
+                      "enable": true,
+                      "example": "1",
+                      "description": "默认页面标记，不是认证凭据；调用方可通过 requestHeader 改名。"
+                    },
+                    {
+                      "id": "Origin#0",
+                      "name": "Origin",
+                      "type": "string",
+                      "schema": {
+                        "type": "string"
+                      },
+                      "required": false,
+                      "enable": true,
+                      "example": "",
+                      "description": "浏览器请求来源；存在时必须与代理脚本配置的 origin 相同，不预设项目域名。"
+                    }
+                  ]
+                },
+                "requestBody": {
+                  "type": "none",
+                  "required": false,
+                  "parameters": []
+                },
+                "responses": [
+                  {
+                    "id": "pp-pp-caches-delete-200",
+                    "code": 200,
+                    "name": "成功",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "deleted"
+                      ],
+                      "properties": {
+                        "deleted": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  },
+                  {
+                    "id": "pp-pp-caches-delete-400",
+                    "code": 400,
+                    "name": "非法路径或 JSON 值",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  },
+                  {
+                    "id": "pp-pp-caches-delete-403",
+                    "code": 403,
+                    "name": "缺标记或异源",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  },
+                  {
+                    "id": "pp-pp-caches-delete-404",
+                    "code": 404,
+                    "name": "存储路径不存在、非接管模块或 Mock 不可用",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  },
+                  {
+                    "id": "pp-pp-caches-delete-405",
+                    "code": 405,
+                    "name": "不支持的操作",
+                    "headers": [],
+                    "contentType": "json",
+                    "jsonSchema": {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "JSON 响应"
+                  },
+                  {
+                    "id": "pp-pp-caches-delete-500",
                     "code": 500,
                     "name": "存储写入或执行失败",
                     "headers": [],

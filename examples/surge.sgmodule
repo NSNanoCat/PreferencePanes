@@ -10,8 +10,8 @@
 ^https://example\.org/configs/Module$ data-type=file data="https://assets.example.org/Module.boxjs.json" status-code=200 header="Content-Type:application/json; charset=utf-8|Cache-Control:no-store"
 
 [Script]
-# 每个模块限定自己的路径，引用相同通用脚本；字段与 storageKey 都从 BoxJS 读取。
-Module-preferences = type=http-request,pattern=^https://example\.org/api/Module(?:/|\?|$),requires-body=true,max-size=262144,script-path=https://assets.example.org/preference-panes.request.js,argument=origin=https://example.org&configURL=https://assets.example.org/Module.boxjs.json,timeout=10
+# 安装配置固定根与模块；API 不读取 BoxJS，界面仍由上面的配置 Mock 生成。
+Module-preferences = type=http-request,pattern=^https://example\.org/api/Module(?:/|\?|$),requires-body=true,max-size=262144,script-path=https://assets.example.org/preference-panes.request.js,argument=origin=https://example.org&storageKey=Example&module=Module,timeout=10
 
 [MITM]
 hostname = %APPEND% example.org

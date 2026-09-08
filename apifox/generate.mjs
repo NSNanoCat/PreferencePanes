@@ -11,12 +11,8 @@ const moduleId = 8522462;
 const guide = await readFile(path.join(root, "apifox/guide.md"), "utf8");
 const scalar = { oneOf: [{ type: "string", maxLength: 2048 }, { type: "number" }, { type: "boolean" }] };
 const value = { oneOf: [...scalar.oneOf, { type: "array", items: scalar, uniqueItems: true }] };
+const dataValue = { description: "任意 JSON 值；API 不按 BoxJS 校验类型或枚举，POST 替换路径处的完整值。", oneOf: [{ type: "string" }, { type: "number" }, { type: "boolean" }, { type: "null" }, { type: "array", items: {} }, { type: "object", additionalProperties: true }] };
 const errorSchema = { type: "object", required: ["error"], properties: { error: { type: "string" } } };
-const settings = {
-	type: "object",
-	additionalProperties: true,
-	description: "动态子树：仅包含 BoxJS 声明且已有持久化值的字段；键名、层级和类型由模块配置决定。",
-};
 const boxjsFields = {
 	type: "array",
 	items: {
@@ -71,12 +67,11 @@ const headers = [header("X-Settings-Client", "1", "默认页面标记，不是�
 const descriptions = {
 	400: "非法路径或 JSON 值",
 	403: "缺标记或异源",
-	404: "未知字段、无覆盖值或模块未启用",
+	404: "存储路径不存在、非接管模块或 Mock 不可用",
 	405: "不支持的操作",
 	413: "正文过长",
 	415: "非 JSON 正文",
 	500: "存储写入或执行失败",
-	502: "BoxJS 配置加载或解析失败",
 };
 const leaf = "/api/{module}/{path}";
 const declarations = [
@@ -130,11 +125,11 @@ const declarations = [
 		id: "pp-subtree-get",
 		method: "get",
 		path: "/api/{module}/",
-		name: "读取模块公开子树",
+		name: "读取模块全部数据",
 		group: "持久化读写",
-		schema: settings,
+		schema: dataValue,
 		example: { Settings: { Home: { Top_left: "videoshortcut" } } },
-		description: "读取模块根下已声明字段的持久化覆盖值；无覆盖值返回空对象。页面通常通过 /api/{module}/{path} 读取 BoxJS 计算出的公共子树，不要求子树名为 Settings。",
+		description: "读取指定模块全部持久化数据，包括 Settings、Caches 和其它键，不按 BoxJS 过滤。模块不存在返回 404。",
 	},
 	{
 		id: "pp-module-head",
@@ -143,7 +138,7 @@ const declarations = [
 		name: "探测模块读写路由",
 		group: "持久化读写",
 		schema: {},
-		description: "通用脚本加载 BoxJS 确认模块具有声明字段，不读取存储；主菜单仍使用 HEAD /configs/{module} 探测配置 Mock。",
+		description: "确认安装配置接管此模块路由，不访问网络或存储，不表示数据已存在；主菜单仍通过 HEAD /configs/{module} 探测配置 Mock。",
 	},
 	{
 		id: "511372916",
@@ -152,7 +147,7 @@ const declarations = [
 		name: "探测指定键或子树",
 		group: "持久化读写",
 		schema: {},
-		description: "加载 BoxJS，确认 path 是已声明叶子或具有已声明后代字段的父路径。200 仅表示路径受支持，不表示已有持久化值；不读写存储。主菜单使用 HEAD /configs/{module}。",
+		description: "确认路径属于安装配置的模块且路径格式合法，不读取存储或 BoxJS；不保证该路径已有值。",
 	},
 	{
 		id: "511372917",
@@ -160,19 +155,19 @@ const declarations = [
 		path: leaf,
 		name: "读取指定键或子树",
 		group: "持久化读写",
-		schema: { oneOf: [...value.oneOf, settings] },
+		schema: dataValue,
 		example: "mine",
-		description: "path 是模块内以 / 分隔的相对路径。叶子直接返回键值，无持久化值且未提供 resolver 时为 404；父路径返回已声明字段的覆盖值子树，无覆盖值返回 {}。不返回 BoxJS 默认值。",
+		description: "直接返回路径处的任意 JSON 值。父路径返回全部子树，缺失路径返回 404；不计算 BoxJS 默认值，也不执行 resolver。",
 	},
 	{
 		id: "511372918",
 		method: "post",
 		path: leaf,
-		name: "写入或修改指定配置键",
+		name: "写入或替换指定值",
 		group: "持久化读写",
 		schema: { type: "object", required: ["saved"], properties: { saved: { type: "boolean", enum: [true] } } },
 		example: { saved: true },
-		description: '正文直接是符合 BoxJS 字段类型的 JSON 值，例如 "mine"、true、42 或数组；不是补丁对象。仅允许写入完整叶子路径。成功返回 200 和 saved=true；客户端只更新该键缓存并显示通知，不追加 GET。',
+		description: "正文直接是 JSON 值，可为字符串、数字、布尔值、null、数组或对象；未声明的键也允许写入。替换路径处的值，不按 BoxJS 校验、不合并对象。成功返回 200 和 saved=true。",
 	},
 	{
 		id: "511372919",
@@ -182,12 +177,43 @@ const declarations = [
 		group: "持久化读写",
 		schema: { type: "object", required: ["deleted"], properties: { deleted: { type: "boolean", enum: [true] } } },
 		example: { deleted: true },
-		description: "无正文，删除该持久化覆盖值。成功 200，重复删除幂等；客户端显示 BoxJS 默认值，不追加 GET。",
+		description: "无正文，删除指定键或整个子树。路径不存在仍为 200；其它路径不受影响。前端删除设置覆盖值后使用 BoxJS 默认值，不追加 GET。",
+	},
+	{
+		id: "pp-module-post",
+		method: "post",
+		path: "/api/{module}/",
+		name: "替换模块全部数据",
+		group: "持久化读写",
+		schema: { type: "object", required: ["saved"], properties: { saved: { type: "boolean", enum: [true] } } },
+		example: { saved: true },
+		description: "用正文 JSON 完整替换此模块数据，不合并旧值；同一存储根中的其它模块保持不变。",
+	},
+	{
+		id: "pp-module-delete",
+		method: "delete",
+		path: "/api/{module}/",
+		name: "重置模块",
+		group: "持久化读写",
+		schema: { type: "object", required: ["deleted"], properties: { deleted: { type: "boolean", enum: [true] } } },
+		example: { deleted: true },
+		description: "删除整个模块节点，包含 Settings、Caches 和其它数据；保留同根的其它模块。页面重置按钮使用此接口，成功后仅重置页面缓存，不追加 GET。",
+	},
+	{ id: "pp-caches-get", method: "get", path: "/api/{module}/Caches", name: "查看模块 Caches", group: "持久化读写", schema: dataValue, example: { items: [1, 2] }, description: "读取模块 Caches 的全部内容；缺失返回 404。页面仅在用户点击查看或刷新时请求。此路径是通用 path 接口的具体用途，不需要专用存储处理器。" },
+	{
+		id: "pp-caches-delete",
+		method: "delete",
+		path: "/api/{module}/Caches",
+		name: "清空模块 Caches",
+		group: "持久化读写",
+		schema: { type: "object", required: ["deleted"], properties: { deleted: { type: "boolean", enum: [true] } } },
+		example: { deleted: true },
+		description: "删除 Caches 节点，保留模块 Settings 和同根其它模块；不存在也返回 200。成功后页面清空缓存显示，不重新读取。",
 	},
 ];
 const apis = declarations.map(entry => {
 	const { method, id } = entry;
-	const codes = entry.mock ? [200, 404] : [200, 400, 403, 404, 405, 502, ...(method === "post" ? [413, 415, 500] : method === "delete" ? [500] : [])];
+	const codes = entry.mock ? [200, 404] : [200, 400, 403, 404, 405, ...(method === "post" ? [413, 415, 500] : method === "head" ? [] : [500])];
 	return {
 		id,
 		method,
@@ -200,7 +226,7 @@ const apis = declarations.map(entry => {
 		tags: [entry.group],
 		operationId: `preference_panes_${id}`,
 		sourceUrl: "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/guide.md",
-		description: `## 接口用途\n\n${entry.description}\n\n## 请求契约\n\n\`${method.toUpperCase()} ${entry.path}\`\n\nmodule 是必填路径参数，与配置文件中字段所属模块一致。${entry.path.includes("{path}") ? "path 是模块内的相对路径，可包含以 / 分隔的多级目录。" : ""}路径参数不预填业务示例值；具体取值由接入项目决定。${entry.mock ? "该资源由代理 Mock 提供，不需要 X-Settings-Client 请求头。" : "请求需携带 X-Settings-Client: 1；该标记不是认证凭据。"}\n\n${method === "post" ? "正文必须为 application/json，直接传字段值本身；不接受整树对象或 values 包装。实际类型、枚举范围由 BoxJS 校验。" : "请求没有正文。"}\n\n${entry.example === undefined ? "" : `## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n\`\`\`${entry.page ? "html" : "json"}\n${entry.page ? entry.example : JSON.stringify(entry.example, null, 2)}\n\`\`\`\n\n`}## 调用流程与具体示例\n\n${guide}`,
+		description: `## 接口用途\n\n${entry.description}\n\n## 请求契约\n\n\`${method.toUpperCase()} ${entry.path}\`\n\nmodule 是必填路径参数，必须属于插件安装配置中的模块。${entry.path.includes("{path}") ? "path 是模块内的相对路径，可包含以 / 分隔的多级目录。" : ""}路径参数不预填业务示例值；具体取值由接入项目决定。${entry.mock ? "该资源由代理 Mock 提供，不需要 X-Settings-Client 请求头。" : "请求需携带 X-Settings-Client: 1；该标记不是认证凭据。"}\n\n${method === "post" ? "正文必须为 application/json，直接传路径处的 JSON 值本身，允许对象、数组和 null。API 不校验 BoxJS 类型或枚举。" : "请求没有正文。"}\n\n${entry.example === undefined ? "" : `## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n\`\`\`${entry.page ? "html" : "json"}\n${entry.page ? entry.example : JSON.stringify(entry.example, null, 2)}\n\`\`\`\n\n`}## 调用流程与具体示例\n\n${guide}`,
 		parameters: {
 			path: [
 				{
@@ -223,7 +249,7 @@ const apis = declarations.map(entry => {
 								required: true,
 								enable: true,
 								example: "",
-								description: "模块内的相对 database 路径，可有多级，用 / 连接各段。逐段编码，不要把分隔斜线编码为 %2F；POST/DELETE 必须指向 BoxJS 声明的叶子，GET/HEAD 也支持父路径。Settings 和 Home 均不是固定层级。",
+								description: "模块内的相对 database 路径，可有多级，用 / 连接各段。逐段编码，不要把分隔斜线编码为 %2F；GET/POST/DELETE 均支持键或子树，不要求字段在 BoxJS 中声明。Settings 和 Home 均不是固定层级。",
 							},
 						]
 					: []),
@@ -238,7 +264,7 @@ const apis = declarations.map(entry => {
 						type: "application/json",
 						required: true,
 						parameters: [],
-						jsonSchema: { ...value, description: "值的具体类型及可选值由运行时 BoxJS 字段约束；不固定为字符串或某个模块的枚举。" },
+						jsonSchema: dataValue,
 						data: "",
 					}
 				: { type: "none", required: false, parameters: [] },
@@ -271,7 +297,7 @@ const document = {
 	$schema: { app: "apifox", type: "project", version: "1.2.0" },
 	info: {
 		name: "Preference Panes",
-		description: "运行时 BoxJS、模块探测、页面初次读取与单键读写（0.2.0）",
+		description: "前端 BoxJS 设置页面与模块存储桥接、缓存清理及模块重置（0.3.0）",
 		mockRule: { rules: [], enableSystemRule: true },
 	},
 	projectSetting: {

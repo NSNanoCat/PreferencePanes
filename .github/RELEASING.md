@@ -1,6 +1,6 @@
 # 发布 PreferencePanes
 
-当前版本为 `0.2.0`，已通过 npm 与 GitHub Packages 工作流发布。此版本使用 `SettingsHandler` class 替换旧工厂函数，新增 BoxJS 元数据展示与自适应多行输入；HTTP 契约不变。
+准备发布 `0.3.0`：SettingsHandler 改为安装配置驱动的存储桥接，参数为 origin/storageKey/module，API 不再下载 BoxJS；GET/POST/DELETE 支持模块内任意键和子树。前端增加 Caches 查看/清空与模块重置。由于移除 configURL/resolver 并放开字段限制，消费者必须同步更新安装参数。
 
 首版沿用 package.json 的 `0.1.0`，发布标签为 `v0.1.0`。包名为 `@nsnanocat/preference-panes`，与 NSNanoCat 其它 package 一样全部小写。
 
