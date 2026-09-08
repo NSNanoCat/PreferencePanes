@@ -257,7 +257,15 @@ test("write failure is not success; resolver is GET-only", async () => {
 test("paths support a trailing slash and reject malformed segments", () => {
   assert.deepEqual(parseSettingsPath(req("GET", "Module/").url), ["Module"]);
   assert.deepEqual(parseSettingsPath(req("GET").url), ["Module", "Settings", "Home", "enabled"]);
-  for (const suffix of ["", "Module//", "a%2fb", "__proto__/x", "%ZZ"])
+  assert.deepEqual(parseSettingsPath("https://example.org/api/%4Dodule/Settings/%6Eote/?query=1"), ["Module", "Settings", "note"]);
+  for (const suffix of ["", "Module//", "a%2fb", "__proto__/x", "%ZZ", "Module/constructor", "Module/a.b", "Module/%5C"])
     assert.throws(() => parseSettingsPath(`https://example.org/api/${suffix}`));
   assert.equal(parseSettingsPath("https://example.org/panel"), undefined);
+});
+
+test("raw BoxJS path segments and browser-style encoded input retain their distinct validation", () => {
+  for (const key of ["bad/path", "bad%20path", "bad path", "prototype"])
+    assert.throws(() => normalizeBoxJs([{ ...config[0], id: `@Example.Module.Settings.${key}` }], "Module"));
+  const field = normalizeBoxJs([{ ...config[0], id: "@Example.Module.Settings.valid_key-1" }], "Module").fields[0];
+  assert.equal(field.key, "Module.Settings.valid_key-1");
 });

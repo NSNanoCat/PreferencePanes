@@ -87,3 +87,16 @@ test("bundles contain no Node imports or compiled-in module fields", () => {
   assert.doesNotMatch(code, /node:fs|node-fetch|require\(/);
   assert.doesNotMatch(code, /@Example\.Module|BiliBili|Enhanced\.Settings/);
 });
+
+test("browser bundle does not include the proxy URL polyfill", async () => {
+  const browser = await rollup(builds[0]);
+  try {
+    const { output } = await browser.generate(builds[0].output);
+    assert.equal(
+      Object.keys(output[0].modules).some((id) => id.includes("/@nsnanocat/url/")),
+      false,
+    );
+  } finally {
+    await browser.close();
+  }
+});
