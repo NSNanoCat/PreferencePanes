@@ -18,6 +18,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "24" }
       - run: npm ci --registry=https://registry.npmjs.org/ --@nsnanocat:registry=https://registry.npmjs.org/
+      - run: npx biome format --write package.json
       - run: npm run build
       - run: npm run check
       - run: node scripts/generate-apifox.mjs --check
@@ -33,6 +34,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "24", registry-url: "https://registry.npmjs.org" }
       - run: npm ci --registry=https://registry.npmjs.org/ --@nsnanocat:registry=https://registry.npmjs.org/
+      - run: npx biome format --write package.json
       - run: npm run build
       - run: npm run check
       - name: Resolve npm dist-tag
