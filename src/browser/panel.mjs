@@ -36,7 +36,17 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
     destroyed = false;
   const notify = (event) => {
     if (destroyed) return;
-    toast.textContent = event.kind === "error" ? `操作失败：${event.message}` : event.operation === "delete" ? "删除成功" : "修改成功";
+    switch (true) {
+      case event.kind === "error":
+        toast.textContent = `操作失败：${event.message}`;
+        break;
+      case event.operation === "delete":
+        toast.textContent = "删除成功";
+        break;
+      default:
+        toast.textContent = "修改成功";
+        break;
+    }
     toast.dataset.kind = event.kind;
     toast.hidden = false;
     clearTimeout(timer);
@@ -120,72 +130,81 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
       if (field.description) row.append(node("p", "pp-description", field.description));
       const value = values[field.key];
       let read, write;
-      if (field.options && field.type !== "array") {
-        const select = node("select", "pp-input");
-        select.setAttribute("aria-label", field.name);
-        field.options.forEach((option, index) => {
-          const item = node("option", "", option.label);
-          item.value = String(index);
-          select.append(item);
-        });
-        write = (value) => {
-          select.selectedIndex = field.options.findIndex((option) => option.key === value);
-        };
-        row.append(select);
-        read = () => field.options[select.selectedIndex]?.key;
-      } else if (field.type === "array" && field.options) {
-        const inputs = field.options.map((option) => {
-          const label = node("label", "pp-choice", option.label);
-          const input = node("input", "");
-          input.type = "checkbox";
-          label.prepend(input);
-          row.append(label);
-          return { input, key: option.key };
-        });
-        read = () => inputs.filter((option) => option.input.checked).map((option) => option.key);
-        write = (value) => {
-          for (const option of inputs) option.input.checked = Array.isArray(value) && value.includes(option.key);
-        };
-      } else {
-        const multiline = field.control === "textarea" || field.type === "array";
-        const input = node(multiline ? "textarea" : "input", "pp-input");
-        input.setAttribute("aria-label", field.name);
-        if (field.placeholder) input.placeholder = field.placeholder;
-        if (multiline && field.rows) input.rows = field.rows;
-        const grow = () => {
-          if (!multiline || !field.autoGrow || !input.isConnected) return;
-          input.style.height = "auto";
-          const baseline = input.getBoundingClientRect().height;
-          const style = window.getComputedStyle(input);
-          const borders = parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
-          input.style.height = `${Math.max(baseline, input.scrollHeight + borders)}px`;
-        };
-        if (multiline && field.autoGrow) {
-          input.addEventListener("input", grow);
-          growingInputs.push(grow);
-        }
-        if (field.type === "boolean") {
-          input.type = "checkbox";
+      switch (true) {
+        case Boolean(field.options) && field.type !== "array": {
+          const select = node("select", "pp-input");
+          select.setAttribute("aria-label", field.name);
+          field.options.forEach((option, index) => {
+            const item = node("option", "", option.label);
+            item.value = String(index);
+            select.append(item);
+          });
           write = (value) => {
-            input.checked = value === true;
+            select.selectedIndex = field.options.findIndex((option) => option.key === value);
           };
-          read = () => input.checked;
-        } else {
-          if (!multiline) input.type = field.type === "number" ? "number" : "text";
-          write = (value) => {
-            input.value = field.type === "array" ? JSON.stringify(value ?? []) : (value ?? "");
-            grow();
-          };
-          read = () =>
-            field.type === "array"
-              ? JSON.parse(input.value)
-              : field.type === "number"
-                ? input.value === ""
-                  ? Number.NaN
-                  : Number(input.value)
-                : input.value;
+          row.append(select);
+          read = () => field.options[select.selectedIndex]?.key;
+          break;
         }
-        row.append(input);
+        case field.type === "array" && Boolean(field.options): {
+          const inputs = field.options.map((option) => {
+            const label = node("label", "pp-choice", option.label);
+            const input = node("input", "");
+            input.type = "checkbox";
+            label.prepend(input);
+            row.append(label);
+            return { input, key: option.key };
+          });
+          read = () => inputs.filter((option) => option.input.checked).map((option) => option.key);
+          write = (value) => {
+            for (const option of inputs) option.input.checked = Array.isArray(value) && value.includes(option.key);
+          };
+          break;
+        }
+        default: {
+          const multiline = field.control === "textarea" || field.type === "array";
+          const input = node(multiline ? "textarea" : "input", "pp-input");
+          input.setAttribute("aria-label", field.name);
+          if (field.placeholder) input.placeholder = field.placeholder;
+          if (multiline && field.rows) input.rows = field.rows;
+          const grow = () => {
+            if (!multiline || !field.autoGrow || !input.isConnected) return;
+            input.style.height = "auto";
+            const baseline = input.getBoundingClientRect().height;
+            const style = window.getComputedStyle(input);
+            const borders = parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
+            input.style.height = `${Math.max(baseline, input.scrollHeight + borders)}px`;
+          };
+          if (multiline && field.autoGrow) {
+            input.addEventListener("input", grow);
+            growingInputs.push(grow);
+          }
+          if (field.type === "boolean") {
+            input.type = "checkbox";
+            write = (value) => {
+              input.checked = value === true;
+            };
+            read = () => input.checked;
+          } else {
+            if (!multiline) input.type = field.type === "number" ? "number" : "text";
+            write = (value) => {
+              input.value = field.type === "array" ? JSON.stringify(value ?? []) : (value ?? "");
+              grow();
+            };
+            read = () => {
+              switch (field.type) {
+                case "array":
+                  return JSON.parse(input.value);
+                case "number":
+                  return input.value === "" ? Number.NaN : Number(input.value);
+                default:
+                  return input.value;
+              }
+            };
+          }
+          row.append(input);
+          break;
+        }
       }
       write(value);
       const actions = node("div", "pp-actions");

@@ -98,9 +98,19 @@ export function normalizeBoxJs(config, module) {
  * @returns {unknown} 控件值 / Control value.
  */
 export function normalizeStoredValue(field, value) {
-  if (field.type === "boolean" && (value === "true" || value === "false")) return value === "true";
-  if (field.type === "number" && typeof value === "string" && value.trim() !== "") return Number(value);
-  if (field.type === "array" && typeof value === "string") value = value === "" || value === "[]" ? [] : value.split(",");
+  switch (field.type) {
+    case "boolean":
+      if (value === "true" || value === "false") return value === "true";
+      break;
+    case "number":
+      if (typeof value === "string" && value.trim() !== "") return Number(value);
+      break;
+    case "array":
+      if (typeof value === "string") value = value === "" || value === "[]" ? [] : value.split(",");
+      break;
+    default:
+      break;
+  }
   if (field.options) {
     const match = (item) => field.options.find((option) => String(option.key) === String(item))?.key ?? item;
     return field.type === "array" && Array.isArray(value) ? value.map(match) : match(value);
@@ -109,11 +119,16 @@ export function normalizeStoredValue(field, value) {
 }
 
 function scalar(value) {
-  return (
-    typeof value === "boolean" ||
-    (typeof value === "string" && value.length <= 2048) ||
-    (typeof value === "number" && Number.isFinite(value))
-  );
+  switch (typeof value) {
+    case "boolean":
+      return true;
+    case "string":
+      return value.length <= 2048;
+    case "number":
+      return Number.isFinite(value);
+    default:
+      return false;
+  }
 }
 
 export function validValue(field, value) {
