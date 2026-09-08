@@ -89,11 +89,12 @@ async function render() {
 			const data = await response.json();
 			if (typeof data.name !== "string" || !Array.isArray(data.apps)) throw new TypeError("Invalid site BoxJS JSON");
 			for (const app of data.apps) validatePathParts([app.module]);
+			const localStyles = document.head.querySelector('link[rel="stylesheet"]');
 			for (const href of data.stylesheets ?? []) {
 				const link = document.createElement("link");
 				link.rel = "stylesheet";
 				link.href = resourceURL(href);
-				document.head.append(link);
+				document.head.insertBefore(link, localStyles);
 			}
 			menu = data;
 		}
