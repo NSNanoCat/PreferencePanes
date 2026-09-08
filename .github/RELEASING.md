@@ -12,7 +12,7 @@
 npm ci --registry=https://registry.npmjs.org/ --@nsnanocat:registry=https://registry.npmjs.org/
 npm run build
 npm run check
-node scripts/generate-apifox.mjs --check
+npm run apifox:check
 npm pack
 ```
 

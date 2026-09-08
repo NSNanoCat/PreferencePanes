@@ -2,6 +2,22 @@
 
 通用设置面板和代理存储 API，基于 `@nsnanocat/util`，首版 `0.1.0` 已发布到 npm 和 GitHub Packages。字段直接来自运行时加载的 BoxJS JSON，页面、缓存与读写逻辑不包含具体项目的选项。
 
+## 目录结构
+
+| 目录 | 内容 |
+| --- | --- |
+| `src/` | 包入口、实现及同目录的 TypeScript 声明 |
+| `src/browser/` | 浏览器面板、会话缓存和样式 |
+| `src/lib/` | BoxJS 解析、路径解析和持久化处理器 |
+| `src/proxy/` | 代理宿主的独立打包入口 |
+| `test/` | 持续回归测试、类型契约和测试数据 |
+| `examples/` | 可复用的最小集成示例 |
+| `apifox/` | 接口定义、说明和原生 JSON 生成器 |
+| `.github/` | CI、发布工作流和发布说明 |
+| `dist/` | 构建产物，不提交 Git |
+
+公开包路径仍为 `@nsnanocat/preference-panes`、`@nsnanocat/preference-panes/browser` 和 `@nsnanocat/preference-panes/browser/panel.css`，由 package.json 的 exports 映射到源码目录。
+
 ## 工作方式
 
 | 操作 | 网络请求 | 页面缓存 |
@@ -90,11 +106,11 @@ npm ci --registry=https://registry.npmjs.org/ --@nsnanocat:registry=https://regi
 npm run build
 npm run check
 npm run apifox:generate
-node scripts/generate-apifox.mjs --check
+npm run apifox:check
 npm pack --dry-run
 ```
 
-构建生成可直接加载的 `dist/preference-panes.mjs` 和代理 IIFE `dist/preference-panes.request.js`，公共样式位于 `browser/panel.css`。代理包包括 util 的平台适配和 `@nsnanocat/url`，不依赖 Node 内置模块。
+构建生成可直接加载的 `dist/preference-panes.mjs` 和代理 IIFE `dist/preference-panes.request.js`，公共样式源码位于 `src/browser/panel.css`。代理包包括 util 的平台适配和 `@nsnanocat/url`，不依赖 Node 内置模块。
 
 [Surge 模板](examples/surge.sgmodule)使用原生 Map Local 提供静态资源，http-request 提供持久化 API。模板中的域名均为占位，尚未部署；需要把源码资源和 dist 产物发布到自己的资源地址。其 `argument` 只配置 `origin` 和 `configURL`，不会固化字段。Map Local 下载缓存的更新时机由代理管理；浏览器 no-store 不会强制 Surge 更新资源缓存。配置 Mock 与脚本 configURL 应引用同一版本的 BoxJS。
 
@@ -104,6 +120,6 @@ Quantumult X 等不能通过模板传递 `$argument` 的平台，需要在构建
 
 - [完整请求、返回与缓存时序说明](apifox/guide.md)
 - [Apifox 原生 JSON](apifox/preference-panes.apifox.json)
-- [Apifox 项目](https://app.apifox.com/project/8803052)、[Git 数据源绑定记录](apifox/sync.md)
+- [Apifox 项目](https://app.apifox.com/project/8803052)、[文档维护与同步](apifox/README.md)
 
-main/dev 普通推送与手动 CI 只验证并生成候选 tgz；两套 v* tag workflow 分别发布 npm 与 GitHub Packages。首版为 `0.1.0`，发布步骤与 Trusted Publisher 配置见 [RELEASING.md](RELEASING.md)。Enhanced 通过 GitHub Packages 安装正式依赖，lockfile 使用 registry 下载地址。
+main/dev 普通推送与手动 CI 只验证并生成候选 tgz；两套 v* tag workflow 分别发布 npm 与 GitHub Packages。首版为 `0.1.0`，发布步骤与 Trusted Publisher 配置见 [发布说明](.github/RELEASING.md)。Enhanced 通过 GitHub Packages 安装正式依赖，lockfile 使用 registry 下载地址。
