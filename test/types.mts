@@ -10,10 +10,10 @@ void code;
 import { createPreferencesClient, mountPreferencePanes } from "@nsnanocat/preference-panes/browser";
 
 const client = createPreferencesClient({
-  notify: (event) => {
-    const kind: "success" | "error" = event.kind;
-    void kind;
-  },
+	notify: event => {
+		const kind: "success" | "error" = event.kind;
+		void kind;
+	},
 });
 const snapshot = await client.open("Module");
 void snapshot.definition.storageKey;

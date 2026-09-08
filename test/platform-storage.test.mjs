@@ -6,13 +6,10 @@ import path from "node:path";
 import test from "node:test";
 
 for (const platform of ["node", "quantumult"])
-  test(`${platform}: runtime BoxJS uses the real util persistence backend`, () => {
-    const cwd = mkdtempSync(path.join(os.tmpdir(), "preference-platform-"));
-    const globals =
-      platform === "quantumult"
-        ? "const db=new Map();globalThis.$task={};globalThis.$prefs={valueForKey:k=>db.get(k),setValueForKey:(v,k)=>{db.set(k,v);return true;}};"
-        : "";
-    const script = `
+	test(`${platform}: runtime BoxJS uses the real util persistence backend`, () => {
+		const cwd = mkdtempSync(path.join(os.tmpdir(), "preference-platform-"));
+		const globals = platform === "quantumult" ? "const db=new Map();globalThis.$task={};globalThis.$prefs={valueForKey:k=>db.get(k),setValueForKey:(v,k)=>{db.set(k,v);return true;}};" : "";
+		const script = `
     ${globals}
     const config=[{id:'@Root.Module.Settings.enabled',name:'Enabled',type:'boolean',val:true}];
     if(globalThis.$task)globalThis.$task.fetch=async()=>({statusCode:200,headers:{},body:JSON.stringify(config)});
@@ -24,5 +21,5 @@ for (const platform of ["node", "quantumult"])
     console.log((await handler.handle({...req,method:'GET'})).body);
     if((await handler.handle({...req,method:'DELETE'})).status!==200)throw Error('delete failed');
   `;
-    assert.equal(execFileSync(process.execPath, ["--input-type=module", "-e", script], { cwd, encoding: "utf8" }).trim(), "false");
-  });
+		assert.equal(execFileSync(process.execPath, ["--input-type=module", "-e", script], { cwd, encoding: "utf8" }).trim(), "false");
+	});

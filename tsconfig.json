@@ -1,4 +1,4 @@
 {
-  "compilerOptions": { "strict": true, "module": "NodeNext", "target": "ES2022", "noEmit": true },
-  "include": ["src/**/*.d.ts", "test/types.mts"]
+	"compilerOptions": { "strict": true, "module": "NodeNext", "target": "ES2022", "noEmit": true },
+	"include": ["src/**/*.d.ts", "test/types.mts"]
 }
