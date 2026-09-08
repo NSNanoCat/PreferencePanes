@@ -147,6 +147,8 @@ export function createPreferencesClient(options?: PreferencesClientOptions): Pre
 /**
  * 按 /settings/{module} 挂载动态面板，监听导航和页面恢复事件。
  * Mount a dynamic panel at /settings/{module} and observe navigation and page restoration.
+ * 控件变化即时串行写入；多选用二级页，返回不重新读取设置。
+ * Control changes save immediately in sequence; multi-select uses a secondary page without refetching on return.
  * @param options 挂载选项 / Mount options.
  * @returns 面板生命周期句柄 / Panel lifecycle handle.
  */
