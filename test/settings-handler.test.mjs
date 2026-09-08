@@ -167,6 +167,32 @@ test("API module root returns only persistence data, never BoxJS config", async 
   assert.equal((await handler.handle(req("POST", "Module/", {}))).status, 405);
 });
 
+test("method dispatch preserves validation order and storage effects", async () => {
+  const handler = new SettingsHandler(options);
+  sourceError = new Error("offline");
+  const unsupported = await handler.handle(req("PATCH"));
+  assert.equal(unsupported.status, 405);
+  assert.equal(unsupported.headers.Allow, "HEAD, GET, POST, DELETE");
+  assert.equal(downloads, 0);
+  assert.equal((await handler.handle({ ...req("PATCH"), headers: {} })).status, 403);
+  sourceError = undefined;
+  for (const method of ["POST", "DELETE"]) {
+    assert.equal((await handler.handle(req(method, "Module/Settings/", {}))).status, 405);
+    assert.equal(reads, 0);
+    assert.equal(writes, 0);
+  }
+  assert.equal((await handler.handle(req("HEAD"))).body, "");
+  assert.equal(reads, 0);
+  assert.equal((await handler.handle(req("GET"))).status, 404);
+  assert.equal(reads, 1);
+  assert.equal((await handler.handle(req("POST", undefined, false))).status, 200);
+  assert.equal(reads, 2);
+  assert.equal(writes, 1);
+  assert.equal((await handler.handle(req("DELETE"))).status, 200);
+  assert.equal(reads, 3);
+  assert.equal(writes, 2);
+});
+
 test("POST and DELETE return 200, use util and preserve hidden/sibling data", async () => {
   store.set(
     "Example",

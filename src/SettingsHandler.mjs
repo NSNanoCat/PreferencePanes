@@ -62,39 +62,51 @@ export class SettingsHandler {
     const field = definition.fields.find((field) => field.key === key);
     const descendants = definition.fields.filter((field) => field.key.startsWith(`${key}.`));
     if (!field && !descendants.length) return reply(404, { error: `Unknown setting path: ${key}` });
-    if (request.method === "HEAD") return reply(200, undefined);
-    if (request.method === "GET") {
-      const stored = Storage.getItem(definition.storageKey, {});
-      const effective = this.#resolveSettings ? this.#resolveSettings(stored, definition) : stored;
-      if (!isRecord(effective)) throw new TypeError("resolved settings must be a synchronous object");
-      if (field) {
-        const value = pathValue(effective, parts);
-        return value === undefined ? reply(404, { error: `Setting has no stored value: ${key}` }) : reply(200, value);
-      }
-      const subtree = {};
-      // 只返回配置文件公开的字段；默认值由浏览器用 BoxJS val 生成。
-      // Expose only declared fields; the browser renders defaults from BoxJS val.
-      for (const descendant of descendants) {
-        const fullPath = descendant.key.split(".");
-        const value = pathValue(effective, fullPath);
-        if (value !== undefined) _.set(subtree, fullPath.slice(parts.length), value);
-      }
-      return reply(200, subtree);
-    }
-    if (!field) return reply(405, { error: "Only individual declared keys can be modified" });
     let value;
-    if (request.method === "POST") {
-      if (requestHeaders["content-type"]?.split(";")[0].trim().toLowerCase() !== "application/json")
-        return reply(415, { error: "Expected application/json" });
-      if (typeof request.body !== "string") return reply(400, { error: "Expected a JSON string body" });
-      if (request.body.length > 65536) return reply(413, { error: "Body exceeds 65536 UTF-16 code units" });
-      try {
-        value = JSON.parse(request.body);
-      } catch {
-        return reply(400, { error: "Invalid JSON" });
+    switch (request.method) {
+      case "HEAD":
+        return reply(200, undefined);
+
+      case "GET": {
+        const stored = Storage.getItem(definition.storageKey, {});
+        const effective = this.#resolveSettings ? this.#resolveSettings(stored, definition) : stored;
+        if (!isRecord(effective)) throw new TypeError("resolved settings must be a synchronous object");
+        if (field) {
+          const value = pathValue(effective, parts);
+          return value === undefined ? reply(404, { error: `Setting has no stored value: ${key}` }) : reply(200, value);
+        }
+        const subtree = {};
+        // 只返回配置文件公开的字段；默认值由浏览器用 BoxJS val 生成。
+        // Expose only declared fields; the browser renders defaults from BoxJS val.
+        for (const descendant of descendants) {
+          const fullPath = descendant.key.split(".");
+          const value = pathValue(effective, fullPath);
+          if (value !== undefined) _.set(subtree, fullPath.slice(parts.length), value);
+        }
+        return reply(200, subtree);
       }
-      if (!validValue(field, value)) return reply(400, { error: `Invalid setting value: ${key}` });
+
+      case "POST":
+        if (!field) return reply(405, { error: "Only individual declared keys can be modified" });
+        if (requestHeaders["content-type"]?.split(";")[0].trim().toLowerCase() !== "application/json")
+          return reply(415, { error: "Expected application/json" });
+        if (typeof request.body !== "string") return reply(400, { error: "Expected a JSON string body" });
+        if (request.body.length > 65536) return reply(413, { error: "Body exceeds 65536 UTF-16 code units" });
+        try {
+          value = JSON.parse(request.body);
+        } catch {
+          return reply(400, { error: "Invalid JSON" });
+        }
+        if (!validValue(field, value)) return reply(400, { error: `Invalid setting value: ${key}` });
+        break;
+
+      case "DELETE":
+        if (!field) return reply(405, { error: "Only individual declared keys can be modified" });
+        break;
     }
+
+    // POST 和 DELETE 共用一次读改写；HEAD/GET 已在各自分支返回。
+    // POST and DELETE share one read-modify-write; HEAD/GET return above.
     const saved = Storage.getItem(definition.storageKey, {});
     if (!isRecord(saved)) throw new TypeError("stored settings must be an object");
     const parent = settingsParent(saved, parts, request.method === "POST");
@@ -122,10 +134,17 @@ function settingsParent(root, parts, create) {
   let parent = root;
   for (const part of parts.slice(0, -1)) {
     let next = _.get(parent, [part]);
-    if (next === undefined) {
-      if (!create) return;
-      next = {};
-    } else if (typeof next === "string") next = JSON.parse(next);
+    switch (typeof next) {
+      case "undefined":
+        if (!create) return;
+        next = {};
+        break;
+      case "string":
+        next = JSON.parse(next);
+        break;
+      default:
+        break;
+    }
     if (!isRecord(next)) throw new TypeError(`Stored path is not an object: ${part}`);
     _.set(parent, [part], next);
     parent = next;

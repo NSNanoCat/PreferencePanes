@@ -17,5 +17,9 @@ import { SettingsHandler } from "../SettingsHandler.mjs";
       body: globalThis.$request.method === "HEAD" ? "" : JSON.stringify({ error: "Settings execution failed" }),
     };
   }
-  done(response ? ($app === "Quantumult X" ? response : { response }) : {});
+  if (!response) {
+    done({});
+    return;
+  }
+  done($app === "Quantumult X" ? response : { response });
 })();
