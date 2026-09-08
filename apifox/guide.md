@@ -1,6 +1,6 @@
 # PreferencePanes：从入口探测到单键读写
 
-本包尚未发布。下面的 Enhanced 只是路径示例，example.org 没有部署接口；各项目复用相同代码，从自己的 BoxJS JSON 生成设置界面。
+已发布版本为 0.1.0；本文中的 SettingsHandler class 和 BoxJS 元数据兼容增强为尚未发布的 dev 契约。下面的 Enhanced 只是路径示例，example.org 没有部署接口；各项目复用相同代码，从自己的 BoxJS JSON 生成设置界面。
 
 ## 通用路径契约
 
@@ -133,6 +133,14 @@ X-Settings-Client: 1
 有覆盖值则返回 HTTP 200，正文直接为 `"mine"`；无值时 404。默认 GET 不返回 BoxJS 默认值。也支持 HEAD 完整叶子路径：声明过则 200，否则 404；不读取存储。主菜单应 HEAD 配置 Mock 地址，不是持久化叶子探测。
 
 ## 通用脚本参数与读取时机
+
+### BoxJS 页面属性
+
+配置可以是 settings 数组、单个 app 或 apps 订阅。字段的 name/val/type/desc/items 决定控件，placeholder 设置输入提示；textarea 保持字符串类型，rows 为正整数基础行数，autoGrow 为布尔值。首次显示、输入及删除覆盖值后都会按内容调整高度。
+
+如果模块字段只属于一个 app，definition.metadata 保留它的 id/name/author/repo/script/icon/icons/desc/descs/description。页面使用 name 作为显示标题，author/desc/descs 作为纯文本，repo 作为项目链接。模块路由和存储根仍由字段的 @根.模块.路径 决定，不能由 app.id/name 推断。多个 app 分别声明同一模块的字段时合并字段，不任意选择一个 app 的展示元数据。
+
+icon 优先于 icons；原版 icons[0] 是透明版，icons[1] 是彩色版，并非亮暗顺序。默认使用彩色版，只有一个图标时使用该图标。页面图片与链接仅接受 HTTP(S) 或同源相对地址。script 只保留元数据，不请求或执行；不渲染 desc_html/descs_html，不使用 keys 推导额外可读写字段。
 
 | 参数或数据 | 来源与作用 |
 | --- | --- |

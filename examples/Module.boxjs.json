@@ -1,10 +1,25 @@
-[
-  { "id": "@Example.Module.Settings.enabled", "name": "启用功能", "type": "boolean", "val": true },
-  {
-    "id": "@Example.Module.Settings.mode",
-    "name": "运行模式",
-    "type": "selects",
-    "val": "auto",
-    "items": [{ "key": "auto", "label": "自动" }, { "key": "manual", "label": "手动" }]
-  }
-]
+{
+  "id": "example.module",
+  "name": "Example Module",
+  "author": "Example",
+  "desc": "BoxJS metadata and fields are provided at runtime.",
+  "settings": [
+    { "id": "@Example.Module.Settings.enabled", "name": "启用功能", "type": "boolean", "val": true },
+    {
+      "id": "@Example.Module.Settings.mode",
+      "name": "运行模式",
+      "type": "selects",
+      "val": "auto",
+      "items": [{ "key": "auto", "label": "自动" }, { "key": "manual", "label": "手动" }]
+    },
+    {
+      "id": "@Example.Module.Settings.notes",
+      "name": "Notes",
+      "type": "textarea",
+      "val": "",
+      "placeholder": "One entry per line",
+      "rows": 3,
+      "autoGrow": true
+    }
+  ]
+}

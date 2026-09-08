@@ -97,6 +97,21 @@ const response = await handler.handle($request);
 
 支持 settings 数组、单个 app 的 `settings`、订阅的 `apps[].settings`；控件类型支持 boolean、selects、checkboxes、text、textarea、number。不执行 BoxJS 脚本或 HTML。
 
+复用 [BoxJs 原版配置格式](https://github.com/chavyleung/scripts/tree/master/box) 的字段语义，不加载原版 HTML/Vue 应用：
+
+| 字段 | 用途 |
+| --- | --- |
+| `name`、`val`、`type`、`desc`、`items` | 控件标题、默认值、类型、说明和选项 |
+| `placeholder` | 文本和数字输入框的占位提示 |
+| `rows`、`autoGrow` | 多行文本框的基础行数和自动高度；保存值仍为字符串 |
+| app 的 `name`、`author`、`desc`、`descs`、`repo` | 页面名称、作者、多段说明及项目链接 |
+| app 的 `icon`、`icons` | 显式图标优先；否则取彩色版 `icons[1]`，单个图标则用 `icons[0]` |
+| app 的 `id`、`script` | 保留在 `definition.metadata` 中，不参与路径映射或脚本执行 |
+
+原版 `icons` 表示透明/彩色变体，不是亮暗模式顺序。显示名称和说明使用纯文本。一个模块的字段来自唯一 app 时，才采用该 app 的元数据；多个 app 合并声明同一模块时不任意选取其中一个的元数据。app 的 id/name 不决定模块归属，始终由字段 ID 选择；因此订阅里无关应用的旧扁平 ID 不会参与该模块渲染。
+
+`keys`、脚本执行、`desc_html`/`descs_html`、动态字符串形式的 `items` 及 slider/radios/modalSelects/colorpicker 不属于当前支持范围。不会给旧扁平 ID 猜测存储根；本地读写仍由现有 util Storage/Lodash 完成，不引入原版 Env 的另一套存储实现。这些兼容增强位于 dev，尚未发布。
+
 设置 ID 必须为 `@存储根.模块.子路径.键`。同一模块使用一个存储根，字段路径不得重复或父子重叠。为了用一次 GET 获取设置，字段必须具有模块根以下的公共父路径，例如 `Enhanced.Settings` 或 `Weather.Preferences`；公共路径自动计算，不固定为 Settings。不满足条件或遇到不支持的控件会报错。
 
 ## 打包与示例

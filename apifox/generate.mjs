@@ -21,6 +21,9 @@ const boxjsFields = {
       id: { type: "string", description: "@存储根.模块.子路径.键" },
       name: { type: "string" },
       desc: { type: "string" },
+      placeholder: { type: "string", description: "文本或数字输入框的占位提示" },
+      rows: { type: "integer", minimum: 1, description: "textarea 的基础行数" },
+      autoGrow: { type: "boolean", description: "textarea 随内容自动增长，缩短内容后回到基础行数" },
       type: { type: "string", enum: ["boolean", "selects", "checkboxes", "text", "textarea", "number"] },
       val: value,
       items: {
@@ -30,7 +33,22 @@ const boxjsFields = {
     },
   },
 };
-const boxjsApp = { type: "object", required: ["settings"], properties: { settings: boxjsFields } };
+const boxjsApp = {
+  type: "object",
+  properties: {
+    id: { type: "string", description: "BoxJS 应用标识，不作为模块路径或存储根" },
+    name: { type: "string", description: "设置页面的显示名称" },
+    author: { type: "string" },
+    repo: { type: "string", description: "项目主页 HTTP(S) 地址" },
+    script: { type: "string", description: "脚本来源元数据，仅保留，不下载或执行" },
+    icon: { type: "string", description: "显式图标 HTTP(S) 地址" },
+    icons: { type: "array", items: { type: "string" }, description: "BoxJS 图标变体：透明版在前，彩色版在后；不是亮暗顺序" },
+    desc: { type: "string", description: "纯文本说明" },
+    description: { type: "string", description: "desc 未提供时的纯文本说明" },
+    descs: { type: "array", items: { type: "string" }, description: "多段纯文本说明" },
+    settings: boxjsFields,
+  },
+};
 const boxjs = {
   oneOf: [boxjsFields, boxjsApp, { type: "object", required: ["apps"], properties: { apps: { type: "array", items: boxjsApp } } }],
 };
