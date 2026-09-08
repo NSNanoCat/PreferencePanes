@@ -1,3 +1,5 @@
+import { URL } from "@nsnanocat/url";
+
 /**
  * 将 /api/ 后的 URL 路径转换为 util 的路径片段；非 API 路径不处理。
  * Convert URL segments after /api/ to util path segments; ignore non-API paths.

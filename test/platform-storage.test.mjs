@@ -14,12 +14,15 @@ for (const platform of ["node", "quantumult"])
         : "";
     const script = `
     ${globals}
-    const {createSettingsHandler}=await import(${JSON.stringify(new URL("../src/index.mjs", import.meta.url).href)});
-    const handler=createSettingsHandler({origin:'https://example.org',loadConfig:()=>[{id:'@Root.Module.Settings.enabled',name:'Enabled',type:'boolean',val:true}]});
+    const config=[{id:'@Root.Module.Settings.enabled',name:'Enabled',type:'boolean',val:true}];
+    if(globalThis.$task)globalThis.$task.fetch=async()=>({statusCode:200,headers:{},body:JSON.stringify(config)});
+    else globalThis.fetch=async()=>new Response(JSON.stringify(config),{status:200});
+    const {SettingsHandler}=await import(${JSON.stringify(new URL("../src/index.mjs", import.meta.url).href)});
+    const handler=new SettingsHandler({origin:'https://example.org',configURL:'https://assets.example.org/Module.boxjs.json'});
     const req={url:'https://example.org/api/Module/Settings/enabled',method:'POST',body:'false',headers:{'X-Settings-Client':'1','Content-Type':'application/json'}};
-    if((await handler(req)).status!==200)throw Error('write failed');
-    console.log((await handler({...req,method:'GET'})).body);
-    if((await handler({...req,method:'DELETE'})).status!==200)throw Error('delete failed');
+    if((await handler.handle(req)).status!==200)throw Error('write failed');
+    console.log((await handler.handle({...req,method:'GET'})).body);
+    if((await handler.handle({...req,method:'DELETE'})).status!==200)throw Error('delete failed');
   `;
     assert.equal(execFileSync(process.execPath, ["--input-type=module", "-e", script], { cwd, encoding: "utf8" }).trim(), "false");
   });

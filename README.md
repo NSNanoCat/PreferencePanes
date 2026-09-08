@@ -7,8 +7,9 @@
 | 目录 | 内容 |
 | --- | --- |
 | `src/` | 包入口、实现及同目录的 TypeScript 声明 |
+| `src/SettingsHandler.mjs` | 通用代理处理类：下载配置、校验与存储读写 |
 | `src/browser/` | 浏览器面板、会话缓存和样式 |
-| `src/lib/` | BoxJS 解析、路径解析和持久化处理器 |
+| `src/lib/` | BoxJS 解析和路径解析 |
 | `src/proxy/` | 代理宿主的独立打包入口 |
 | `test/` | 持续回归测试、类型契约和测试数据 |
 | `examples/` | 可复用的最小集成示例 |
@@ -72,22 +73,21 @@ const panel = mountPreferencePanes({
 ## 代理读写组件
 
 ```js
-import { createSettingsHandler } from "@nsnanocat/preference-panes";
-import { fetch } from "@nsnanocat/util/polyfill/fetch";
+import { SettingsHandler } from "@nsnanocat/preference-panes";
 
-const handle = createSettingsHandler({
+const handler = new SettingsHandler({
   origin: "https://example.org",
-  loadConfig: async module => {
-    const response = await fetch(`https://assets.example.org/${module}.boxjs.json`);
-    if (response.status !== 200) throw new Error(`BoxJS HTTP ${response.status}`);
-    return JSON.parse(response.body);
-  }
+  configURL: "https://assets.example.org/Module.boxjs.json"
 });
-const response = await handle($request);
+const response = await handler.handle($request);
 // 接入现有平台的 done 适配；或直接使用下述打包入口。
 ```
 
 每个支持面板的模块都携带自己的配置 Mock，并引用同一个通用读写脚本。脚本正则只匹配各自 `/api/<模块>` 的数据路径，配置 Mock 则只匹配 `/configs/`。处理器每次键值请求运行时加载配置，仅允许操作已声明的字段。
+
+`SettingsHandler` 自身使用 util `fetch` 下载 configURL，要求 HTTP 200、解析 JSON 并按 URL 中的模块归一化 BoxJS。下载、HTTP 状态、JSON 或配置错误返回 502，不读取存储；HEAD 只加载配置验证声明，不读取存储。类不缓存配置，各次 handle 请求加载一次；浏览器仍按页面会话缓存设置。configURL 可指向单模块配置或包含多个模块的 BoxJS 订阅，字段所属模块由 `/api/` 后第一段选择。
+
+此 class API 属于 dev 中的下一版变更，替换 0.1.0 的 `createSettingsHandler({ loadConfig })` 工厂；已发布的 0.1.0 尚不导出 SettingsHandler。接入方只需构造实例并调用 handle，不再自行实现配置请求。
 
 持久化 GET 调用一次 util `Storage.getItem`；POST/DELETE 在写入前重新读取最新根对象，再用 util `Lodash.set/unset` 修改单键并 `Storage.setItem` 写回，保留其它模块、隐藏字段和缓存。这是代理端必要的读改写，浏览器不会因此重新 GET 整个模块。多个独立脚本上下文同时写同一根键仍受代理存储无事务能力的限制。
 

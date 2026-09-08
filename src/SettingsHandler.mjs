@@ -1,23 +1,48 @@
+import { URL } from "@nsnanocat/url";
+import { fetch } from "@nsnanocat/util/polyfill/fetch";
 import { Lodash as _ } from "@nsnanocat/util/polyfill/Lodash.mjs";
 import { Storage } from "@nsnanocat/util/polyfill/Storage";
-import { normalizeBoxJs, validValue } from "./boxjs.mjs";
-import { parseSettingsPath } from "./settings-path.mjs";
+import { normalizeBoxJs, validValue } from "./lib/boxjs.mjs";
+import { parseSettingsPath } from "./lib/settings-path.mjs";
 
 /**
- * 创建通用读写处理器；字段通过 loadConfig 在运行时加载，不固化在脚本中。
- * Create a generic endpoint using runtime-loaded config, never compiled-in fields.
- * @param {import("../index.js").SettingsHandlerOptions} options 路由与配置加载器 / Routing and config loader.
- * @returns {(request: import("../index.js").SettingsRequest) => Promise<import("../index.js").SettingsResponse | undefined>} 异步处理器 / Async handler.
+ * 使用 util 下载 BoxJS、校验字段并读写持久化存储。
+ * Download BoxJS through util, validate fields and handle persistent storage.
  */
-export function createSettingsHandler({ origin, loadConfig, requestHeader = "X-Settings-Client", resolveSettings }) {
-  const target = new URL(origin);
-  if (target.protocol !== "https:" || target.pathname !== "/" || target.search || target.hash || target.username || target.password)
-    throw new TypeError("origin must be an HTTPS origin");
-  if (typeof loadConfig !== "function") throw new TypeError("loadConfig is required");
-  if (!/^[a-z][a-z0-9-]*$/i.test(requestHeader)) throw new TypeError("Invalid requestHeader");
-  return async function handle(request) {
+export class SettingsHandler {
+  #origin;
+  #configURL;
+  #requestHeader;
+  #resolveSettings;
+
+  /** @param {import("./index.js").SettingsHandlerOptions} options 来源、配置地址与 GET 解析器 / Origin, config source and GET resolver. */
+  constructor({ origin, configURL, requestHeader = "X-Settings-Client", resolveSettings }) {
+    const target = new URL(origin);
+    if (target.protocol !== "https:" || target.pathname !== "/" || target.search || target.hash || target.username || target.password)
+      throw new TypeError("origin must be an HTTPS origin");
+    const source = new URL(configURL);
+    if (source.protocol !== "https:" || source.username || source.password || source.hash)
+      throw new TypeError("configURL must be an HTTPS URL without credentials or fragment");
+    if (!/^[a-z][a-z0-9-]*$/i.test(requestHeader)) throw new TypeError("Invalid requestHeader");
+    this.#origin = target.origin;
+    this.#configURL = source.href;
+    this.#requestHeader = requestHeader;
+    this.#resolveSettings = resolveSettings;
+  }
+
+  async #loadConfig(module) {
+    const response = await fetch({ url: this.#configURL, method: "GET", headers: { "Cache-Control": "no-cache" }, timeout: 5000 });
+    if (response.status !== 200) throw new Error(`BoxJS source HTTP ${response.status}`);
+    return normalizeBoxJs(JSON.parse(response.body), module);
+  }
+
+  /**
+   * @param {import("./index.js").SettingsRequest} request 代理请求 / Proxy request.
+   * @returns {Promise<import("./index.js").SettingsResponse | undefined>} API 响应，非本来源 API 则不处理 / API response, or undefined outside the configured API origin.
+   */
+  async handle(request) {
     const url = new URL(request.url);
-    if (url.origin !== target.origin || !url.pathname.startsWith("/api/")) return;
+    if (url.origin !== this.#origin || !url.pathname.startsWith("/api/")) return;
     const headers = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
     const reply = (status, data) => ({ status, headers, body: request.method === "HEAD" ? "" : JSON.stringify(data) });
     let parts;
@@ -27,13 +52,13 @@ export function createSettingsHandler({ origin, loadConfig, requestHeader = "X-S
       return reply(400, { error: error.message });
     }
     const requestHeaders = Object.fromEntries(Object.entries(request.headers ?? {}).map(([key, value]) => [key.toLowerCase(), value]));
-    if (requestHeaders[requestHeader.toLowerCase()] !== "1" || (requestHeaders.origin && requestHeaders.origin !== target.origin))
+    if (requestHeaders[this.#requestHeader.toLowerCase()] !== "1" || (requestHeaders.origin && requestHeaders.origin !== this.#origin))
       return reply(403, { error: "Forbidden settings client" });
     if (!["HEAD", "GET", "POST", "DELETE"].includes(request.method))
       return { ...reply(405, { error: "Method not allowed" }), headers: { ...headers, Allow: "HEAD, GET, POST, DELETE" } };
     let definition;
     try {
-      definition = normalizeBoxJs(await loadConfig(parts[0]), parts[0]);
+      definition = await this.#loadConfig(parts[0]);
     } catch (error) {
       return reply(502, { error: `Module configuration unavailable: ${error.message}` });
     }
@@ -44,7 +69,7 @@ export function createSettingsHandler({ origin, loadConfig, requestHeader = "X-S
     if (request.method === "HEAD") return reply(200, undefined);
     if (request.method === "GET") {
       const stored = Storage.getItem(definition.storageKey, {});
-      const effective = resolveSettings ? resolveSettings(stored, definition) : stored;
+      const effective = this.#resolveSettings ? this.#resolveSettings(stored, definition) : stored;
       if (!isRecord(effective)) throw new TypeError("resolved settings must be a synchronous object");
       if (field) {
         const value = pathValue(effective, parts);
@@ -83,7 +108,7 @@ export function createSettingsHandler({ origin, loadConfig, requestHeader = "X-S
     }
     if (!Storage.setItem(definition.storageKey, saved)) return reply(500, { error: "Settings storage write failed" });
     return reply(200, request.method === "DELETE" ? { deleted: true } : { saved: true });
-  };
+  }
 }
 
 function isRecord(value) {

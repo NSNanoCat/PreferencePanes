@@ -137,12 +137,14 @@ X-Settings-Client: 1
 | 参数或数据 | 来源与作用 |
 | --- | --- |
 | origin | 调用方的 HTTPS 页面来源，不带路径 |
-| loadConfig(module) | 每次键值请求时加载 BoxJS，动态决定字段与写入校验 |
+| configURL | 传给 SettingsHandler 的 HTTPS BoxJS 下载地址；类内部每次通过 util fetch 加载，按请求中的 module 选择字段 |
 | storageKey | 从 BoxJS 的 @根键.模块.路径 提取，不通过 header 传递 |
 | requestHeader | 默认 X-Settings-Client，值为 1；同源页面标记，不是认证凭据 |
 | resolveSettings(stored, definition) | 可选 GET 有效配置解析器，返回完整 database 形状的对象；不参与 HEAD/POST/DELETE |
 
 独立打包脚本通过 argument 的 origin/configURL 接收地址，用 util fetch 下载 BoxJS，用 util Storage/Lodash 读写。不同模块引用同一份脚本，分别配置自己的 /api/ 正则与校验 BoxJS 地址；/configs/ Mock 不经过此脚本。原生配置 Mock 与脚本应使用同一版本的配置源；代理自己的 Mock 资源缓存需要按代理机制更新。
+
+dev 中的代理调用方式为 `new SettingsHandler({ origin, configURL }).handle(request)`。配置下载、HTTP 200 检查、JSON 解析及字段归一化均由这个 class 完成，调用方不再提供 loadConfig 回调。网络异常、非 200、非法 JSON 或模块配置解析失败统一返回 502；不会继续读写持久化存储。此类 API 将随下一版发布，0.1.0 仍使用旧工厂函数；HTTP 路径、方法和返回契约不变。
 
 每次 GET 持久化设置读根一次。每次 POST/DELETE 写入前重新读根，再单键修改、写回一次。浏览器缓存不触发额外 GET，但不能取消代理端保证保留其它数据所需的读改写。不同代理脚本同时写同一根键不具备事务隔离保证。
 
