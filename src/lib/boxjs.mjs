@@ -1,4 +1,4 @@
-import { parseSettingsPath } from "./settings-path.mjs";
+import { validatePathParts } from "./settings-path.mjs";
 
 /**
  * 将 BoxJS 数组、app 或订阅转换为模块字段，保留原文件为唯一字段来源。
@@ -8,7 +8,7 @@ import { parseSettingsPath } from "./settings-path.mjs";
  * @returns {import("../index.js").ModuleDefinition} 存储根和字段 / Storage root and fields.
  */
 export function normalizeBoxJs(config, module) {
-  parseSettingsPath(`https://example.invalid/api/${module}`);
+  validatePathParts([module]);
   const apps = Array.isArray(config) ? [] : (config?.apps ?? [config]);
   if (!Array.isArray(apps)) throw new TypeError("Expected BoxJS apps array");
   for (const candidate of apps) {
@@ -22,7 +22,6 @@ export function normalizeBoxJs(config, module) {
   );
   const entries = Array.isArray(config) ? config : owners.flatMap((candidate) => candidate.settings);
   const app = owners.length === 1 ? owners[0] : undefined;
-  if (!Array.isArray(entries)) throw new TypeError("Expected BoxJS settings array, app or subscription");
   let storageKey;
   const fields = [];
   for (const entry of entries) {
@@ -30,7 +29,7 @@ export function normalizeBoxJs(config, module) {
     const [root, ...parts] = entry.id.slice(1).split(".");
     if (parts[0] !== module) continue;
     if (parts.length < 2) throw new TypeError("A BoxJS setting must be below the module root");
-    parseSettingsPath(`https://example.invalid/api/${parts.map(encodeURIComponent).join("/")}`);
+    validatePathParts(parts);
     if (!root || (storageKey && root !== storageKey)) throw new TypeError("A module must use one storage root");
     storageKey = root;
     const type = { boolean: "boolean", checkboxes: "array", selects: "select", text: "string", textarea: "string", number: "number" }[
@@ -74,15 +73,12 @@ export function normalizeBoxJs(config, module) {
   for (const field of fields) while (!field.key.startsWith(`${common.join(".")}.`)) common.pop();
   const metadata = {};
   if (app) {
-    for (const key of ["id", "name", "author", "repo", "script", "icon", "description", "desc"]) {
+    for (const key of ["id", "name", "author", "repo", "script", "icon", "description", "desc", "icons", "descs"]) {
       if (app[key] === undefined) continue;
-      if (typeof app[key] !== "string") throw new TypeError(`Invalid BoxJS app ${key}`);
-      metadata[key] = app[key];
-    }
-    for (const key of ["icons", "descs"]) {
-      if (app[key] === undefined) continue;
-      if (!Array.isArray(app[key]) || app[key].some((item) => typeof item !== "string")) throw new TypeError(`Invalid BoxJS app ${key}`);
-      metadata[key] = [...app[key]];
+      const multiple = key === "icons" || key === "descs";
+      const values = multiple ? app[key] : [app[key]];
+      if (!Array.isArray(values) || values.some((item) => typeof item !== "string")) throw new TypeError(`Invalid BoxJS app ${key}`);
+      metadata[key] = multiple ? [...values] : app[key];
     }
   }
   return {

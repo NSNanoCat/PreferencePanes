@@ -3,7 +3,7 @@ import { fetch } from "@nsnanocat/util/polyfill/fetch";
 import { Lodash as _ } from "@nsnanocat/util/polyfill/Lodash.mjs";
 import { Storage } from "@nsnanocat/util/polyfill/Storage";
 import { normalizeBoxJs, validValue } from "./lib/boxjs.mjs";
-import { parseSettingsPath } from "./lib/settings-path.mjs";
+import { parseSettingsPathname } from "./lib/settings-path.mjs";
 
 /**
  * 使用 util 下载 BoxJS、校验字段并读写持久化存储。
@@ -30,12 +30,6 @@ export class SettingsHandler {
     this.#resolveSettings = resolveSettings;
   }
 
-  async #loadConfig(module) {
-    const response = await fetch({ url: this.#configURL, method: "GET", headers: { "Cache-Control": "no-cache" }, timeout: 5000 });
-    if (response.status !== 200) throw new Error(`BoxJS source HTTP ${response.status}`);
-    return normalizeBoxJs(JSON.parse(response.body), module);
-  }
-
   /**
    * @param {import("./index.js").SettingsRequest} request 代理请求 / Proxy request.
    * @returns {Promise<import("./index.js").SettingsResponse | undefined>} API 响应，非本来源 API 则不处理 / API response, or undefined outside the configured API origin.
@@ -47,7 +41,7 @@ export class SettingsHandler {
     const reply = (status, data) => ({ status, headers, body: request.method === "HEAD" ? "" : JSON.stringify(data) });
     let parts;
     try {
-      parts = parseSettingsPath(request.url);
+      parts = parseSettingsPathname(url.pathname);
     } catch (error) {
       return reply(400, { error: error.message });
     }
@@ -58,7 +52,9 @@ export class SettingsHandler {
       return { ...reply(405, { error: "Method not allowed" }), headers: { ...headers, Allow: "HEAD, GET, POST, DELETE" } };
     let definition;
     try {
-      definition = await this.#loadConfig(parts[0]);
+      const response = await fetch({ url: this.#configURL, method: "GET", headers: { "Cache-Control": "no-cache" }, timeout: 5000 });
+      if (response.status !== 200) throw new Error(`BoxJS source HTTP ${response.status}`);
+      definition = normalizeBoxJs(JSON.parse(response.body), parts[0]);
     } catch (error) {
       return reply(502, { error: `Module configuration unavailable: ${error.message}` });
     }

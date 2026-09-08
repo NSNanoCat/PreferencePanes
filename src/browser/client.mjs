@@ -1,6 +1,6 @@
 import { Lodash as _ } from "@nsnanocat/util/polyfill/Lodash.mjs";
 import { normalizeBoxJs, normalizeStoredValue, validValue } from "../lib/boxjs.mjs";
-import { parseSettingsPath } from "../lib/settings-path.mjs";
+import { validatePathParts } from "../lib/settings-path.mjs";
 
 /**
  * 创建页面会话缓存；打开时重读，选项操作仅在 HTTP 200 后更新缓存。
@@ -33,9 +33,7 @@ export function createPreferencesClient({ fetch: request = globalThis.fetch.bind
     }
   }
   const configPath = (module) => {
-    if (typeof module !== "string" || !module) throw new TypeError("module is required");
-    const parts = parseSettingsPath(`https://example.invalid/api/${encodeURIComponent(module)}/`);
-    if (parts.length !== 1) throw new TypeError("Expected a module name");
+    validatePathParts([module]);
     return `/configs/${encodeURIComponent(module)}`;
   };
   const snapshot = (module) => {
@@ -82,8 +80,10 @@ export function createPreferencesClient({ fetch: request = globalThis.fetch.bind
       const state = { controller: new AbortController(), definition: null, values: {}, saving: false };
       sessions.set(module, state);
       try {
-        const resource = configPath(module);
-        const definition = normalizeBoxJs(await (await send(resource, "GET", undefined, state.controller.signal, true)).json(), module);
+        const definition = normalizeBoxJs(
+          await (await send(configPath(module), "GET", undefined, state.controller.signal, true)).json(),
+          module,
+        );
         if (definition.settingsPath.length < 2) throw new TypeError("BoxJS fields must share a settings subtree below the module root");
         const subtree = await (
           await send(`/api/${definition.settingsPath.map(encodeURIComponent).join("/")}/`, "GET", undefined, state.controller.signal)

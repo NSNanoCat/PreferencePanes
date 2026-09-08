@@ -44,11 +44,11 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
       toast.hidden = true;
     }, 2400);
   };
-  const client = createPreferencesClient({ ...(fetch ? { fetch } : {}), notify });
+  const client = createPreferencesClient({ fetch, notify });
   function replace(view, direction) {
     const old = viewport.firstElementChild;
     viewport.replaceChildren(view);
-    if (old && !document.defaultView.matchMedia("(prefers-reduced-motion: reduce)").matches)
+    if (old && !window.matchMedia("(prefers-reduced-motion: reduce)").matches)
       view.animate(
         [
           { opacity: 0.4, transform: `translateX(${direction * 24}px)` },
@@ -81,6 +81,11 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
     heading.textContent = definition.metadata?.name || active;
     const view = node("section", "pp-fields");
     const growingInputs = [];
+    const disableControls = (disabled) => {
+      view.querySelectorAll("button,input,select,textarea").forEach((input) => {
+        input.disabled = disabled;
+      });
+    };
     const metadata = definition.metadata;
     if (metadata) {
       const info = node("div", "pp-module-info");
@@ -97,8 +102,7 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
         info.append(image);
       }
       const details = node("div", "pp-module-details");
-      if (metadata.author) details.append(node("p", "pp-description", metadata.author));
-      for (const description of [metadata.desc ?? metadata.description, ...(metadata.descs ?? [])])
+      for (const description of [metadata.author, metadata.desc ?? metadata.description, ...(metadata.descs ?? [])])
         if (description) details.append(node("p", "pp-description", description));
       if (metadata.repo) {
         const link = node("a", "pp-module-source", "项目主页");
@@ -134,7 +138,6 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
           const label = node("label", "pp-choice", option.label);
           const input = node("input", "");
           input.type = "checkbox";
-          input.checked = Array.isArray(value) && value.includes(option.key);
           label.prepend(input);
           row.append(label);
           return { input, key: option.key };
@@ -196,10 +199,7 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
           if (saving) return;
           saving = true;
           back.disabled = true;
-          view.querySelectorAll("button,input,select,textarea").forEach((input) => {
-            input.disabled = true;
-          });
-          let success = false;
+          disableControls(true);
           try {
             if (operation === "delete") await client.remove(active, field.key);
             else {
@@ -212,20 +212,15 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
               }
               await client.set(active, field.key, value);
             }
-            success = true;
+            // 只更新当前控件，保留其它尚未保存的输入。
+            // Update this control without discarding other unsaved inputs.
+            if (!destroyed) write(client.snapshot(active).values[field.key]);
           } catch {
             /* 客户端已显示错误通知 / Client already displayed an error notification. */
           } finally {
             saving = false;
             back.disabled = window.history.length <= 1;
-            view.querySelectorAll("button,input,select,textarea").forEach((input) => {
-              input.disabled = false;
-            });
-            if (success && !destroyed) {
-              // 只更新当前控件，保留其它尚未保存的输入。
-              // Update this control without discarding other unsaved inputs.
-              write(client.snapshot(active).values[field.key]);
-            }
+            disableControls(false);
             if (!destroyed && pendingRoute) route();
           }
         };
