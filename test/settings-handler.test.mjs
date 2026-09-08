@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
+import { parseBoxJs } from "../src/lib/boxjs.mjs";
 import { config } from "./fixtures/module.mjs";
 
 const store = new Map();
@@ -101,6 +102,63 @@ test("BoxJS input presentation metadata is preserved for the generic renderer", 
 	assert.throws(() => normalizeBoxJs([{ ...config[3], rows: 0 }], "Module"), /Invalid or overlapping/);
 	assert.throws(() => normalizeBoxJs([{ ...config[3], autoGrow: "yes" }], "Module"), /Invalid or overlapping/);
 	assert.throws(() => normalizeBoxJs([{ ...config[3], placeholder: [] }], "Module"), /Invalid or overlapping/);
+});
+
+test("proxy parser skips display attributes but keeps the same storage constraints", () => {
+	const app = { settings: structuredClone(config), name: "Display", icons: ["icon.png"] };
+	const full = normalizeBoxJs(app, "Module");
+	const lean = parseBoxJs(app, "Module");
+	assert.deepEqual(lean, {
+		module: full.module,
+		storageKey: full.storageKey,
+		settingsPath: full.settingsPath,
+		fields: full.fields.map(({ key, type, defaultValue, options }) => ({ key, type, defaultValue, ...(options ? { options: options.map(({ key }) => ({ key })) } : {}) })),
+	});
+	for (const field of app.settings) {
+		for (const key of ["name", "desc", "placeholder", "rows", "autoGrow"])
+			Object.defineProperty(field, key, {
+				get() {
+					throw new Error(`Read display field ${key}`);
+				},
+			});
+		for (const item of field.items ?? [])
+			Object.defineProperty(item, "label", {
+				configurable: true,
+				get() {
+					throw new Error("Read label");
+				},
+			});
+	}
+	Object.defineProperty(app, "icons", {
+		get() {
+			throw new Error("Read icons");
+		},
+	});
+	assert.deepEqual(parseBoxJs(app, "Module"), lean);
+	assert.throws(() => normalizeBoxJs(app, "Module"), /Read display/);
+});
+
+test("proxy still rejects undeclared fields, invalid enum and cross-root configs without display data", async () => {
+	latest = config.map(({ name, desc, ...field }) => ({ ...field, ...(field.items ? { items: field.items.map(({ key }) => ({ key })) } : {}) }));
+	const handler = new SettingsHandler(options);
+	assert.equal((await handler.handle(req("POST", "Module/Settings/Home/mode", "a"))).status, 200);
+	assert.equal((await handler.handle(req("POST", "Module/Settings/Home/mode", "wrong"))).status, 400);
+	assert.equal((await handler.handle(req("POST", "Module/Settings/secret", true))).status, 404);
+	latest = [...latest, { id: "@Other.Module.Settings.other", type: "boolean", val: true }];
+	assert.equal((await handler.handle(req("GET"))).status, 502);
+	assert.equal(writes, 1);
+});
+
+test("custom GET resolvers retain their full module definition contract", async () => {
+	latest = { name: "Module title", settings: config };
+	const handler = new SettingsHandler({
+		...options,
+		resolveSettings(stored, definition) {
+			assert.deepEqual(definition, normalizeBoxJs(latest, "Module"));
+			return stored;
+		},
+	});
+	assert.equal((await handler.handle(req("GET", "Module/Settings/"))).status, 200);
 });
 
 test("app IDs and names never override field routing, including mixed legacy subscriptions", () => {

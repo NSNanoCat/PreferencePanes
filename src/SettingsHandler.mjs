@@ -2,12 +2,14 @@ import { URL } from "@nsnanocat/url";
 import { fetch } from "@nsnanocat/util/polyfill/fetch";
 import { Lodash as _ } from "@nsnanocat/util/polyfill/Lodash.mjs";
 import { Storage } from "@nsnanocat/util/polyfill/Storage";
-import { normalizeBoxJs, validValue } from "./lib/boxjs.mjs";
+import { parseBoxJs, validValue } from "./lib/boxjs.mjs";
 import { parseSettingsPathname } from "./lib/settings-path.mjs";
 
 /**
  * 使用 util 下载 BoxJS、校验字段并读写持久化存储。
  * Download BoxJS through util, validate fields and handle persistent storage.
+ * 默认仅提取存储约束；自定义 GET resolver 保留完整模块定义。
+ * Extract storage constraints by default; custom GET resolvers retain the full module definition.
  */
 export class SettingsHandler {
 	/** @type {string} 接管来源 / Handled origin. */
@@ -62,7 +64,9 @@ export class SettingsHandler {
 		try {
 			const response = await fetch({ url: this.#configURL, method: "GET", headers: { "Cache-Control": "no-cache" }, timeout: 5000 });
 			if (response.status !== 200) throw new Error(`BoxJS source HTTP ${response.status}`);
-			definition = normalizeBoxJs(JSON.parse(response.body), parts[0]);
+			// 自定义 GET resolver 的公开契约仍接收完整定义。
+			// Custom GET resolvers still receive the full definition required by their public contract.
+			definition = parseBoxJs(JSON.parse(response.body), parts[0], request.method === "GET" && Boolean(this.#resolveSettings));
 		} catch (error) {
 			return reply(502, { error: `Module configuration unavailable: ${error.message}` });
 		}
