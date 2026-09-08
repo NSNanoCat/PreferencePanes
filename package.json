@@ -1,6 +1,6 @@
 {
 	"name": "@nsnanocat/preference-panes",
-	"version": "0.3.1",
+	"version": "0.4.0",
 	"description": "Shared settings API runtime for JavaScript proxy modules",
 	"author": "VirgilClyne <Virgil@nanocat.me>",
 	"homepage": "https://NSNanoCat.github.io/preference-panes",
@@ -28,7 +28,8 @@
 		},
 		"./browser/panel.css": "./src/browser/panel.css",
 		"./dist/preference-panes.mjs": "./dist/preference-panes.mjs",
-		"./dist/preference-panes.request.js": "./dist/preference-panes.request.js"
+		"./dist/preference-panes.request.js": "./dist/preference-panes.request.js",
+		"./dist/settings/*": "./dist/settings/*"
 	},
 	"types": "src/index.d.ts",
 	"scripts": {
