@@ -1,6 +1,6 @@
 # @nsnanocat/preference-panes
 
-尚未发布的通用设置面板和代理存储 API，基于 `@nsnanocat/util`。字段直接来自运行时加载的 BoxJS JSON，页面、缓存与读写逻辑不包含具体项目的选项。
+通用设置面板和代理存储 API，基于 `@nsnanocat/util`，首版 `0.1.0` 已发布到 npm 和 GitHub Packages。字段直接来自运行时加载的 BoxJS JSON，页面、缓存与读写逻辑不包含具体项目的选项。
 
 ## 工作方式
 
@@ -106,4 +106,4 @@ Quantumult X 等不能通过模板传递 `$argument` 的平台，需要在构建
 - [Apifox 原生 JSON](apifox/preference-panes.apifox.json)
 - [Apifox 项目](https://app.apifox.com/project/8803052)、[Git 数据源绑定记录](apifox/sync.md)
 
-main/dev 普通推送与手动 CI 只验证并生成候选 tgz；两套 v* tag workflow 分别发布 npm 与 GitHub Packages。首版拟定为 `0.1.0`，发布步骤、首次 npm 注册与 Trusted Publisher 配置见 [RELEASING.md](RELEASING.md)。Enhanced 可先用候选 tgz 验证，正式依赖及 lockfile 必须在 registry 首发成功后生成。
+main/dev 普通推送与手动 CI 只验证并生成候选 tgz；两套 v* tag workflow 分别发布 npm 与 GitHub Packages。首版为 `0.1.0`，发布步骤与 Trusted Publisher 配置见 [RELEASING.md](RELEASING.md)。Enhanced 通过 GitHub Packages 安装正式依赖，lockfile 使用 registry 下载地址。
