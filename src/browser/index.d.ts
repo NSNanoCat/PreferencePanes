@@ -7,7 +7,7 @@ export interface Notification {
 	/** 结果类别 / Result kind. */
 	kind: "success" | "error";
 	/** 操作类别 / Operation kind. */
-	operation: "write" | "delete";
+	operation: "write" | "delete" | "clearCaches" | "reset";
 	/** 模块标识 / Module identifier. */
 	module: string;
 	/** 含模块名、不含存储根的点分路径 / Dotted path including the module but excluding the storage root. */
@@ -91,6 +91,27 @@ export interface PreferencesClient {
 	 * @throws {Error} 会话、路径、并发写入或网络错误 / Session, path, concurrent-write or network error.
 	 */
 	remove(module: string, key: string): Promise<void>;
+	/**
+	 * 按需读取整个模块 Caches，不刷新设置。
+	 * Read all module Caches on demand without refreshing settings.
+	 * @param module 已打开模块 / Open module.
+	 * @returns 缓存 JSON 值，缺失时为 undefined / Cache JSON value, or undefined when absent.
+	 */
+	readCaches(module: string): Promise<unknown>;
+	/**
+	 * 删除模块 Caches 并更新相关页面状态，不追加 GET。
+	 * Delete module Caches and update related page state without a follow-up GET.
+	 * @param module 已打开模块 / Open module.
+	 * @returns 清理完成 / Cleanup completion.
+	 */
+	clearCaches(module: string): Promise<void>;
+	/**
+	 * 删除整个模块持久化数据，页面使用当前 BoxJS 默认值。
+	 * Delete all module persistence and use current BoxJS defaults on the page.
+	 * @param module 已打开模块 / Open module.
+	 * @returns 重置完成 / Reset completion.
+	 */
+	reset(module: string): Promise<void>;
 }
 /**
  * WebView 面板的挂载选项，模块标识从页面路径读取。

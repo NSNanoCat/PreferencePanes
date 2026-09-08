@@ -94,8 +94,22 @@
 }
 .pp-actions {
 	display: flex;
+	flex-wrap: wrap;
 	gap: 8px;
 	margin-top: 12px;
+}
+.pp-maintenance {
+	border-top: 1px solid var(--pp-border, #d8dce0);
+	padding-top: 16px;
+}
+.pp-cache {
+	max-height: 320px;
+	overflow: auto;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+.pp-panel .pp-danger {
+	color: #d34242;
 }
 .pp-toast {
 	position: fixed;

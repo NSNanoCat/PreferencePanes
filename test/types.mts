@@ -34,6 +34,9 @@ const event: Notification = { kind: "success", operation: "delete", module: "Mod
 void event;
 await client.remove("Module", "Module.Settings.notes");
 client.leave("Module");
+await client.readCaches("Module");
+await client.clearCaches("Module");
+await client.reset("Module");
 
 // @ts-expect-error 布尔字段不能使用字符串默认值 / Boolean fields cannot have string defaults.
 const invalidDefault: SettingsField = { key: "Module.Settings.enabled", name: "Enabled", type: "boolean", defaultValue: "true" };

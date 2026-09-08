@@ -21,15 +21,15 @@ export function createPreferencesClient({ fetch: request = globalThis.fetch.bind
 	/** @type {Map<string, ModuleSession>} 模块会话表 / Module session map. */
 	const sessions = new Map();
 	/**
-	 * 发送同源请求，处理超时与取消，并要求 HTTP 200。
-	 * Send a same-origin request with timeout and cancellation, requiring HTTP 200.
+	 * 发送同源请求，处理超时与取消；数据 GET 的 404 交给调用方处理。
+	 * Send a same-origin request with timeout and cancellation; callers handle missing-data GET responses.
 	 * @param {string} path 相对请求路径 / Relative request path.
 	 * @param {"HEAD" | "GET" | "POST" | "DELETE"} method HTTP 方法 / HTTP method.
 	 * @param {unknown} body POST 值，其它方法忽略 / POST value, ignored by other methods.
 	 * @param {AbortSignal | undefined} signal 会话取消信号 / Session cancellation signal.
 	 * @param {boolean} [resource=false] 是否为无标记头的配置资源 / Whether this is a config resource without the marker header.
 	 * @returns {Promise<Response>} 未消费正文的响应 / Response with an unread body.
-	 * @throws {Error} 非 200、超时、取消或网络错误 / Non-200 status, timeout, cancellation or network error.
+	 * @throws {Error} 非 200 且非数据 GET 404、超时、取消或网络错误 / Non-200 status except missing-data GETs, timeout, cancellation or network error.
 	 */
 	async function send(path, method, body, signal, resource = false) {
 		const controller = new AbortController();
@@ -46,7 +46,7 @@ export function createPreferencesClient({ fetch: request = globalThis.fetch.bind
 				headers: resource ? {} : { "X-Settings-Client": "1", ...(method === "POST" ? { "Content-Type": "application/json" } : {}) },
 				...(method === "POST" ? { body: JSON.stringify(body) } : {}),
 			});
-			if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
+			if (response.status !== 200 && !(!resource && method === "GET" && response.status === 404)) throw new Error(`HTTP ${response.status}`);
 			return response;
 		} finally {
 			clearTimeout(timer);
@@ -82,27 +82,38 @@ export function createPreferencesClient({ fetch: request = globalThis.fetch.bind
 	 * @param {string} key 完整点分字段路径 / Complete dotted field path.
 	 * @param {"POST" | "DELETE"} method 写入或删除 / Write or delete.
 	 * @param {unknown} value 写入值，删除时忽略 / Write value, ignored for deletion.
+	 * @param {"write" | "delete" | "clearCaches" | "reset"} [operation] 操作类型 / Operation kind.
 	 * @returns {Promise<void>} 操作完成 / Operation completion.
 	 * @throws {Error} 会话、字段、值或请求错误 / Session, field, value or request error.
 	 */
-	async function change(module, key, method, value) {
+	async function change(module, key, method, value, operation = method === "POST" ? "write" : "delete") {
 		const state = sessions.get(module);
 		if (!state?.definition) throw new Error("Open the module first");
 		if (state.saving) throw new Error("A settings write is already in progress");
 		const field = state.definition.fields.find(field => field.key === key);
 		state.saving = true;
 		try {
-			if (!field || (method === "POST" && !validValue(field, value))) throw new TypeError("Invalid setting value");
+			if ((operation === "write" || operation === "delete") && (!field || (method === "POST" && !validValue(field, value)))) throw new TypeError("Invalid setting value");
 			await send(`/api/${key.split(".").map(encodeURIComponent).join("/")}`, method, value);
 			if (sessions.get(module) === state) {
-				if (method === "DELETE") {
-					delete state.values[key];
-					if (Object.hasOwn(field, "defaultValue")) state.values[key] = structuredClone(field.defaultValue);
-				} else state.values[key] = structuredClone(value);
+				switch (operation) {
+					case "write":
+						state.values[key] = structuredClone(value);
+						break;
+					case "delete":
+					case "clearCaches":
+					case "reset":
+						for (const candidate of state.definition.fields) {
+							if (candidate.key !== key && !candidate.key.startsWith(`${key}.`)) continue;
+							delete state.values[candidate.key];
+							if (Object.hasOwn(candidate, "defaultValue")) state.values[candidate.key] = structuredClone(candidate.defaultValue);
+						}
+						break;
+				}
 			}
-			notify({ kind: "success", operation: method === "DELETE" ? "delete" : "write", module, key });
+			notify({ kind: "success", operation, module, key });
 		} catch (error) {
-			notify({ kind: "error", operation: method === "DELETE" ? "delete" : "write", module, key, message: error.message });
+			notify({ kind: "error", operation, module, key, message: error.message });
 			throw error;
 		} finally {
 			state.saving = false;
@@ -139,7 +150,9 @@ export function createPreferencesClient({ fetch: request = globalThis.fetch.bind
 			try {
 				const definition = normalizeBoxJs(await (await send(configPath(module), "GET", undefined, state.controller.signal, true)).json(), module);
 				if (definition.settingsPath.length < 2) throw new TypeError("BoxJS fields must share a settings subtree below the module root");
-				const subtree = await (await send(`/api/${definition.settingsPath.map(encodeURIComponent).join("/")}/`, "GET", undefined, state.controller.signal)).json();
+				const response = await send(`/api/${definition.settingsPath.map(encodeURIComponent).join("/")}/`, "GET", undefined, state.controller.signal);
+				let subtree = response.status === 404 ? {} : await response.json();
+				if (typeof subtree === "string") subtree = JSON.parse(subtree);
 				if (!subtree || typeof subtree !== "object" || Array.isArray(subtree)) throw new TypeError("Expected a settings subtree object");
 				if (sessions.get(module) !== state) throw new Error("Module session was replaced");
 				state.definition = definition;
@@ -158,6 +171,32 @@ export function createPreferencesClient({ fetch: request = globalThis.fetch.bind
 			}
 		},
 		snapshot,
+		/**
+		 * 按需读取模块 Caches，不自动读取其它设置。
+		 * Read module Caches on demand without refreshing other settings.
+		 * @param {string} module 已打开的模块 / Open module.
+		 * @returns {Promise<unknown>} 缓存值，缺失为 undefined / Cache value, or undefined when absent.
+		 */
+		async readCaches(module) {
+			const state = sessions.get(module);
+			if (!state?.definition) throw new Error("Open the module first");
+			const response = await send(`/api/${encodeURIComponent(module)}/Caches`, "GET", undefined, state.controller.signal);
+			return response.status === 404 ? undefined : response.json();
+		},
+		/**
+		 * 删除整个 Caches 节点，成功后不追加 GET。
+		 * Delete the entire Caches node without a follow-up GET.
+		 * @param {string} module 已打开模块 / Open module.
+		 * @returns {Promise<void>} 清理完成 / Cleanup completion.
+		 */
+		clearCaches: module => change(module, `${module}.Caches`, "DELETE", undefined, "clearCaches"),
+		/**
+		 * 删除整个模块持久化节点，以当前 BoxJS 默认值重置页面缓存。
+		 * Delete module persistence and reset the page cache using current BoxJS defaults.
+		 * @param {string} module 已打开模块 / Open module.
+		 * @returns {Promise<void>} 重置完成 / Reset completion.
+		 */
+		reset: module => change(module, module, "DELETE", undefined, "reset"),
 		/**
 		 * 取消读取并清除会话，不撤销已发送的写入。
 		 * Abort reads and clear the session without undoing dispatched writes.

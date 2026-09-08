@@ -63,12 +63,56 @@ function fixture() {
 		fetch: async (url, options) => {
 			calls.push({ url, ...options });
 			if (state.error) throw state.error;
-			const body = options.method === "HEAD" || state.status === 204 ? null : JSON.stringify(url === "/configs/Module" ? state.config : state.stored);
-			return new Response(body, { status: state.status });
+			const data = url === "/configs/Module" ? state.config : url === "/api/Module/Caches" ? state.caches : state.stored;
+			const status = options.method === "GET" && url === "/api/Module/Settings/" ? (state.settingsStatus ?? state.status) : state.status;
+			const body = options.method === "HEAD" || status === 204 ? null : JSON.stringify(data);
+			return new Response(body, { status });
 		},
 	});
 	return { client, calls, notifications, state };
 }
+
+test("fresh or reset modules load defaults when their stored subtree is absent", async () => {
+	const { client, state, calls } = fixture();
+	state.settingsStatus = 404;
+	const result = await client.open("Module");
+	assert.equal(result.values["Module.Settings.Home.enabled"], true);
+	assert.equal(result.values["Module.Settings.count"], 1);
+	assert.equal(calls.length, 2);
+	state.settingsStatus = 200;
+	state.stored = JSON.stringify({ count: 9 });
+	assert.equal((await client.open("Module")).values["Module.Settings.count"], 9);
+});
+
+test("cache inspection is explicit; clear and reset use DELETE without follow-up GET", async () => {
+	const { client, state, calls, notifications } = fixture();
+	state.caches = { items: [1, 2] };
+	await client.open("Module");
+	assert.equal(calls.length, 2);
+	const settings = client.snapshot("Module").values;
+	assert.deepEqual(await client.readCaches("Module"), { items: [1, 2] });
+	await client.clearCaches("Module");
+	assert.deepEqual(client.snapshot("Module").values, settings);
+	await client.reset("Module");
+	assert.equal(client.snapshot("Module").values["Module.Settings.Home.enabled"], true);
+	assert.deepEqual(
+		calls.slice(2).map(({ method, url }) => [method, url]),
+		[
+			["GET", "/api/Module/Caches"],
+			["DELETE", "/api/Module/Caches"],
+			["DELETE", "/api/Module"],
+		],
+	);
+	assert.deepEqual(
+		notifications.map(({ operation }) => operation),
+		["clearCaches", "reset"],
+	);
+	state.status = 500;
+	const before = client.snapshot("Module");
+	await assert.rejects(client.reset("Module"), /HTTP 500/);
+	assert.deepEqual(client.snapshot("Module"), before);
+	assert.equal(notifications.at(-1).kind, "error");
+});
 
 test("menu probes only HEAD; opening loads config and subtree exactly once", async () => {
 	const { client, calls } = fixture();

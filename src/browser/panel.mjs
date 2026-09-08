@@ -46,7 +46,7 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
 	/**
 	 * 展示短暂通知，不刷新设置数据。
 	 * Display a transient notification without refreshing settings.
-	 * @param {{kind: "success" | "error", operation?: "write" | "delete", message?: string}} event 操作结果 / Operation result.
+	 * @param {{kind: "success" | "error", operation?: "write" | "delete" | "clearCaches" | "reset", message?: string}} event 操作结果 / Operation result.
 	 * @returns {void} 无返回值 / No return value.
 	 */
 	const notify = event => {
@@ -57,6 +57,12 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
 				break;
 			case event.operation === "delete":
 				toast.textContent = "删除成功";
+				break;
+			case event.operation === "clearCaches":
+				toast.textContent = "Caches 已清空";
+				break;
+			case event.operation === "reset":
+				toast.textContent = "模块已重置";
 				break;
 			default:
 				toast.textContent = "修改成功";
@@ -136,6 +142,30 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
 				input.disabled = disabled;
 			});
 		};
+		/**
+		 * 执行页面操作，期间锁定控件，完成后处理延后的导航。
+		 * Run a page action with controls locked, then process deferred navigation.
+		 * @param {() => Promise<void>} action 请求或写入 / Request or mutation.
+		 * @param {() => void} success 成功后的局部更新 / Local update after success.
+		 * @returns {Promise<void>} 操作完成 / Operation completion.
+		 */
+		async function perform(action, success) {
+			if (saving) return;
+			saving = true;
+			back.disabled = true;
+			disableControls(true);
+			try {
+				await action();
+				if (!destroyed) success();
+			} catch {
+				/* 请求层已通知错误 / The request layer has already reported the error. */
+			} finally {
+				saving = false;
+				back.disabled = window.history.length <= 1;
+				disableControls(false);
+				if (!destroyed && pendingRoute) route();
+			}
+		}
 		const metadata = definition.metadata;
 		if (metadata) {
 			const info = node("div", "pp-module-info");
@@ -268,40 +298,72 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
 			]) {
 				const button = node("button", "", label);
 				button.type = "button";
-				button.onclick = async () => {
-					if (saving) return;
-					saving = true;
-					back.disabled = true;
-					disableControls(true);
-					try {
-						if (operation === "delete") await client.remove(active, field.key);
-						else {
-							let value;
-							try {
-								value = read();
-							} catch (error) {
-								notify({ kind: "error", message: error.message });
-								throw error;
+				button.onclick = () =>
+					perform(
+						async () => {
+							if (operation === "delete") await client.remove(active, field.key);
+							else {
+								let value;
+								try {
+									value = read();
+								} catch (error) {
+									notify({ kind: "error", message: error.message });
+									throw error;
+								}
+								await client.set(active, field.key, value);
 							}
-							await client.set(active, field.key, value);
-						}
-						// 只更新当前控件，保留其它尚未保存的输入。
-						// Update this control without discarding other unsaved inputs.
-						if (!destroyed) write(client.snapshot(active).values[field.key]);
-					} catch {
-						/* 客户端已显示错误通知 / Client already displayed an error notification. */
-					} finally {
-						saving = false;
-						back.disabled = window.history.length <= 1;
-						disableControls(false);
-						if (!destroyed && pendingRoute) route();
-					}
-				};
+						},
+						() => write(client.snapshot(active).values[field.key]),
+					);
 				actions.append(button);
 			}
 			row.append(actions);
 			view.append(row);
 		}
+		const maintenance = node("section", "pp-maintenance");
+		maintenance.append(node("h2", "pp-title", "模块数据"));
+		const actions = node("div", "pp-actions");
+		const cacheView = node("button", "", "查看 Caches");
+		const cacheClear = node("button", "", "清空 Caches");
+		const reset = node("button", "pp-danger", "重置模块");
+		const output = node("pre", "pp-cache");
+		output.hidden = true;
+		output.setAttribute("aria-label", "Caches 内容");
+		for (const button of [cacheView, cacheClear, reset]) button.type = "button";
+		cacheView.onclick = () => {
+			let value;
+			return perform(
+				async () => {
+					try {
+						value = await client.readCaches(active);
+					} catch (error) {
+						notify({ kind: "error", message: error.message });
+						throw error;
+					}
+				},
+				() => {
+					output.textContent = value === undefined ? "暂无缓存" : JSON.stringify(value, null, 2);
+					output.hidden = false;
+					cacheView.textContent = "刷新 Caches";
+				},
+			);
+		};
+		cacheClear.onclick = () => {
+			if (!window.confirm(`清空 ${active} 的全部 Caches？`)) return;
+			return perform(
+				() => client.clearCaches(active),
+				() => {
+					output.textContent = "暂无缓存";
+				},
+			);
+		};
+		reset.onclick = () => {
+			if (!window.confirm(`重置 ${active}？这将删除该模块的 Settings、Caches 和其它持久化数据。`)) return;
+			return perform(() => client.reset(active), controls);
+		};
+		actions.append(cacheView, cacheClear, reset);
+		maintenance.append(actions, output);
+		view.append(maintenance);
 		viewport.replaceChildren(view);
 		for (const grow of growingInputs) grow();
 	}
