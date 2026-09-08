@@ -13,6 +13,21 @@ test("missing or invalid module never sends a request", async () => {
 	assert.equal(calls.length, 0);
 });
 
+test("native subtree reads preserve falsy values and default only for undefined", async () => {
+	const { client, state } = fixture();
+	state.stored = { Home: { enabled: false, mode: "a" }, items: [], count: 0, note: "" };
+	const { values } = await client.open("Module");
+	assert.equal(values["Module.Settings.Home.enabled"], false);
+	assert.equal(values["Module.Settings.count"], 0);
+	assert.equal(values["Module.Settings.note"], "");
+	assert.deepEqual(values["Module.Settings.items"], []);
+	state.stored = { Home: null, note: null };
+	const reopened = await client.open("Module");
+	assert.equal(reopened.values["Module.Settings.Home.enabled"], true);
+	assert.equal(reopened.values["Module.Settings.note"], null);
+	assert.equal(reopened.values["Module.Settings.count"], 1);
+});
+
 test("template config Mock and API script patterns are disjoint regardless of rule order", async () => {
 	const template = await readFile(new URL("../examples/surge.sgmodule", import.meta.url), "utf8");
 	const mock = new RegExp(

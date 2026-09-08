@@ -1,4 +1,3 @@
-import { Lodash as _ } from "@nsnanocat/util/polyfill/Lodash.mjs";
 import { normalizeBoxJs, normalizeStoredValue, validValue } from "../lib/boxjs.mjs";
 import { validatePathParts } from "../lib/settings-path.mjs";
 
@@ -145,7 +144,11 @@ export function createPreferencesClient({ fetch: request = globalThis.fetch.bind
 				if (sessions.get(module) !== state) throw new Error("Module session was replaced");
 				state.definition = definition;
 				for (const field of definition.fields) {
-					const value = _.get(subtree, field.key.split(".").slice(definition.settingsPath.length), field.defaultValue);
+					const stored = field.key
+						.split(".")
+						.slice(definition.settingsPath.length)
+						.reduce((parent, part) => Object(parent)[part], subtree);
+					const value = stored === undefined ? field.defaultValue : stored;
 					if (value !== undefined) state.values[field.key] = normalizeStoredValue(field, value);
 				}
 				return snapshot(module);

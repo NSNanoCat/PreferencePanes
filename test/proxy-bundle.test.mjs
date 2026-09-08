@@ -88,12 +88,12 @@ test("bundles contain no Node imports or compiled-in module fields", () => {
 	assert.doesNotMatch(code, /@Example\.Module|BiliBili|Enhanced\.Settings/);
 });
 
-test("browser bundle does not include the proxy URL polyfill", async () => {
+test("browser bundle contains no proxy polyfills or third-party dependencies", async () => {
 	const browser = await rollup(builds[0]);
 	try {
 		const { output } = await browser.generate(builds[0].output);
 		assert.equal(
-			Object.keys(output[0].modules).some(id => id.includes("/@nsnanocat/url/")),
+			Object.entries(output[0].modules).some(([id, module]) => id.includes("/node_modules/") && module.renderedLength > 0),
 			false,
 		);
 	} finally {
