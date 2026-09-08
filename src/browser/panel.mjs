@@ -78,7 +78,38 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
   }
   function controls() {
     const { definition, values } = client.snapshot(active);
+    heading.textContent = definition.metadata?.name || active;
     const view = node("section", "pp-fields");
+    const growingInputs = [];
+    const metadata = definition.metadata;
+    if (metadata) {
+      const info = node("div", "pp-module-info");
+      const iconURL = metadata.icon || metadata.icons?.[1] || metadata.icons?.[0];
+      const resourceURL = (value) => {
+        const url = new window.URL(value, window.location.href);
+        if (!["http:", "https:"].includes(url.protocol)) throw new TypeError("Module metadata URLs must use HTTP or HTTPS");
+        return url.href;
+      };
+      if (iconURL) {
+        const image = node("img", "pp-module-icon");
+        image.src = resourceURL(iconURL);
+        image.alt = "";
+        info.append(image);
+      }
+      const details = node("div", "pp-module-details");
+      if (metadata.author) details.append(node("p", "pp-description", metadata.author));
+      for (const description of [metadata.desc ?? metadata.description, ...(metadata.descs ?? [])])
+        if (description) details.append(node("p", "pp-description", description));
+      if (metadata.repo) {
+        const link = node("a", "pp-module-source", "项目主页");
+        link.href = resourceURL(metadata.repo);
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        details.append(link);
+      }
+      info.append(details);
+      view.append(info);
+    }
     for (const field of definition.fields) {
       const row = node("fieldset", "pp-field");
       row.append(node("legend", "", field.name));
@@ -113,8 +144,23 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
           for (const option of inputs) option.input.checked = Array.isArray(value) && value.includes(option.key);
         };
       } else {
-        const input = node(field.type === "array" ? "textarea" : "input", "pp-input");
+        const multiline = field.control === "textarea" || field.type === "array";
+        const input = node(multiline ? "textarea" : "input", "pp-input");
         input.setAttribute("aria-label", field.name);
+        if (field.placeholder) input.placeholder = field.placeholder;
+        if (multiline && field.rows) input.rows = field.rows;
+        const grow = () => {
+          if (!multiline || !field.autoGrow || !input.isConnected) return;
+          input.style.height = "auto";
+          const baseline = input.getBoundingClientRect().height;
+          const style = window.getComputedStyle(input);
+          const borders = parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
+          input.style.height = `${Math.max(baseline, input.scrollHeight + borders)}px`;
+        };
+        if (multiline && field.autoGrow) {
+          input.addEventListener("input", grow);
+          growingInputs.push(grow);
+        }
         if (field.type === "boolean") {
           input.type = "checkbox";
           write = (value) => {
@@ -122,9 +168,10 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
           };
           read = () => input.checked;
         } else {
-          input.type = field.type === "number" ? "number" : "text";
+          if (!multiline) input.type = field.type === "number" ? "number" : "text";
           write = (value) => {
             input.value = field.type === "array" ? JSON.stringify(value ?? []) : (value ?? "");
+            grow();
           };
           read = () =>
             field.type === "array"
@@ -188,6 +235,7 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
       view.append(row);
     }
     viewport.replaceChildren(view);
+    for (const grow of growingInputs) grow();
   }
   function route() {
     if (saving) {
