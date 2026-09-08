@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { createPreferencesClient } from "../browser/client.mjs";
+import { createPreferencesClient } from "../src/browser/client.mjs";
 import { config } from "./fixtures/module.mjs";
 
 test("missing or invalid module never sends a request", async () => {

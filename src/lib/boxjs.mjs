@@ -5,7 +5,7 @@ import { parseSettingsPath } from "./settings-path.mjs";
  * Normalize a BoxJS array, app or subscription using the source JSON as the field authority.
  * @param {unknown} config BoxJS JSON / BoxJS document.
  * @param {string} module API 第一段模块名 / First API path segment.
- * @returns {import("../types/index.js").ModuleDefinition} 存储根和字段 / Storage root and fields.
+ * @returns {import("../index.js").ModuleDefinition} 存储根和字段 / Storage root and fields.
  */
 export function normalizeBoxJs(config, module) {
   parseSettingsPath(`https://example.invalid/api/${module}`);
@@ -59,7 +59,7 @@ export function normalizeBoxJs(config, module) {
 /**
  * 归一化 BoxJS 的字符串存储值，不改变普通文本内容。
  * Normalize BoxJS string persistence without changing free-text values.
- * @param {import("../types/index.js").SettingsField} field 字段 / Field.
+ * @param {import("../index.js").SettingsField} field 字段 / Field.
  * @param {unknown} value 存储值 / Stored value.
  * @returns {unknown} 控件值 / Control value.
  */

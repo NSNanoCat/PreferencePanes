@@ -21,7 +21,7 @@ jobs:
       - run: npx biome format --write package.json
       - run: npm run build
       - run: npm run check
-      - run: node scripts/generate-apifox.mjs --check
+      - run: npm run apifox:check
       - run: npm pack --dry-run
   publish:
     needs: build

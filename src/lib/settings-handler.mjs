@@ -6,8 +6,8 @@ import { parseSettingsPath } from "./settings-path.mjs";
 /**
  * 创建通用读写处理器；字段通过 loadConfig 在运行时加载，不固化在脚本中。
  * Create a generic endpoint using runtime-loaded config, never compiled-in fields.
- * @param {import("../types/index.js").SettingsHandlerOptions} options 路由与配置加载器 / Routing and config loader.
- * @returns {(request: import("../types/index.js").SettingsRequest) => Promise<import("../types/index.js").SettingsResponse | undefined>} 异步处理器 / Async handler.
+ * @param {import("../index.js").SettingsHandlerOptions} options 路由与配置加载器 / Routing and config loader.
+ * @returns {(request: import("../index.js").SettingsRequest) => Promise<import("../index.js").SettingsResponse | undefined>} 异步处理器 / Async handler.
  */
 export function createSettingsHandler({ origin, loadConfig, requestHeader = "X-Settings-Client", resolveSettings }) {
   const target = new URL(origin);

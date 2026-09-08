@@ -14,7 +14,7 @@ for (const platform of ["node", "quantumult"])
         : "";
     const script = `
     ${globals}
-    const {createSettingsHandler}=await import(${JSON.stringify(new URL("../index.mjs", import.meta.url).href)});
+    const {createSettingsHandler}=await import(${JSON.stringify(new URL("../src/index.mjs", import.meta.url).href)});
     const handler=createSettingsHandler({origin:'https://example.org',loadConfig:()=>[{id:'@Root.Module.Settings.enabled',name:'Enabled',type:'boolean',val:true}]});
     const req={url:'https://example.org/api/Module/Settings/enabled',method:'POST',body:'false',headers:{'X-Settings-Client':'1','Content-Type':'application/json'}};
     if((await handler(req)).status!==200)throw Error('write failed');

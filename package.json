@@ -16,21 +16,21 @@
   "license": "Apache-2.0",
   "bugs": "https://github.com/NSNanoCat/PreferencePanes/issues",
   "type": "module",
-  "main": "index.mjs",
+  "main": "src/index.mjs",
   "exports": {
     ".": {
-      "types": "./types/index.d.ts",
-      "import": "./index.mjs"
+      "types": "./src/index.d.ts",
+      "import": "./src/index.mjs"
     },
     "./browser": {
-      "types": "./types/browser.d.ts",
-      "import": "./browser/index.mjs"
+      "types": "./src/browser/index.d.ts",
+      "import": "./src/browser/index.mjs"
     },
-    "./browser/panel.css": "./browser/panel.css",
+    "./browser/panel.css": "./src/browser/panel.css",
     "./dist/preference-panes.mjs": "./dist/preference-panes.mjs",
     "./dist/preference-panes.request.js": "./dist/preference-panes.request.js"
   },
-  "types": "types/index.d.ts",
+  "types": "src/index.d.ts",
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "check": "npm run lint && npm run typecheck && npm test",
@@ -39,19 +39,16 @@
     "typecheck": "tsc --noEmit",
     "build": "rollup -c",
     "prepack": "npm run build",
-    "apifox:generate": "node scripts/generate-apifox.mjs"
+    "apifox:generate": "node apifox/generate.mjs",
+    "apifox:check": "node apifox/generate.mjs --check"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/NSNanoCat/PreferencePanes.git"
   },
   "files": [
-    "index.mjs",
-    "lib",
-    "browser",
-    "types",
-    "dist",
-    "proxy"
+    "src",
+    "dist"
   ],
   "dependencies": {
     "@nsnanocat/url": "^1.2.6",

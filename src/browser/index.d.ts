@@ -1,4 +1,4 @@
-import type { ModuleDefinition, SettingsScalar } from "./index.js";
+import type { ModuleDefinition, SettingsScalar } from "../index.js";
 export interface Notification {
   kind: "success" | "error";
   operation: "write" | "delete";

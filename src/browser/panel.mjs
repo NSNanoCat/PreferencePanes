@@ -3,7 +3,7 @@ import { createPreferencesClient } from "./client.mjs";
 /**
  * 挂载从 BoxJS 实时生成的设置面板和短暂通知。
  * Mount runtime-generated BoxJS controls and transient notifications.
- * @param {import("../types/browser.js").PreferencesPanelOptions} options 容器与请求；页面路径 /settings/{module} 对应配置 / Container and requests; /settings/{module} selects config.
+ * @param {import("./index.js").PreferencesPanelOptions} options 容器与请求；页面路径 /settings/{module} 对应配置 / Container and requests; /settings/{module} selects config.
  * @returns {{destroy(): void}} 清理接口 / Cleanup handle.
  */
 export function mountPreferencePanes({ element: root, fetch, title = "Preferences" }) {

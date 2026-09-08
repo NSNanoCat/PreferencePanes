@@ -5,8 +5,8 @@ import { parseSettingsPath } from "../lib/settings-path.mjs";
 /**
  * 创建页面会话缓存；打开时重读，选项操作仅在 HTTP 200 后更新缓存。
  * Create a page-session cache; reload on open and mutate cache only after HTTP 200.
- * @param {import("../types/browser.js").PreferencesClientOptions} options 请求与通知 / Requests and notifications.
- * @returns {import("../types/browser.js").PreferencesClient} 通用客户端 / Generic client.
+ * @param {import("./index.js").PreferencesClientOptions} options 请求与通知 / Requests and notifications.
+ * @returns {import("./index.js").PreferencesClient} 通用客户端 / Generic client.
  */
 export function createPreferencesClient({ fetch: request = globalThis.fetch.bind(globalThis), notify = () => {}, timeout = 10000 } = {}) {
   const sessions = new Map();

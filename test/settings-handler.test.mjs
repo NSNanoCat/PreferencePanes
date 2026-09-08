@@ -19,7 +19,7 @@ globalThis.$persistentStore = {
     return true;
   },
 };
-const { createSettingsHandler, normalizeBoxJs, parseSettingsPath } = await import("../index.mjs");
+const { createSettingsHandler, normalizeBoxJs, parseSettingsPath } = await import("../src/index.mjs");
 const options = { origin: "https://example.org", loadConfig: async () => config };
 const req = (method, pathname = "Module/Settings/Home/enabled", value) => ({
   url: `https://example.org/api/${pathname}`,
