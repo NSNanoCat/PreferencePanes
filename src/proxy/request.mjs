@@ -1,30 +1,5 @@
-import { $app } from "@nsnanocat/util/lib/app.mjs";
-import { done } from "@nsnanocat/util/lib/done.mjs";
-import { qs } from "@nsnanocat/util/polyfill/qs.mjs";
-import { SettingsHandler } from "../SettingsHandler.mjs";
+import { runPreferences } from "./handler.mjs";
 
-/**
- * 读取代理参数、执行处理器并将响应交给宿主 done。
- * Read proxy arguments, execute the handler and pass the response to the host's done function.
- * @returns {Promise<void>} 代理脚本执行结束 / Proxy script execution completion.
- */
-(async () => {
-	let response;
-	try {
-		const { origin, storageKey, module } = qs.parse(globalThis.$argument);
-		const handler = new SettingsHandler({ origin, storageKey, module });
-		response = await handler.handle(globalThis.$request);
-	} catch (error) {
-		console.error(`PreferencePanes: ${error.message}`);
-		response = {
-			status: 500,
-			headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" },
-			body: globalThis.$request.method === "HEAD" ? "" : JSON.stringify({ error: "Settings execution failed" }),
-		};
-	}
-	if (!response) {
-		done({});
-		return;
-	}
-	done($app === "Quantumult X" ? response : { response });
-})();
+// 直接安装时读取宿主参数；站点生成的脚本使用同一执行入口并传入安装映射。
+// Direct installs read host arguments; site-generated scripts call the same entry with a mapping.
+runPreferences();

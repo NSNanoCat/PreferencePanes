@@ -67,11 +67,11 @@ const panel = mountPreferencePanes({ element: document.querySelector("#preferenc
 
 模块页底部提供查看/刷新 Caches、清空 Caches 和重置模块。查看缓存按需 GET；清空和重置经确认后 DELETE，成功只更新本页状态。重置后控件显示当前 BoxJS 默认值，再次进入页面才重新读取。模块选择、设置值校验和默认值处理都在前端完成。
 
-主菜单、导航、控件和样式均由本包实现。调用项目只提供品牌与模块 JSON，不需要维护 HTML、页面 JS、CSS 或专用 Rollup 配置。未提供对应配置 Mock 的插件入口保持禁用。
+主菜单、导航、控件和样式均由本包实现。业务插件只提供 BoxJS JSON；品牌、菜单、图标与安装映射属于托管站点。插件不导入本包、不维护页面代码，也不把设置请求接入自己的业务 Request。未提供对应配置 Mock 的插件入口保持禁用。
 
 ## 零前端代码接入
 
-部署本包的 `dist/settings/` 到 `/settings/assets/`，将其中 index.html 同时用于 `/settings/` 与 `/settings/{module}`。根菜单读取同目录的 `site.boxjs.json`：
+托管站点安装本包，部署 `dist/settings/` 到 `/settings/assets/`，将其中 index.html 同时用于 `/settings/` 与 `/settings/{module}`。根菜单读取由站点维护的 `site.boxjs.json`，这份主菜单不放在业务插件仓库：
 
 ~~~json
 {
@@ -86,7 +86,19 @@ const panel = mountPreferencePanes({ element: document.querySelector("#preferenc
 
 根页面每次进入重新 HEAD 探测，菜单 JSON 在当前文档只读取一次；模块页直接打开时无需先读菜单。图片与额外样式由托管站点提供。
 
-代理优先使用原生 Mock 提供配置和页面。需要请求脚本响应静态资源的平台，直接使用本包的 PreferencesHandler，安装参数也可放在 JSON 中：
+代理优先使用原生 Mock 提供配置和页面。存储 API 和没有原生 Mock 的资源请求，由独立代理脚本处理。托管站点维护 installation JSON（origin/storageKey/module/resources），并用包内已经构建好的代理运行时生成安装文件：
+
+~~~js
+import { readFile, writeFile } from "node:fs/promises";
+
+const runtime = await readFile(new URL(import.meta.resolve("@nsnanocat/preference-panes/dist/preference-panes.proxy.js")), "utf8");
+const installation = JSON.parse(await readFile("installation.json", "utf8"));
+await writeFile("Module.request.js", `${runtime}\nPreferencePanes.runPreferences(${JSON.stringify(installation)});\n`);
+~~~
+
+业务插件的代理规则直接引用托管站点的 Module.request.js；无需 npm 依赖、业务 Request 接入代码或额外构建脚本。生成文件把可信安装映射与通用执行端放在一起，不依赖平台是否支持 $argument，Quantumult X 也使用同一文件。所有代理平台判断、done 适配、异常响应、资源下载和读写都由本包完成。API 不下载安装 JSON 或 BoxJS。
+
+以下是包内部处理器接受的安装映射形状；也可供需要手动集成的宿主使用：
 
 ~~~js
 import { PreferencesHandler } from "@nsnanocat/preference-panes";
@@ -103,7 +115,7 @@ const handler = new PreferencesHandler({
 const response = await handler.handle($request);
 ~~~
 
-资源 pattern 匹配 pathname，下载源必须避开拦截路径。只有命中静态资源的 GET/HEAD 才下载文件；API 由 SettingsHandler 直接处理，读写不会下载 BoxJS。接入方保留宿主请求入口和原生 Mock 规则，将响应交给现有 done 适配；无需自行实现路由、fetch、控件或持久化操作。
+资源 pattern 匹配 pathname，下载源必须避开拦截路径。只有命中静态资源的 GET/HEAD 才下载文件；API 由 SettingsHandler 直接处理，读写不会下载 BoxJS。业务插件只保留安装规则和配置 Mock；其业务请求脚本不负责设置接口。
 
 ## BoxJS 兼容
 
@@ -129,6 +141,6 @@ npm run apifox:check
 npm pack --dry-run
 ~~~
 
-构建生成 dist/preference-panes.mjs、dist/preference-panes.request.js，以及可直接部署的 dist/settings/{index.html,app.mjs,panel.css,home.css}。静态文件也通过 `@nsnanocat/preference-panes/dist/settings/*` 导出，托管仓库直接从依赖包复制，不读取业务插件的前端构建目录。0.4.0 增加完整页面与资源处理器，保留 0.3.1 的存储契约和页面交互。
+构建生成 dist/preference-panes.mjs、读取宿主参数的 dist/preference-panes.request.js、供托管站点配置的 dist/preference-panes.proxy.js，以及可直接部署的 dist/settings/{index.html,app.mjs,panel.css,home.css}。托管仓库直接从依赖包复制，不读取业务插件的前端构建目录。0.5.0 将独立代理执行入口也交给本包，保留既有存储契约与页面交互。
 
 [完整接口说明](apifox/guide.md) · [Apifox JSON](apifox/preference-panes.apifox.json) · [同步方式](apifox/README.md) · [发布工作流](.github/RELEASING.md)
