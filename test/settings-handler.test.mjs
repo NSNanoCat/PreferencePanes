@@ -1,187 +1,130 @@
 import assert from "node:assert/strict";
-import test, { beforeEach } from "node:test";
+import { beforeEach, test } from "node:test";
 
 const store = new Map();
 let reads = 0,
-  writes = 0,
-  writable = true;
+	writes = 0,
+	writable = true;
 globalThis.$environment = { "surge-version": "test" };
 globalThis.$persistentStore = {
-  read(key) {
-    reads++;
-    return store.get(key) ?? null;
-  },
-  write(value, key) {
-    writes++;
-    if (!writable) return false;
-    store.set(key, value);
-    return true;
-  },
+	read(key) {
+		reads++;
+		return store.get(key) ?? null;
+	},
+	write(value, key) {
+		writes++;
+		if (!writable) return false;
+		store.set(key, value);
+		return true;
+	},
 };
-const { createSettingsHandler, parseSettingsPath } = await import("../index.mjs");
-const fields = [
-  {
-    key: "Enhanced.Settings.Home.Top_left",
-    name: "顶栏左侧",
-    type: "string",
-    defaultValue: "mine",
-    options: [
-      { key: "mine", label: "我的" },
-      { key: "videoshortcut", label: "短视频" },
-    ],
-  },
-  { key: "Enhanced.Settings.Home.Switch", name: "启用", type: "boolean", defaultValue: true },
-  { key: "Enhanced.Settings.Home.Top", name: "顶栏", type: "array", defaultValue: ["messages"] },
-  { key: "Other.preferences.count", name: "Count", type: "number" },
-];
-const options = { fields, storageKey: "BiliBili", origin: "https://example.org" };
-const request = (method = "GET", key = fields[0].key, value) => ({
-  url: `https://example.org/api/${key.replaceAll(".", "/")}`,
-  method,
-  headers: { "X-Settings-Client": "1", "Content-Type": "application/json" },
-  ...(value === undefined ? {} : { body: JSON.stringify(value) }),
+globalThis.$httpClient = {
+	get() {
+		throw new Error("Storage API must not fetch configuration");
+	},
+};
+const { SettingsHandler, parseSettingsPath } = await import("../src/index.mjs");
+const options = { origin: "https://example.org", storageKey: "Root", module: "Module" };
+const req = (method, path = "Module/Settings/key", body = undefined) => ({
+	url: `https://example.org/api/${path}`,
+	method,
+	headers: { "X-Settings-Client": "1", "Content-Type": "application/json" },
+	...(body === undefined ? {} : { body: JSON.stringify(body) }),
 });
 beforeEach(() => {
-  store.clear();
-  reads = 0;
-  writes = 0;
-  writable = true;
+	store.clear();
+	reads = writes = 0;
+	writable = true;
 });
 
-test("common path parser fixes only api and rejects unsafe/ambiguous segments", () => {
-  assert.deepEqual(parseSettingsPath(request().url), ["Enhanced", "Settings", "Home", "Top_left"]);
-  assert.deepEqual(parseSettingsPath("https://example.org/api/Other/preferences/count?q=1"), ["Other", "preferences", "count"]);
-  assert.equal(parseSettingsPath("https://example.org/settings/api/Example"), undefined);
-  for (const suffix of ["", "A//B", "A/", "__proto__/x", "constructor/prototype", "A%2FB", "A%2eB", "%ZZ"])
-    assert.throws(() => parseSettingsPath(`https://example.org/api/${suffix}`), TypeError);
+test("GET returns the full addressed value including Caches and undeclared keys", async () => {
+	const data = { Module: { Settings: { key: "value", hidden: 7 }, Caches: { list: [1, 2] } }, Other: { secret: true } };
+	store.set("Root", JSON.stringify(data));
+	const handler = new SettingsHandler(options);
+	assert.deepEqual(JSON.parse((await handler.handle(req("GET", "Module/"))).body), data.Module);
+	assert.equal(reads, 1);
+	assert.deepEqual(JSON.parse((await handler.handle(req("GET", "Module/Caches"))).body), data.Module.Caches);
+	assert.equal((await handler.handle(req("GET", "Module/missing"))).status, 404);
+	const count = reads;
+	assert.equal((await handler.handle(req("GET", "Other/Settings/key"))).status, 404);
+	assert.equal(reads, count);
+	assert.equal(writes, 0);
 });
 
-test("POST literal mine writes the exact database path and GET returns the JSON scalar", () => {
-  const handle = createSettingsHandler(options);
-  assert.equal(handle(request("POST", fields[0].key, "mine")).status, 204);
-  assert.deepEqual(JSON.parse(store.get("BiliBili")), { Enhanced: { Settings: { Home: { Top_left: "mine" } } } });
-  assert.equal(handle(request()).body, '"mine"');
-  assert.equal(writes, 1);
+test("POST replaces any JSON value without BoxJS field or enum validation", async () => {
+	const handler = new SettingsHandler(options);
+	store.set("Root", JSON.stringify({ Other: { sentinel: 7 } }));
+	for (const value of ["not-an-enum", false, 0, "", null, [], [1, 1], { nested: { enabled: true }, list: [null, 2] }]) {
+		assert.equal((await handler.handle(req("POST", "Module/New/key", value))).status, 200);
+		assert.deepEqual(JSON.parse((await handler.handle(req("GET", "Module/New/key"))).body), value);
+	}
+	assert.equal((await handler.handle(req("POST", "Module/", { Settings: {}, Caches: { x: 1 } }))).status, 200);
+	assert.deepEqual(JSON.parse(store.get("Root")), { Other: { sentinel: 7 }, Module: { Settings: {}, Caches: { x: 1 } } });
 });
 
-test("false, zero and empty arrays are stored as values, not missing defaults", () => {
-  const handle = createSettingsHandler(options);
-  for (const [key, value] of [
-    [fields[1].key, false],
-    [fields[2].key, []],
-    [fields[3].key, 0],
-  ]) {
-    assert.equal(handle(request("POST", key, value)).status, 204);
-    assert.deepEqual(JSON.parse(handle(request("GET", key)).body), value);
-  }
+test("DELETE clears Caches or resets the module without touching sibling modules", async () => {
+	const handler = new SettingsHandler(options);
+	store.set("Root", JSON.stringify({ Module: { Settings: { key: 1 }, Caches: { large: [1, 2] }, hidden: 3 }, Other: { sentinel: 7 } }));
+	assert.equal((await handler.handle(req("DELETE", "Module/Caches"))).status, 200);
+	assert.deepEqual(JSON.parse(store.get("Root")), { Module: { Settings: { key: 1 }, hidden: 3 }, Other: { sentinel: 7 } });
+	assert.equal((await handler.handle(req("GET", "Module/Caches"))).status, 404);
+	assert.equal((await handler.handle(req("DELETE", "Module/"))).status, 200);
+	assert.deepEqual(JSON.parse(store.get("Root")), { Other: { sentinel: 7 } });
+	assert.equal((await handler.handle(req("GET", "Module/"))).status, 404);
+	assert.equal((await handler.handle(req("DELETE", "Module/"))).status, 200);
+	assert.equal(writes, 3);
 });
 
-test("DELETE uses the URL only, preserves siblings and is idempotent", () => {
-  store.set(
-    "BiliBili",
-    JSON.stringify({
-      Enhanced: { Settings: { Home: { Top_left: "videoshortcut", hidden: 7 } }, Caches: { marker: 1 } },
-      Other: { preferences: { count: 5 } },
-    }),
-  );
-  const handle = createSettingsHandler(options);
-  const deletion = request("DELETE");
-  delete deletion.headers["Content-Type"];
-  assert.equal(handle(deletion).status, 204);
-  assert.equal(handle(deletion).body, "");
-  assert.deepEqual(JSON.parse(store.get("BiliBili")), {
-    Enhanced: { Settings: { Home: { hidden: 7 } }, Caches: { marker: 1 } },
-    Other: { preferences: { count: 5 } },
-  });
-  assert.equal(handle(request()).body, '"mine"', "default reappears after removing override");
-  store.clear();
-  assert.equal(handle(deletion).status, 204);
+test("HEAD checks routing without reading storage or requiring an existing value", async () => {
+	const handler = new SettingsHandler(options);
+	for (const path of ["Module/", "Module/Caches", "Module/missing"]) {
+		const response = await handler.handle(req("HEAD", path));
+		assert.equal(response.status, 200);
+		assert.equal(response.body, "");
+	}
+	assert.equal(reads, 0);
+	assert.equal(writes, 0);
+	for (const path of ["/configs/Module", "/settings/Module"]) assert.equal(await handler.handle({ ...req("GET"), url: "https://example.org" + path }), undefined);
 });
 
-test("reads and updates util-serialized intermediate Settings without losing hidden fields", () => {
-  store.set("BiliBili", JSON.stringify({ Enhanced: { Settings: JSON.stringify({ Home: { Top_left: "videoshortcut", hidden: 8 } }) } }));
-  const handle = createSettingsHandler(options);
-  assert.equal(handle(request()).body, '"videoshortcut"');
-  assert.equal(handle(request("POST", fields[0].key, "mine")).status, 204);
-  assert.equal(JSON.parse(store.get("BiliBili")).Enhanced.Settings.Home.hidden, 8);
+test("legacy serialized parents and array elements retain values during path writes", async () => {
+	const handler = new SettingsHandler(options);
+	store.set("Root", JSON.stringify({ Module: { Settings: JSON.stringify({ nested: { old: 1 } }), Caches: { items: [{ value: 1 }] } } }));
+	assert.equal((await handler.handle(req("POST", "Module/Settings/nested/new", false))).status, 200);
+	assert.deepEqual(JSON.parse(store.get("Root")).Module.Settings, { nested: { old: 1, new: false } });
+	assert.equal((await handler.handle(req("POST", "Module/Caches/items/0/value", 2))).status, 200);
+	assert.equal(JSON.parse((await handler.handle(req("GET", "Module/Caches/items/0/value"))).body), 2);
+	assert.equal((await handler.handle(req("POST", "Module", null))).status, 200);
+	assert.equal((await handler.handle(req("POST", "Module/child", 1))).status, 500);
+	assert.equal(JSON.parse(store.get("Root")).Module, null);
 });
 
-test("HEAD checks declared path without accessing persistent settings or resolver", () => {
-  const handle = createSettingsHandler({
-    ...options,
-    resolveSettings() {
-      throw Error("unexpected");
-    },
-  });
-  assert.equal(handle(request("HEAD")).status, 200);
-  assert.equal(handle(request("HEAD", "Unknown.path")).status, 404);
-  assert.equal(handle(request("HEAD", "Unknown.path")).body, "");
-  assert.equal(reads, 0);
-  assert.equal(writes, 0);
+test("transport validation and storage failures do not report success", async () => {
+	const handler = new SettingsHandler(options);
+	assert.equal((await handler.handle({ ...req("GET"), headers: {} })).status, 403);
+	assert.equal((await handler.handle({ ...req("POST"), headers: { "X-Settings-Client": "1", "Content-Type": "text/plain" }, body: "1" })).status, 415);
+	assert.equal((await handler.handle({ ...req("POST"), body: "{" })).status, 400);
+	assert.equal((await handler.handle({ ...req("POST"), body: " ".repeat(65537) })).status, 413);
+	assert.equal((await handler.handle(req("PATCH"))).status, 405);
+	for (const path of ["Module/__proto__/x", "Module//key", "Module/%ZZ"]) assert.equal((await handler.handle(req("POST", path, 1))).status, 400);
+	assert.equal(reads, 0);
+	assert.equal(writes, 0);
+	writable = false;
+	assert.equal((await handler.handle(req("POST", undefined, 1))).status, 500);
+	assert.equal(store.size, 0);
 });
 
-test("unknown paths, type mismatch, old values envelopes and malformed input never write", () => {
-  const handle = createSettingsHandler(options);
-  assert.equal(handle(request("POST", "Unknown.path", 1)).status, 404);
-  for (const value of [null, false, 1, "unknown", { values: { Top_left: "mine" } }])
-    assert.equal(handle(request("POST", fields[0].key, value)).status, 400);
-  assert.equal(handle({ ...request("POST"), body: "mine" }).status, 400);
-  assert.equal(handle(request("POST")).status, 400);
-  assert.equal(handle({ ...request("POST"), body: "x".repeat(65537) }).status, 413);
-  assert.equal(handle({ ...request("POST"), url: "https://example.org/api/__proto__/polluted", body: "true" }).status, 400);
-  assert.equal(writes, 0);
-  assert.equal({}.polluted, undefined);
+test("installed root and module are required and never taken from browser headers", async () => {
+	for (const storageKey of [undefined, "", "@Root.Other"]) assert.throws(() => new SettingsHandler({ ...options, storageKey }));
+	assert.throws(() => new SettingsHandler({ ...options, module: "Other/path" }));
+	assert.throws(() => new SettingsHandler({ ...options, origin: "http://example.org" }));
+	const handler = new SettingsHandler(options);
+	await handler.handle({ ...req("POST", undefined, 9), headers: { ...req("POST").headers, storageKey: "OtherRoot" } });
+	assert.equal(store.has("OtherRoot"), false);
+	assert.equal(JSON.parse(store.get("Root")).Module.Settings.key, 9);
 });
 
-test("origin, marker and unsupported methods are enforced; non API URLs pass through", () => {
-  const handle = createSettingsHandler(options);
-  assert.equal(handle({ ...request(), url: "https://other.org/api/Enhanced/Settings/Home/Top_left" }), undefined);
-  assert.equal(handle({ ...request(), url: "https://example.org/settings/api/Enhanced" }), undefined);
-  assert.equal(handle({ ...request(), headers: {} }).status, 403);
-  assert.equal(handle({ ...request(), headers: { ...request().headers, Origin: "https://other.org" } }).status, 403);
-  assert.equal(handle(request("OPTIONS")).headers.Allow, "HEAD, GET, POST, DELETE");
-  assert.equal(
-    handle({ ...request("POST", fields[0].key, "mine"), headers: { ...request().headers, "Content-Type": "text/plain" } }).status,
-    415,
-  );
-});
-
-test("resolver supplies a full database, is GET-only and is recomputed", () => {
-  let count = 2;
-  const handle = createSettingsHandler({ ...options, resolveSettings: () => ({ Other: { preferences: { count } } }) });
-  assert.equal(handle(request("GET", fields[3].key)).body, "2");
-  count = 3;
-  assert.equal(handle(request("GET", fields[3].key)).body, "3");
-  const noResolve = createSettingsHandler({
-    ...options,
-    resolveSettings() {
-      throw Error("resolver failure");
-    },
-  });
-  assert.equal(noResolve(request("DELETE")).status, 204);
-  assert.throws(() => noResolve(request()), /resolver failure/);
-});
-
-test("missing values and backend failures remain explicit", () => {
-  const handle = createSettingsHandler(options);
-  assert.equal(handle(request("GET", fields[3].key)).status, 404);
-  writable = false;
-  assert.equal(handle(request("POST", fields[0].key, "mine")).status, 500);
-  assert.equal(handle(request("DELETE")).status, 500);
-  store.set("BiliBili", JSON.stringify({ Enhanced: { Settings: "broken" } }));
-  assert.throws(() => handle(request()), SyntaxError);
-});
-
-test("schema rejects overlapping or dangerous keys; arbitrary org/root shapes work", () => {
-  assert.throws(() => createSettingsHandler({ ...options, fields: [fields[0], fields[0]] }), /Overlapping/);
-  for (const key of ["__proto__.x", "A..B", "A/B", "A.constructor"])
-    assert.throws(() => createSettingsHandler({ ...options, fields: [{ key, name: key, type: "string" }] }), TypeError);
-  assert.throws(() => createSettingsHandler({ ...options, origin: "https://example.org/api" }), /origin/);
-  const handle = createSettingsHandler({
-    origin: "https://other.org",
-    storageKey: "DifferentRoot",
-    fields: [{ key: "preferences.volume", name: "Volume", type: "number" }],
-  });
-  assert.equal(handle({ ...request("POST", "preferences.volume", 5), url: "https://other.org/api/preferences/volume" }).status, 204);
-  assert.deepEqual(JSON.parse(store.get("DifferentRoot")), { preferences: { volume: 5 } });
+test("paths preserve decoding and reject unsafe segments", () => {
+	assert.deepEqual(parseSettingsPath("https://example.org/api/%4Dodule/Settings/key/"), ["Module", "Settings", "key"]);
+	for (const path of ["", "Module//", "Module/a%2fb", "Module/__proto__/x"]) assert.throws(() => parseSettingsPath("https://example.org/api/" + path));
 });

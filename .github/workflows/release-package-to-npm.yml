@@ -18,8 +18,11 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "24" }
       - run: npm ci --registry=https://registry.npmjs.org/ --@nsnanocat:registry=https://registry.npmjs.org/
+      - run: npx biome format --write package.json
       - run: npm run build
       - run: npm run check
+      - run: npm run apifox:check
+      - run: npm pack --dry-run
   publish:
     needs: build
     runs-on: ubuntu-latest
@@ -31,6 +34,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "24", registry-url: "https://registry.npmjs.org" }
       - run: npm ci --registry=https://registry.npmjs.org/ --@nsnanocat:registry=https://registry.npmjs.org/
+      - run: npx biome format --write package.json
       - run: npm run build
       - run: npm run check
       - name: Resolve npm dist-tag
@@ -44,3 +48,5 @@ jobs:
             echo "tag=latest" >> "$GITHUB_OUTPUT"
           fi
       - run: npm publish --registry=https://registry.npmjs.org/ --access public --tag "${{ steps.npm_tag.outputs.tag }}"
+        # 首发可使用 NPM_TOKEN；配置 Trusted Publisher 后删除该 secret，使用 OIDC。
+        env: { NODE_AUTH_TOKEN: "${{ secrets.NPM_TOKEN }}" }

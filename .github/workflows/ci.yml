@@ -1,9 +1,10 @@
-name: Validate Settings Package
+name: Validate PreferencePanes Package
 
 on:
   push:
     branches: [main, dev]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -18,5 +19,10 @@ jobs:
       - run: npm ci --registry=https://registry.npmjs.org/ --@nsnanocat:registry=https://registry.npmjs.org/
       - run: npm run build
       - run: npm run check
-      - run: node scripts/generate-apifox.mjs --check
-      - run: npm pack --dry-run
+      - run: npm run apifox:check
+      - run: npm pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: preference-panes-package
+          path: nsnanocat-preference-panes-*.tgz
+          if-no-files-found: error

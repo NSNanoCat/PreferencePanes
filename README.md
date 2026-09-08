@@ -1,72 +1,95 @@
 # @nsnanocat/preference-panes
 
-未发布的通用配置键值 API，基于 `@nsnanocat/util`。源码：[NSNanoCat/PreferencePanes](https://github.com/NSNanoCat/PreferencePanes)。
+通用 WebView 设置面板与代理持久化存储桥接。0.3.0 起，BoxJS 完全由前端解析；API 只按安装配置中的根和模块读写数据，不下载配置、不重复校验字段或枚举。
 
-## 路径就是数据层级
+## 目录
 
-```http
-POST /api/Enhanced/Settings/Home/Top_left
-Content-Type: application/json
-X-Settings-Client: 1
+| 目录 | 内容 |
+| --- | --- |
+| src/SettingsHandler.mjs | 模块存储桥接 class |
+| src/browser/ | WebView 控件、内存会话和样式 |
+| src/lib/ | 前端 BoxJS 与通用路径解析 |
+| src/proxy/ | 代理宿主打包入口 |
+| test/ | 类型与行为回归测试 |
+| examples/ | BoxJS、HTML 和 Surge 集成示例 |
+| apifox/ | 接口说明、原生 JSON 与生成器 |
+| .github/ | CI、双平台发布工作流 |
+| dist/ | 构建产物，不提交 Git |
 
-"mine"
-```
+Biome 与 NSNanoCat Util/FlatBufferRoot 对齐：tab、LF、320 列，保留统一 lint 规则。类型声明位于 src/index.d.ts 和 src/browser/index.d.ts，JSDoc 使用中英双语。
 
-这会写入 database 对应的 `Enhanced.Settings.Home.Top_left`。固定路径前缀只有 `/api/`，后续层级由调用方的数据结构决定。存储操作修改持久化对象，不修改源码 `database.mjs`。
+## 代理接口
 
-| 方法 | 请求正文 | 成功响应 |
-| --- | --- | --- |
-| HEAD | 无 | 200，无正文；表示该字段已声明，不读取存储 |
-| GET | 无 | 200，JSON 值本身；缺省且无默认值则 404 |
-| POST | JSON 值本身，如 `"mine"`、`false`、`0`、`[]` | 204，无正文；创建或修改单键 |
-| DELETE | 无，键由 URL 指定 | 204，无正文；删除覆盖值，幂等 |
+~~~js
+import { SettingsHandler } from "@nsnanocat/preference-panes";
 
-## 使用
-
-```js
-import { createSettingsHandler, parseSettingsPath } from "@nsnanocat/preference-panes";
-const handle = createSettingsHandler({
+const handler = new SettingsHandler({
   origin: "https://example.org",
-  storageKey: "BiliBili",
-  fields: [{ key: "Enhanced.Settings.Home.Top_left", name: "顶栏左侧", type: "string", defaultValue: "mine" }]
+  storageKey: "Root",
+  module: "Module"
 });
-const response = handle($request);
-// Surge/Loon 示例；其它平台继续使用现有 util done 适配。
-if (response) $done({ response });
-else $done({});
-```
+const response = await handler.handle($request);
+// 使用现有代理宿主的 done 适配。
+// Adapt the response with the existing proxy host's done function.
+~~~
 
-`parseSettingsPath(url)` 统一解析 URL，返回安全的键路径片段。`createSettingsHandler` 统一调用 util 的 Storage 和 Lodash.get/set/unset，fields 的所有选项共用同一读写逻辑。不包含域名、组织名、模块名或 Settings 层级常量。
+安装配置固定 Root.Module，浏览器不能通过 header 指定其它根。API 不接受 configURL、loadConfig 或 resolveSettings，也不依赖 BoxJS 是否可用。
 
-fields 使用完整 database 点路径，类型为 boolean/number/string/array，保留 argument config 的 name/defaultValue/options/description。路径必须唯一且不能父子重叠。schema 只授权单个声明键，未声明键返回 404；不开放任意整树写入。Origin 和页面专用 header 检查继续保留，但不是认证机制，也不放行跨域 OPTIONS。
+| 请求 | 行为 |
+| --- | --- |
+| HEAD /api/Module/… | 确认路由可达，不读取存储 |
+| GET /api/Module/Settings/key | 返回原值，缺失返回 404 |
+| POST /api/Module/Settings/key | 以任意 JSON 值替换该位置，成功 200 |
+| DELETE /api/Module/Settings/key | 删除键或子树，不存在也成功 |
+| GET /api/Module/Caches | 返回所有 Caches |
+| DELETE /api/Module/Caches | 清空缓存，保留 Settings |
+| DELETE /api/Module/ | 重置模块全部数据，保留 Root 下其它模块 |
 
-`resolveSettings(stored)` 可在 GET 时返回完整的有效 database 对象，处理存储/参数/默认值优先级；不传时读取持久化对象。它不在 HEAD/POST/DELETE 时执行，不改变参数优先级。POST 只保存一个明确值，DELETE 只删除一个覆盖值，保留同级字段和缓存。中间 util 序列化的 JSON 对象会解码后继续遍历，错误不静默吞掉。
+POST 正文就是值本身，允许对象、数组、null、字符串、数字或布尔值。不存在于 BoxJS 中的键也允许读写。使用 util Storage/Lodash 做根对象读改写，保留同级数据；每次 GET 读一次根，POST/DELETE 读一次再写一次，不发网络请求。仍检查模块归属、路径格式、请求来源、JSON 语法和正文大小；不做 BoxJS 业务校验。
 
-## Apifox
+## WebView
 
-项目：[Preference Panes](https://app.apifox.com/project/8803052)，GitHub main/dev 分别绑定 Apifox 同名分支。
+~~~js
+import { mountPreferencePanes } from "@nsnanocat/preference-panes/browser";
+import "@nsnanocat/preference-panes/browser/panel.css";
 
-- [通俗说明及四种操作示例](apifox/guide.md)
-- [Apifox 原生 JSON](apifox/preference-panes.apifox.json)
-- [数据源绑定记录](apifox/sync.md)
+const panel = mountPreferencePanes({ element: document.querySelector("#preferences") });
+// 卸载时调用 panel.destroy()。
+// Call panel.destroy() when unmounting.
+~~~
 
-示例域名 `example.org` 没有部署服务。Apifox 展示一个具体叶子键的完整路径，实际可用路径由调用方 fields 决定；更改本包不意味着已发布的 Biliverse 插件自动支持新契约。
+同一份 HTML 从 /settings/{module} 读取模块名，再 GET /configs/{module} 取得 BoxJS 并生成控件。配置源地址写在模块的 Mock 规则中，不写入页面 query 参数或 API。
 
-## 开发
+每次进入主菜单仅并发 HEAD 各配置 Mock。打开、再次进入或刷新模块页，各 GET 一次 BoxJS 与设置子树；404 的设置子树按无覆盖值处理。保存/删除根据 HTTP 200 更新页面缓存并显示通知，不追加 GET。
 
-```sh
+模块页底部提供查看/刷新 Caches、清空 Caches 和重置模块。查看缓存按需 GET；清空和重置经确认后 DELETE，成功只更新本页状态。重置后控件显示当前 BoxJS 默认值，再次进入页面才重新读取。模块选择、设置值校验和默认值处理都在前端完成。
+
+业务主菜单由调用项目维护，Biliverse 的入口和四个模块按钮归 Enhanced。未提供对应配置 Mock 的插件入口保持禁用。
+
+## BoxJS 兼容
+
+前端接受字段数组、单 app 和 apps 订阅。字段 ID 为 @根.模块.子路径.键；模块归属来自字段 ID，不能用 app 名称推断。
+
+- name/val/type/desc/items：控件标题、默认值、类型、说明和选项。
+- boolean/selects/checkboxes/text/textarea/number：支持的控件类型。
+- placeholder/rows/autoGrow：输入提示、多行基础行数和自动高度。
+- app name/author/desc/descs/repo：纯文本标题、作者、说明和项目链接。
+- icon/icons：显式图标优先，原版 icons 为透明/彩色顺序，不是亮暗顺序。
+- script：仅保留元数据，不下载或执行。
+
+不执行 BoxJS HTML、脚本、动态字符串 items，不通过 keys 推导额外字段。WebView 使用原生网络与对象访问，不打入 util 的网络、存储或 Lodash polyfill。代理安装的 storageKey/module 应由接入方与 BoxJS 路径保持一致。
+
+## 构建与发布
+
+~~~sh
 npm ci --registry=https://registry.npmjs.org/ --@nsnanocat:registry=https://registry.npmjs.org/
 npm run build
 npm run check
 npm run apifox:generate
-node scripts/generate-apifox.mjs --check
+npm run apifox:check
 npm pack --dry-run
-```
+~~~
 
-纯 ESM 与 TypeScript 声明。Node 使用 util 文件存储条件导出，代理脚本用 Rollup 等工具选择默认/import 条件打包。检查包括路径解析、各类型值、嵌套键和 util 序列化对象、数据隔离、GET resolver、HEAD 无存储访问、删除幂等、Node 和 Quantumult X 存储后端。
+构建生成 dist/preference-panes.mjs 和 dist/preference-panes.request.js；公开 import 路径由 exports 保持稳定。0.3.0 的安装参数替换 0.2.0 的 configURL，HTTP 读写从声明字段变为模块内的任意数据，是一次契约升级。
 
-## 发布边界
-
-普通 main/dev push 只运行 CI，不发布包。两个 `v*` tag workflow 分别发布 npm 和 GitHub Packages：先构建、lint/typecheck/test；稳定版 latest，预发布用 beta/alpha 等 dist-tag。两端显式指定 registry，npm 用 OIDC、GitHub Packages 用发布步骤的 GITHUB_TOKEN。
-
-尚未创建版本 tag、npm 包或 GitHub Package，也未接入 Biliverse。首次包发布和 Trusted Publisher 配置仍待用户评审确认。参考：[npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/)、[GitHub npm registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-npm-registry)。
+[完整接口说明](apifox/guide.md) · [Apifox JSON](apifox/preference-panes.apifox.json) · [同步方式](apifox/README.md) · [发布工作流](.github/RELEASING.md)
