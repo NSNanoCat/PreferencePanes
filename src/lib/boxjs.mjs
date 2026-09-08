@@ -9,7 +9,19 @@ import { parseSettingsPath } from "./settings-path.mjs";
  */
 export function normalizeBoxJs(config, module) {
   parseSettingsPath(`https://example.invalid/api/${module}`);
-  const entries = Array.isArray(config) ? config : config?.apps ? config.apps.flatMap((app) => app.settings ?? []) : config?.settings;
+  const apps = Array.isArray(config) ? [] : (config?.apps ?? [config]);
+  if (!Array.isArray(apps)) throw new TypeError("Expected BoxJS apps array");
+  for (const candidate of apps) {
+    if (!candidate || typeof candidate !== "object") throw new TypeError("Expected BoxJS app object");
+    if (candidate.settings !== undefined && !Array.isArray(candidate.settings)) throw new TypeError("Expected BoxJS settings array");
+  }
+  const owners = apps.filter((candidate) =>
+    candidate.settings?.some(
+      (entry) => typeof entry.id === "string" && entry.id.startsWith("@") && entry.id.slice(1).split(".")[1] === module,
+    ),
+  );
+  const entries = Array.isArray(config) ? config : owners.flatMap((candidate) => candidate.settings);
+  const app = owners.length === 1 ? owners[0] : undefined;
   if (!Array.isArray(entries)) throw new TypeError("Expected BoxJS settings array, app or subscription");
   let storageKey;
   const fields = [];
@@ -30,6 +42,10 @@ export function normalizeBoxJs(config, module) {
       name: entry.name,
       type: type === "select" ? typeof entry.val : type,
       description: entry.desc ?? "",
+      control: entry.type,
+      ...(entry.placeholder === undefined ? {} : { placeholder: entry.placeholder }),
+      ...(entry.rows === undefined ? {} : { rows: entry.rows }),
+      ...(entry.autoGrow === undefined ? {} : { autoGrow: entry.autoGrow }),
     };
     if (type === "select" && !["string", "number", "boolean"].includes(field.type))
       throw new TypeError(`Select requires a scalar val: ${entry.id}`);
@@ -37,6 +53,9 @@ export function normalizeBoxJs(config, module) {
     if (Object.hasOwn(entry, "val")) field.defaultValue = normalizeStoredValue(field, entry.val);
     if (
       typeof field.name !== "string" ||
+      (field.placeholder !== undefined && typeof field.placeholder !== "string") ||
+      (field.rows !== undefined && (!Number.isInteger(field.rows) || field.rows < 1)) ||
+      (field.autoGrow !== undefined && typeof field.autoGrow !== "boolean") ||
       fields.some((other) => other.key === field.key || other.key.startsWith(`${field.key}.`) || field.key.startsWith(`${other.key}.`))
     )
       throw new TypeError(`Invalid or overlapping BoxJS field: ${entry.id}`);
@@ -53,7 +72,26 @@ export function normalizeBoxJs(config, module) {
   if (!fields.length) throw new TypeError(`No BoxJS settings for module: ${module}`);
   const common = fields[0].key.split(".").slice(0, -1);
   for (const field of fields) while (!field.key.startsWith(`${common.join(".")}.`)) common.pop();
-  return { module, storageKey, fields, settingsPath: common };
+  const metadata = {};
+  if (app) {
+    for (const key of ["id", "name", "author", "repo", "script", "icon", "description", "desc"]) {
+      if (app[key] === undefined) continue;
+      if (typeof app[key] !== "string") throw new TypeError(`Invalid BoxJS app ${key}`);
+      metadata[key] = app[key];
+    }
+    for (const key of ["icons", "descs"]) {
+      if (app[key] === undefined) continue;
+      if (!Array.isArray(app[key]) || app[key].some((item) => typeof item !== "string")) throw new TypeError(`Invalid BoxJS app ${key}`);
+      metadata[key] = [...app[key]];
+    }
+  }
+  return {
+    module,
+    storageKey,
+    fields,
+    settingsPath: common,
+    ...(Object.keys(metadata).length ? { metadata } : {}),
+  };
 }
 
 /**

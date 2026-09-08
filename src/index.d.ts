@@ -8,6 +8,10 @@ interface FieldBase {
   key: string;
   name: string;
   description?: string;
+  control?: "boolean" | "checkboxes" | "selects" | "text" | "textarea" | "number";
+  placeholder?: string;
+  rows?: number;
+  autoGrow?: boolean;
 }
 /** 对齐 argument 配置字段 / Argument-compatible field. */
 export type SettingsField = FieldBase &
@@ -45,6 +49,19 @@ export interface ModuleDefinition {
   storageKey: string;
   fields: SettingsField[];
   settingsPath: string[];
+  metadata?: {
+    id?: string;
+    name?: string;
+    author?: string;
+    repo?: string;
+    /** 仅保留来源信息，不执行脚本 / Source metadata only; never executed. */
+    script?: string;
+    icon?: string;
+    icons?: string[];
+    descs?: string[];
+    description?: string;
+    desc?: string;
+  };
 }
 export function normalizeBoxJs(config: unknown, module: string): ModuleDefinition;
 export class SettingsHandler {
