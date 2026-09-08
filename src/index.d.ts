@@ -85,6 +85,29 @@ export interface SettingsHandlerOptions {
 	requestHeader?: string;
 }
 /**
+ * 原生 Mock 的等价资源映射，支持不具备该语法的代理。
+ * Equivalent resource mapping for proxies lacking native Mock syntax.
+ */
+export interface PreferencesHandlerOptions extends SettingsHandlerOptions {
+	/** 按 pathname 匹配，不匹配下载源自身 / Match pathnames without intercepting the download source itself. */
+	resources: Array<{
+		/** 锚定的 pathname 正则 / Anchored pathname regular expression. */
+		pattern: string;
+		/** HTTPS 下载源 / HTTPS resource source. */
+		source: string;
+		/** 响应媒体类型 / Response media type. */
+		contentType: string;
+	}>;
+}
+/**
+ * 通用安装入口；API 保持无网络读写，静态请求才下载资源。
+ * Generic installation entry; APIs remain network-free and only static requests download resources.
+ */
+export class PreferencesHandler extends SettingsHandler {
+	/** @param options 安装 JSON 配置 / Installation JSON configuration. */
+	constructor(options: PreferencesHandlerOptions);
+}
+/**
  * 属于单个模块的字段、存储根及可选展示元数据。
  * Fields, storage root and optional display metadata belonging to one module.
  */

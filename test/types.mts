@@ -1,5 +1,5 @@
 import type { SettingsField, SettingsHandlerOptions } from "@nsnanocat/preference-panes";
-import { normalizeBoxJs, SettingsHandler } from "@nsnanocat/preference-panes";
+import { normalizeBoxJs, PreferencesHandler, SettingsHandler } from "@nsnanocat/preference-panes";
 import type { Notification, PreferencesPanel } from "@nsnanocat/preference-panes/browser";
 
 const definition = normalizeBoxJs([], "Module");
@@ -26,6 +26,8 @@ mountPreferencePanes({ element: document.body }).destroy();
 // Fields stay constrained in the frontend; the proxy receives only an installed storage mapping.
 const options: SettingsHandlerOptions = { origin: "https://example.org", storageKey: "Root", module: "Module" };
 void options;
+const resourceHandler: SettingsHandler = new PreferencesHandler({ ...options, resources: [{ pattern: "^/configs/Module$", source: "https://example.org/assets/module.json", contentType: "application/json" }] });
+await resourceHandler.handle({ url: "https://example.org/configs/Module", method: "HEAD" });
 const field: SettingsField = { key: "Module.Settings.notes", name: "Notes", type: "string", control: "textarea", rows: 3, autoGrow: true, placeholder: "Notes", defaultValue: "" };
 void field;
 const panel: PreferencesPanel = mountPreferencePanes({ element: document.body });
