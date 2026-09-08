@@ -286,7 +286,7 @@ const document = {
   $schema: { app: "apifox", type: "project", version: "1.2.0" },
   info: {
     name: "Preference Panes",
-    description: "运行时 BoxJS、模块探测、页面初次读取与单键读写（包未发布）",
+    description: "运行时 BoxJS、模块探测、页面初次读取与单键读写（0.2.0）",
     mockRule: { rules: [], enableSystemRule: true },
   },
   projectSetting: {

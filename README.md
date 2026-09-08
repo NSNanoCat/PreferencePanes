@@ -1,6 +1,6 @@
 # @nsnanocat/preference-panes
 
-通用设置面板和代理存储 API，基于 `@nsnanocat/util`，首版 `0.1.0` 已发布到 npm 和 GitHub Packages。字段直接来自运行时加载的 BoxJS JSON，页面、缓存与读写逻辑不包含具体项目的选项。
+通用设置面板和代理存储 API，基于 `@nsnanocat/util`，当前版本 `0.2.0` 已发布到 npm 和 GitHub Packages。字段直接来自运行时加载的 BoxJS JSON，页面、缓存与读写逻辑不包含具体项目的选项。
 
 ## 目录结构
 
@@ -87,7 +87,7 @@ const response = await handler.handle($request);
 
 `SettingsHandler` 自身使用 util `fetch` 下载 configURL，要求 HTTP 200、解析 JSON 并按 URL 中的模块归一化 BoxJS。下载、HTTP 状态、JSON 或配置错误返回 502，不读取存储；HEAD 只加载配置验证声明，不读取存储。类不缓存配置，各次 handle 请求加载一次；浏览器仍按页面会话缓存设置。configURL 可指向单模块配置或包含多个模块的 BoxJS 订阅，字段所属模块由 `/api/` 后第一段选择。
 
-此 class API 属于 dev 中的下一版变更，替换 0.1.0 的 `createSettingsHandler({ loadConfig })` 工厂；已发布的 0.1.0 尚不导出 SettingsHandler。接入方只需构造实例并调用 handle，不再自行实现配置请求。
+此 class API 自 0.2.0 起替换 0.1.0 的 `createSettingsHandler({ loadConfig })` 工厂。接入方只需构造实例并调用 handle，不再自行实现配置请求。
 
 持久化 GET 调用一次 util `Storage.getItem`；POST/DELETE 在写入前重新读取最新根对象，再用 util `Lodash.set/unset` 修改单键并 `Storage.setItem` 写回，保留其它模块、隐藏字段和缓存。这是代理端必要的读改写，浏览器不会因此重新 GET 整个模块。多个独立脚本上下文同时写同一根键仍受代理存储无事务能力的限制。
 
@@ -110,7 +110,7 @@ const response = await handler.handle($request);
 
 原版 `icons` 表示透明/彩色变体，不是亮暗模式顺序。显示名称和说明使用纯文本。一个模块的字段来自唯一 app 时，才采用该 app 的元数据；多个 app 合并声明同一模块时不任意选取其中一个的元数据。app 的 id/name 不决定模块归属，始终由字段 ID 选择；因此订阅里无关应用的旧扁平 ID 不会参与该模块渲染。
 
-`keys`、脚本执行、`desc_html`/`descs_html`、动态字符串形式的 `items` 及 slider/radios/modalSelects/colorpicker 不属于当前支持范围。不会给旧扁平 ID 猜测存储根；本地读写仍由现有 util Storage/Lodash 完成，不引入原版 Env 的另一套存储实现。这些兼容增强位于 dev，尚未发布。
+`keys`、脚本执行、`desc_html`/`descs_html`、动态字符串形式的 `items` 及 slider/radios/modalSelects/colorpicker 不属于当前支持范围。不会给旧扁平 ID 猜测存储根；本地读写仍由现有 util Storage/Lodash 完成，不引入原版 Env 的另一套存储实现。这些兼容增强已包含在 0.2.0 中。
 
 设置 ID 必须为 `@存储根.模块.子路径.键`。同一模块使用一个存储根，字段路径不得重复或父子重叠。为了用一次 GET 获取设置，字段必须具有模块根以下的公共父路径，例如 `Enhanced.Settings` 或 `Weather.Preferences`；公共路径自动计算，不固定为 Settings。不满足条件或遇到不支持的控件会报错。
 

@@ -1,6 +1,6 @@
 # PreferencePanes：从入口探测到单键读写
 
-已发布版本为 0.1.0；本文中的 SettingsHandler class 和 BoxJS 元数据兼容增强为尚未发布的 dev 契约。下面的 Enhanced 只是路径示例，example.org 没有部署接口；各项目复用相同代码，从自己的 BoxJS JSON 生成设置界面。
+当前已发布版本为 0.2.0，包含 SettingsHandler class 和 BoxJS 元数据兼容增强。下面的 Enhanced 只是路径示例，example.org 没有部署接口；各项目复用相同代码，从自己的 BoxJS JSON 生成设置界面。
 
 ## 通用路径契约
 
@@ -41,7 +41,7 @@ module 必须与 BoxJS ID `@BiliBili.Enhanced.Settings.…` 中的 Enhanced 一�
 
 配置资源使用 `/configs/`，持久化接口使用 `/api/`，两种模板正则互不重叠，不依赖执行优先级。各业务项目用现有 argument config 生成器生成 BoxJS JSON。模块的 Mock 规则引用生成文件的下载源；通用读写脚本参数 configURL 引用同一版本资源进行校验。configURL 是代理脚本的模板参数，不是页面参数；页面仅用 module 按约定寻找配置 Mock。
 
-业务主菜单独立于通用设置页，由调用项目提供模块链接；Biliverse 主菜单归 Enhanced。HTML 和通用 JS 不包含 Enhanced/Global 等目录或字段，本仓库尚未迁移 Biliverse。
+业务主菜单独立于通用设置页，由调用项目提供模块链接；Biliverse 主菜单归 Enhanced。通用 JS 不包含 Enhanced/Global 等目录或字段，Enhanced 已通过包的公开接口接入。
 
 ## 一、主菜单只探测配置 Mock
 
@@ -152,7 +152,7 @@ icon 优先于 icons；原版 icons[0] 是透明版，icons[1] 是彩色版，�
 
 独立打包脚本通过 argument 的 origin/configURL 接收地址，用 util fetch 下载 BoxJS，用 util Storage/Lodash 读写。不同模块引用同一份脚本，分别配置自己的 /api/ 正则与校验 BoxJS 地址；/configs/ Mock 不经过此脚本。原生配置 Mock 与脚本应使用同一版本的配置源；代理自己的 Mock 资源缓存需要按代理机制更新。
 
-dev 中的代理调用方式为 `new SettingsHandler({ origin, configURL }).handle(request)`。配置下载、HTTP 200 检查、JSON 解析及字段归一化均由这个 class 完成，调用方不再提供 loadConfig 回调。网络异常、非 200、非法 JSON 或模块配置解析失败统一返回 502；不会继续读写持久化存储。此类 API 将随下一版发布，0.1.0 仍使用旧工厂函数；HTTP 路径、方法和返回契约不变。
+0.2.0 的代理调用方式为 `new SettingsHandler({ origin, configURL }).handle(request)`。配置下载、HTTP 200 检查、JSON 解析及字段归一化均由这个 class 完成，调用方不再提供 loadConfig 回调。网络异常、非 200、非法 JSON 或模块配置解析失败统一返回 502；不会继续读写持久化存储。0.1.0 使用旧工厂函数；HTTP 路径、方法和返回契约不变。
 
 每次 GET 持久化设置读根一次。每次 POST/DELETE 写入前重新读根，再单键修改、写回一次。浏览器缓存不触发额外 GET，但不能取消代理端保证保留其它数据所需的读改写。不同代理脚本同时写同一根键不具备事务隔离保证。
 

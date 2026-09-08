@@ -1,5 +1,7 @@
 # 发布 PreferencePanes
 
+当前版本为 `0.2.0`，已通过 npm 与 GitHub Packages 工作流发布。此版本使用 `SettingsHandler` class 替换旧工厂函数，新增 BoxJS 元数据展示与自适应多行输入；HTTP 契约不变。
+
 首版沿用 package.json 的 `0.1.0`，发布标签为 `v0.1.0`。包名为 `@nsnanocat/preference-panes`，与 NSNanoCat 其它 package 一样全部小写。
 
 `0.1.0` 已于 2026-09-08 通过两个发布工作流完成首发。npm 和 GitHub Packages tarball 的 SHA-1 均为 `58f0ed3b056936a5e90b3406b802640ddca67c91`。npm 首发使用仓库 secret `NPM_TOKEN`；Trusted Publisher 尚待配置，因此暂时保留该 secret。
