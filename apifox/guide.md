@@ -136,6 +136,8 @@ X-Settings-Client: 1
 
 ### BoxJS 页面属性
 
+本地 dev 优化：WebView 使用原生对象访问，不再打包 util Lodash。代理每次仍从自己的 configURL 下载配置并校验字段，只提取存储根、字段路径、类型、默认值和枚举约束；不处理标题、描述、图标、占位文字、rows/autoGrow 等展示属性。展示属性由 WebView 校验，非法展示属性不会影响默认代理对合法字段的访问。自定义 GET resolver 仍收到完整 ModuleDefinition，保留其既有契约。HTTP 路径、状态码、访问范围与存储读写次数不变，未取消代理端配置请求。
+
 配置可以是 settings 数组、单个 app 或 apps 订阅。字段的 name/val/type/desc/items 决定控件，placeholder 设置输入提示；textarea 保持字符串类型，rows 为正整数基础行数，autoGrow 为布尔值。首次显示、输入及删除覆盖值后都会按内容调整高度。
 
 如果模块字段只属于一个 app，definition.metadata 保留它的 id/name/author/repo/script/icon/icons/desc/descs/description。页面使用 name 作为显示标题，author/desc/descs 作为纯文本，repo 作为项目链接。模块路由和存储根仍由字段的 @根.模块.路径 决定，不能由 app.id/name 推断。多个 app 分别声明同一模块的字段时合并字段，不任意选择一个 app 的展示元数据。

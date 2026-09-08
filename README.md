@@ -87,6 +87,10 @@ const response = await handler.handle($request);
 
 `SettingsHandler` 自身使用 util `fetch` 下载 configURL，要求 HTTP 200、解析 JSON 并按 URL 中的模块归一化 BoxJS。下载、HTTP 状态、JSON 或配置错误返回 502，不读取存储；HEAD 只加载配置验证声明，不读取存储。类不缓存配置，各次 handle 请求加载一次；浏览器仍按页面会话缓存设置。configURL 可指向单模块配置或包含多个模块的 BoxJS 订阅，字段所属模块由 `/api/` 后第一段选择。
 
+WebView 使用原生 fetch、JSON 和逐段对象访问，浏览器包不包含 util 的 Lodash、存储或网络 polyfill。默认代理请求只解析存储根、字段路径、值类型、默认值及选项约束，不读取名称、标签、图标或行数等展示属性；这些属性由浏览器校验和绘制。声明字段范围、类型校验和存储读改写仍保留在代理端，不信任前端传来的存储根或字段清单。
+
+自定义 GET `resolveSettings` 仍接收完整 `ModuleDefinition`，仅该兼容分支会在代理端解析展示信息；其余请求使用精简定义。纯展示属性错误会使页面配置加载失败，但不会阻止默认代理对合法存储字段的访问。此优化位于本地 dev，尚未发布。
+
 此 class API 自 0.2.0 起替换 0.1.0 的 `createSettingsHandler({ loadConfig })` 工厂。接入方只需构造实例并调用 handle，不再自行实现配置请求。
 
 持久化 GET 调用一次 util `Storage.getItem`；POST/DELETE 在写入前重新读取最新根对象，再用 util `Lodash.set/unset` 修改单键并 `Storage.setItem` 写回，保留其它模块、隐藏字段和缓存。这是代理端必要的读改写，浏览器不会因此重新 GET 整个模块。多个独立脚本上下文同时写同一根键仍受代理存储无事务能力的限制。
