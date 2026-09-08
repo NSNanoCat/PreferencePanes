@@ -3,7 +3,6 @@ import test from "node:test";
 import vm from "node:vm";
 import { rollup } from "rollup";
 import builds from "../rollup.config.mjs";
-import { config } from "./fixtures/module.mjs";
 
 const bundle = await rollup(builds[1]);
 const { output } = await bundle.generate(builds[1].output);
@@ -14,15 +13,14 @@ for (const platform of ["surge", "quantumult"]) {
 	test(`${platform}: standalone bundle works without browser globals and preserves persistence siblings`, async () => {
 		const store = new Map([["Example", JSON.stringify({ Other: { secret: 7 } })]]);
 		let reads = 0,
-			requests = 0,
-			sourceStatus = 200;
+			requests = 0;
 		const run = (method, path = "Module/Settings/count", body) =>
 			new Promise(resolve => {
 				const context = {
 					setTimeout: (callback, delay) => setTimeout(callback, delay).unref(),
 					clearTimeout,
 					console: { log() {}, error() {} },
-					$argument: "origin=https://example.org&configURL=https://assets.example.org/Module.boxjs.json",
+					$argument: "origin=https://example.org&storageKey=Example&module=Module",
 					$request: {
 						method,
 						url: path.startsWith("/") ? `https://example.org${path}` : `https://example.org/api/${path}`,
@@ -40,10 +38,9 @@ for (const platform of ["surge", "quantumult"]) {
 					store.set(key, value);
 					return true;
 				};
-				const fetch = request => {
-					assert.equal(request.url, "https://assets.example.org/Module.boxjs.json");
+				const fetch = () => {
 					requests++;
-					return { status: sourceStatus, statusCode: sourceStatus, headers: {}, body: JSON.stringify(config) };
+					throw new Error("No network access allowed for storage API");
 				};
 				if (platform === "surge") {
 					context.$environment = { "surge-version": "test" };
@@ -75,17 +72,19 @@ for (const platform of ["surge", "quantumult"]) {
 		response = unwrap(await run("DELETE"));
 		assert.equal(status(response), 200, response.body);
 		assert.equal(JSON.parse(store.get("Example")).Module.Settings.count, undefined);
-		sourceStatus = 503;
-		const previousReads = reads;
 		response = unwrap(await run("POST", undefined, "10"));
-		assert.equal(status(response), 502);
-		assert.equal(reads, previousReads);
+		assert.equal(status(response), 200);
+		response = unwrap(await run("DELETE", "Module/"));
+		assert.equal(status(response), 200);
+		assert.deepEqual(JSON.parse(store.get("Example")), { Other: { secret: 7 } });
+		assert.equal(requests, 0);
 	});
 }
 
 test("bundles contain no Node imports or compiled-in module fields", () => {
 	assert.doesNotMatch(code, /node:fs|node-fetch|require\(/);
 	assert.doesNotMatch(code, /@Example\.Module|BiliBili|Enhanced\.Settings/);
+	assert.doesNotMatch(code, /normalizeBoxJs|parseBoxJs|configURL|BoxJS source HTTP/);
 });
 
 test("browser bundle contains no proxy polyfills or third-party dependencies", async () => {

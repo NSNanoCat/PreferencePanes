@@ -71,26 +71,18 @@ export interface SettingsResponse {
 	body: string;
 }
 /**
- * 同步解析有效设置，返回包含模块层级的完整存储根对象。
- * Resolve effective settings synchronously into a complete root object including the module level.
- * @param stored 当前根对象 / Current stored root.
- * @param definition 运行时配置 / Runtime module definition.
- * @returns 有效根对象，不返回 Promise / Effective root object, never a Promise.
- */
-export type SettingsResolver = (stored: Record<string, unknown>, definition: ModuleDefinition) => Record<string, unknown>;
-/**
- * 通用代理处理器的来源、配置下载和 GET 解析选项。
- * Origin, configuration download and GET resolution options for the proxy handler.
+ * 由插件安装配置提供的固定存储映射，不接受浏览器指定存储根。
+ * Fixed storage mapping provided by plugin installation, never a browser-selected root.
  */
 export interface SettingsHandlerOptions {
 	/** 接管 /api/ 路径的 HTTPS 来源 / HTTPS origin serving /api/ paths. */
 	origin: string;
-	/** BoxJS JSON 的 HTTPS 下载地址；类内部使用 util fetch 加载 / HTTPS BoxJS source fetched by the class through util. */
-	configURL: string;
+	/** 顶层持久化键，不能使用 @ 路径语法 / Literal top-level storage key, without @ path syntax. */
+	storageKey: string;
+	/** /api/ 后的模块段，只能访问该模块内的数据 / Module segment following /api/; access stays within this module. */
+	module: string;
 	/** 默认 X-Settings-Client，值必须为 1；不是认证凭据 / Defaults to X-Settings-Client with value 1; not an authentication credential. */
 	requestHeader?: string;
-	/** 仅 GET 调用；不传则直接读取持久化覆盖值 / Called only for GET; omitted means reading persisted overrides directly. */
-	resolveSettings?: SettingsResolver;
 }
 /**
  * 属于单个模块的字段、存储根及可选展示元数据。
@@ -139,23 +131,23 @@ export interface ModuleDefinition {
  */
 export function normalizeBoxJs(config: unknown, module: string): ModuleDefinition;
 /**
- * 通过 util 下载 BoxJS 并按声明字段读写代理持久化存储。
- * Download BoxJS through util and access proxy persistence only for declared fields.
+ * 使用 util 桥接指定模块的持久化存储，不下载或校验 BoxJS。
+ * Bridge module persistence through util without downloading or validating BoxJS.
  */
 export class SettingsHandler {
 	/**
 	 * 创建实例，不发送请求或读取存储。
 	 * Construct an instance without network requests or storage reads.
-	 * @param options 来源、配置源与 GET 解析器 / Origin, config source and GET resolver.
-	 * @throws {TypeError} 来源、配置 URL 或头名称无效 / Invalid origin, config URL or header name.
+	 * @param options 来源、存储根与模块 / Origin, storage root and module.
+	 * @throws {TypeError} 来源、存储根、模块或头名称无效 / Invalid origin, storage root, module or header name.
 	 */
 	constructor(options: SettingsHandlerOptions);
 	/**
-	 * 每次请求加载配置；HEAD 不读存储，POST/DELETE 读改写一次。
-	 * Load config per request; HEAD avoids storage and POST/DELETE perform one read-modify-write.
+	 * HEAD 不读存储；GET 返回任意指定值，POST/DELETE 对键或子树读改写一次。
+	 * HEAD avoids storage; GET returns any requested value, and POST/DELETE mutate a key or subtree in one read-modify-write.
 	 * @param request 代理请求 / Proxy request.
 	 * @returns HTTP 响应；非目标来源或非 API 路径返回 undefined / HTTP response, or undefined outside the configured API origin and path.
-	 * @throws {Error} 请求 URL、存储对象或自定义 resolver 执行错误；配置加载失败返回 502 / Invalid request URL, storage object or custom resolver failure; config download failures return 502.
+	 * @throws {Error} 请求 URL 无效；存储失败以 HTTP 500 返回 / Invalid request URL; storage failures return HTTP 500.
 	 */
 	handle(request: SettingsRequest): Promise<SettingsResponse | undefined>;
 }

@@ -1,50 +1,45 @@
 import { URL } from "@nsnanocat/url";
-import { fetch } from "@nsnanocat/util/polyfill/fetch";
 import { Lodash as _ } from "@nsnanocat/util/polyfill/Lodash.mjs";
 import { Storage } from "@nsnanocat/util/polyfill/Storage";
-import { parseBoxJs, validValue } from "./lib/boxjs.mjs";
-import { parseSettingsPathname } from "./lib/settings-path.mjs";
+import { parseSettingsPathname, validatePathParts } from "./lib/settings-path.mjs";
 
 /**
- * 使用 util 下载 BoxJS、校验字段并读写持久化存储。
- * Download BoxJS through util, validate fields and handle persistent storage.
- * 默认仅提取存储约束；自定义 GET resolver 保留完整模块定义。
- * Extract storage constraints by default; custom GET resolvers retain the full module definition.
+ * 按插件声明的根和模块桥接持久化存储，不下载或解析 BoxJS。
+ * Bridge persistence within the installed root and module without downloading or parsing BoxJS.
  */
 export class SettingsHandler {
 	/** @type {string} 接管来源 / Handled origin. */
 	#origin;
-	/** @type {string} BoxJS 下载地址 / BoxJS download URL. */
-	#configURL;
+	/** @type {string} 安装配置中的存储根 / Storage root from installation config. */
+	#storageKey;
+	/** @type {string} 安装配置中的模块 / Module from installation config. */
+	#module;
 	/** @type {string} 页面标记头 / Page marker header. */
 	#requestHeader;
-	/** @type {import("./index.js").SettingsResolver | undefined} 同步 GET 解析器 / Synchronous GET resolver. */
-	#resolveSettings;
 
 	/**
-	 * 校验来源与配置地址，构造时不发出网络请求。
-	 * Validate origin and config URL without network requests during construction.
-	 * @param {import("./index.js").SettingsHandlerOptions} options 来源、配置地址与 GET 解析器 / Origin, config source and GET resolver.
-	 * @throws {TypeError} 地址或标记头不符合契约 / URLs or marker header do not satisfy the contract.
+	 * 固定来源、存储根和模块，构造时不访问网络或存储。
+	 * Fix the origin, storage root and module without network or storage access at construction.
+	 * @param {import("./index.js").SettingsHandlerOptions} options 插件安装配置 / Plugin installation config.
+	 * @throws {TypeError} 安装配置无效 / Invalid installation config.
 	 */
-	constructor({ origin, configURL, requestHeader = "X-Settings-Client", resolveSettings }) {
+	constructor({ origin, storageKey, module, requestHeader = "X-Settings-Client" }) {
 		const target = new URL(origin);
 		if (target.protocol !== "https:" || target.pathname !== "/" || target.search || target.hash || target.username || target.password) throw new TypeError("origin must be an HTTPS origin");
-		const source = new URL(configURL);
-		if (source.protocol !== "https:" || source.username || source.password || source.hash) throw new TypeError("configURL must be an HTTPS URL without credentials or fragment");
+		if (typeof storageKey !== "string" || !storageKey || storageKey.startsWith("@")) throw new TypeError("storageKey must be a literal root key");
+		validatePathParts([module]);
 		if (!/^[a-z][a-z0-9-]*$/i.test(requestHeader)) throw new TypeError("Invalid requestHeader");
 		this.#origin = target.origin;
-		this.#configURL = source.href;
+		this.#storageKey = storageKey;
+		this.#module = module;
 		this.#requestHeader = requestHeader;
-		this.#resolveSettings = resolveSettings;
 	}
 
 	/**
-	 * 按方法处理已声明路径，每次加载配置，写入前读取最新存储根。
-	 * Dispatch declared paths by method, loading config per request and reading the latest root before mutations.
+	 * GET 返回指定值，POST 替换指定值，DELETE 删除指定键或整个模块。
+	 * GET returns a value, POST replaces it, and DELETE removes a key or the entire module.
 	 * @param {import("./index.js").SettingsRequest} request 代理请求 / Proxy request.
-	 * @returns {Promise<import("./index.js").SettingsResponse | undefined>} API 响应，非本来源 API 则不处理 / API response, or undefined outside the configured API origin.
-	 * @throws {Error} 非配置类执行错误交给代理入口处理 / Execution errors other than config failures propagate to the proxy entry.
+	 * @returns {Promise<import("./index.js").SettingsResponse | undefined>} 响应或非接管请求 / Response, or undefined for an unhandled request.
 	 */
 	async handle(request) {
 		const url = new URL(request.url);
@@ -57,49 +52,17 @@ export class SettingsHandler {
 		} catch (error) {
 			return reply(400, { error: error.message });
 		}
+		if (parts[0] !== this.#module) return reply(404, { error: "Module is not handled" });
 		const requestHeaders = Object.fromEntries(Object.entries(request.headers ?? {}).map(([key, value]) => [key.toLowerCase(), value]));
 		if (requestHeaders[this.#requestHeader.toLowerCase()] !== "1" || (requestHeaders.origin && requestHeaders.origin !== this.#origin)) return reply(403, { error: "Forbidden settings client" });
-		if (!["HEAD", "GET", "POST", "DELETE"].includes(request.method)) return { ...reply(405, { error: "Method not allowed" }), headers: { ...headers, Allow: "HEAD, GET, POST, DELETE" } };
-		let definition;
-		try {
-			const response = await fetch({ url: this.#configURL, method: "GET", headers: { "Cache-Control": "no-cache" }, timeout: 5000 });
-			if (response.status !== 200) throw new Error(`BoxJS source HTTP ${response.status}`);
-			// 自定义 GET resolver 的公开契约仍接收完整定义。
-			// Custom GET resolvers still receive the full definition required by their public contract.
-			definition = parseBoxJs(JSON.parse(response.body), parts[0], request.method === "GET" && Boolean(this.#resolveSettings));
-		} catch (error) {
-			return reply(502, { error: `Module configuration unavailable: ${error.message}` });
-		}
-		const key = parts.join(".");
-		const field = definition.fields.find(field => field.key === key);
-		const descendants = definition.fields.filter(field => field.key.startsWith(`${key}.`));
-		if (!field && !descendants.length) return reply(404, { error: `Unknown setting path: ${key}` });
 		let value;
 		switch (request.method) {
 			case "HEAD":
 				return reply(200, undefined);
-
-			case "GET": {
-				const stored = Storage.getItem(definition.storageKey, {});
-				const effective = this.#resolveSettings ? this.#resolveSettings(stored, definition) : stored;
-				if (!isRecord(effective)) throw new TypeError("resolved settings must be a synchronous object");
-				if (field) {
-					const value = pathValue(effective, parts);
-					return value === undefined ? reply(404, { error: `Setting has no stored value: ${key}` }) : reply(200, value);
-				}
-				const subtree = {};
-				// 只返回配置文件公开的字段；默认值由浏览器用 BoxJS val 生成。
-				// Expose only declared fields; the browser renders defaults from BoxJS val.
-				for (const descendant of descendants) {
-					const fullPath = descendant.key.split(".");
-					const value = pathValue(effective, fullPath);
-					if (value !== undefined) _.set(subtree, fullPath.slice(parts.length), value);
-				}
-				return reply(200, subtree);
-			}
-
+			case "GET":
+			case "DELETE":
+				break;
 			case "POST":
-				if (!field) return reply(405, { error: "Only individual declared keys can be modified" });
 				if (requestHeaders["content-type"]?.split(";")[0].trim().toLowerCase() !== "application/json") return reply(415, { error: "Expected application/json" });
 				if (typeof request.body !== "string") return reply(400, { error: "Expected a JSON string body" });
 				if (request.body.length > 65536) return reply(413, { error: "Body exceeds 65536 UTF-16 code units" });
@@ -108,60 +71,55 @@ export class SettingsHandler {
 				} catch {
 					return reply(400, { error: "Invalid JSON" });
 				}
-				if (!validValue(field, value)) return reply(400, { error: `Invalid setting value: ${key}` });
 				break;
-
-			case "DELETE":
-				if (!field) return reply(405, { error: "Only individual declared keys can be modified" });
-				break;
+			default:
+				return { ...reply(405, { error: "Method not allowed" }), headers: { ...headers, Allow: "HEAD, GET, POST, DELETE" } };
 		}
-
-		// POST 和 DELETE 共用一次读改写；HEAD/GET 已在各自分支返回。
-		// POST and DELETE share one read-modify-write; HEAD/GET return above.
-		const saved = Storage.getItem(definition.storageKey, {});
-		if (!isRecord(saved)) throw new TypeError("stored settings must be an object");
-		const parent = settingsParent(saved, parts, request.method === "POST");
-		if (parent) {
-			if (request.method === "DELETE") _.unset(parent, [parts.at(-1)]);
-			else _.set(parent, [parts.at(-1)], value);
+		try {
+			const root = Storage.getItem(this.#storageKey, {});
+			if (!isRecord(root)) throw new TypeError("stored root must be an object");
+			const parent = storageParent(root, parts, request.method === "POST");
+			const key = parts.at(-1);
+			switch (request.method) {
+				case "GET": {
+					const result = parent ? _.get(parent, [key]) : undefined;
+					return result === undefined ? reply(404, { error: "Stored path does not exist" }) : reply(200, result);
+				}
+				case "POST":
+					_.set(parent, [key], value);
+					break;
+				case "DELETE":
+					if (parent) _.unset(parent, [key]);
+					break;
+			}
+			if (!Storage.setItem(this.#storageKey, root)) throw new Error("Storage write failed");
+			return reply(200, request.method === "POST" ? { saved: true } : { deleted: true });
+		} catch (error) {
+			return reply(500, { error: error.message });
 		}
-		if (!Storage.setItem(definition.storageKey, saved)) return reply(500, { error: "Settings storage write failed" });
-		return reply(200, request.method === "DELETE" ? { deleted: true } : { saved: true });
 	}
 }
 
 /**
- * 判断存储节点是否为普通对象。
- * Determine whether a storage node is a plain object.
+ * 判断根节点是否为普通对象。
+ * Determine whether a root node is a plain object.
  * @param {unknown} value 待检查值 / Value to inspect.
- * @returns {value is Record<string, unknown>} 是否为普通对象 / Whether the value is a plain object.
+ * @returns {boolean} 是否为普通对象 / Whether this is a plain object.
  */
 function isRecord(value) {
 	return value !== null && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype;
 }
 
 /**
- * 解码中间存储节点并读取叶子值。
- * Decode intermediate storage nodes and read a leaf value.
- * @param {Record<string, unknown>} root 存储根对象 / Storage root object.
- * @param {string[]} parts 已校验的路径片段 / Validated path segments.
- * @returns {unknown} 叶子值，缺失为 undefined / Leaf value, or undefined when absent.
+ * 遍历父路径，兼容旧存储中 JSON 字符串形式的中间节点。
+ * Traverse parents, supporting legacy intermediate nodes serialized as JSON strings.
+ * @param {Record<string, unknown>} root 存储根 / Storage root.
+ * @param {string[]} parts 完整路径 / Complete path.
+ * @param {boolean} create 是否创建缺失节点 / Whether to create missing parents.
+ * @returns {object | undefined} 父节点，缺失且不创建时为 undefined / Parent, or undefined when absent and not creating.
+ * @throws {TypeError} 无法继续遍历标量节点 / A scalar node cannot be traversed.
  */
-function pathValue(root, parts) {
-	const parent = settingsParent(root, parts, false);
-	return parent ? _.get(parent, [parts.at(-1)]) : undefined;
-}
-
-/**
- * 解码 util 序列化的中间对象，保留相邻键并返回父节点。
- * Decode util-serialized intermediate objects, retain siblings and return the parent node.
- * @param {Record<string, unknown>} root 存储根对象 / Storage root object.
- * @param {string[]} parts 已校验的完整叶子路径 / Validated complete leaf path.
- * @param {boolean} create 是否创建缺失的父节点 / Whether missing parents should be created.
- * @returns {Record<string, unknown> | undefined} 父节点或缺失状态 / Parent node, or undefined if absent.
- * @throws {Error} 中间节点不是对象或 JSON 无效 / Intermediate node is not an object or its JSON is invalid.
- */
-function settingsParent(root, parts, create) {
+function storageParent(root, parts, create) {
 	let parent = root;
 	for (const part of parts.slice(0, -1)) {
 		let next = _.get(parent, [part]);
@@ -176,7 +134,7 @@ function settingsParent(root, parts, create) {
 			default:
 				break;
 		}
-		if (!isRecord(next)) throw new TypeError(`Stored path is not an object: ${part}`);
+		if (!isRecord(next) && !Array.isArray(next)) throw new TypeError("Stored parent is not an object or array");
 		_.set(parent, [part], next);
 		parent = next;
 	}

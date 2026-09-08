@@ -1,16 +1,6 @@
 import { validatePathParts } from "./settings-path.mjs";
 
 /**
- * 不含展示属性的代理字段约束，仅在解析模块内部使用。
- * Proxy field constraints without presentation data, used only inside the parser module.
- * @typedef {object} StorageField
- * @property {string} key 点分字段路径 / Dotted field path.
- * @property {"string" | "number" | "boolean" | "array"} type 值类型 / Value type.
- * @property {unknown} [defaultValue] 归一化默认值 / Normalized default value.
- * @property {Array<{key: import("../index.js").SettingsScalar}>} [options] 可写入的选项值 / Allowed option values.
- */
-
-/**
  * 将 BoxJS 数组、app 或订阅转换为模块字段，保留原文件为唯一字段来源。
  * Normalize a BoxJS array, app or subscription using the source JSON as the field authority.
  * @param {unknown} config BoxJS JSON / BoxJS document.
@@ -19,20 +9,6 @@ import { validatePathParts } from "./settings-path.mjs";
  * @throws {TypeError} 配置结构、字段路径、默认值或展示属性无效 / Invalid configuration, field path, default or presentation attribute.
  */
 export function normalizeBoxJs(config, module) {
-	return parseBoxJs(config, module, true);
-}
-
-/**
- * 共用字段约束解析；代理默认不提取展示属性，WebView 请求完整定义。
- * Share field constraint parsing; proxies omit presentation while WebViews request the full definition.
- * @param {unknown} config 外部 BoxJS 数据 / External BoxJS data.
- * @param {string} module 模块标识 / Module identifier.
- * @param {boolean} [presentation=false] 是否提取展示信息 / Whether to extract presentation data.
- * @returns {{module: string, storageKey: string, fields: StorageField[], settingsPath: string[]}} 存储定义，启用展示时附加完整属性 / Storage definition with full attributes when presentation is enabled.
- * @throws {TypeError} 配置约束无效 / Invalid configuration constraints.
- * @internal
- */
-export function parseBoxJs(config, module, presentation = false) {
 	validatePathParts([module]);
 	const apps = Array.isArray(config) ? [] : (config?.apps ?? [config]);
 	if (!Array.isArray(apps)) throw new TypeError("Expected BoxJS apps array");
@@ -58,28 +34,26 @@ export function parseBoxJs(config, module, presentation = false) {
 		const field = {
 			key: parts.join("."),
 			type: type === "select" ? typeof entry.val : type,
+
+			name: entry.name,
+			description: entry.desc ?? "",
+			control: entry.type,
+			...(entry.placeholder === undefined ? {} : { placeholder: entry.placeholder }),
+			...(entry.rows === undefined ? {} : { rows: entry.rows }),
+			...(entry.autoGrow === undefined ? {} : { autoGrow: entry.autoGrow }),
 		};
-		if (presentation)
-			Object.assign(field, {
-				name: entry.name,
-				description: entry.desc ?? "",
-				control: entry.type,
-				...(entry.placeholder === undefined ? {} : { placeholder: entry.placeholder }),
-				...(entry.rows === undefined ? {} : { rows: entry.rows }),
-				...(entry.autoGrow === undefined ? {} : { autoGrow: entry.autoGrow }),
-			});
 		if (type === "select" && !["string", "number", "boolean"].includes(field.type)) throw new TypeError(`Select requires a scalar val: ${entry.id}`);
-		if (entry.items) field.options = entry.items.map(item => (presentation ? { key: item.key, label: item.label } : { key: item.key }));
+		if (entry.items) field.options = entry.items.map(item => ({ key: item.key, label: item.label }));
 		if (Object.hasOwn(entry, "val")) field.defaultValue = normalizeStoredValue(field, entry.val);
 		if (
-			(presentation && typeof field.name !== "string") ||
+			typeof field.name !== "string" ||
 			(field.placeholder !== undefined && typeof field.placeholder !== "string") ||
 			(field.rows !== undefined && (!Number.isInteger(field.rows) || field.rows < 1)) ||
 			(field.autoGrow !== undefined && typeof field.autoGrow !== "boolean") ||
 			fields.some(other => other.key === field.key || other.key.startsWith(`${field.key}.`) || field.key.startsWith(`${other.key}.`))
 		)
 			throw new TypeError(`Invalid or overlapping BoxJS field: ${entry.id}`);
-		if (field.options && (new Set(field.options.map(item => item.key)).size !== field.options.length || field.options.some(item => !scalar(item.key) || (presentation && typeof item.label !== "string")))) throw new TypeError(`Invalid options: ${entry.id}`);
+		if (field.options && (new Set(field.options.map(item => item.key)).size !== field.options.length || field.options.some(item => !scalar(item.key) || typeof item.label !== "string"))) throw new TypeError(`Invalid options: ${entry.id}`);
 		if (Object.hasOwn(field, "defaultValue") && !validValue(field, field.defaultValue)) throw new TypeError(`Invalid BoxJS val: ${entry.id}`);
 		fields.push(field);
 	}
@@ -87,7 +61,7 @@ export function parseBoxJs(config, module, presentation = false) {
 	const common = fields[0].key.split(".").slice(0, -1);
 	for (const field of fields) while (!field.key.startsWith(`${common.join(".")}.`)) common.pop();
 	const metadata = {};
-	if (presentation && app) {
+	if (app) {
 		for (const key of ["id", "name", "author", "repo", "script", "icon", "description", "desc", "icons", "descs"]) {
 			if (app[key] === undefined) continue;
 			const multiple = key === "icons" || key === "descs";
@@ -108,7 +82,7 @@ export function parseBoxJs(config, module, presentation = false) {
 /**
  * 归一化 BoxJS 的字符串存储值，不改变普通文本内容。
  * Normalize BoxJS string persistence without changing free-text values.
- * @param {StorageField | import("../index.js").SettingsField} field 字段约束 / Field constraints.
+ * @param {import("../index.js").SettingsField} field 前端字段约束 / Frontend field constraints.
  * @param {unknown} value 存储值 / Stored value.
  * @returns {unknown} 转换后的控件值；是否允许写入由 validValue 单独校验 / Converted control value; write eligibility is checked separately by validValue.
  */
@@ -155,7 +129,7 @@ function scalar(value) {
 /**
  * 检查值类型、数组唯一性及声明的选项，不进行转换。
  * Check value type, array uniqueness and declared choices without coercion.
- * @param {StorageField | import("../index.js").SettingsField} field 归一化字段约束 / Normalized field constraints.
+ * @param {import("../index.js").SettingsField} field 前端归一化字段 / Normalized frontend field.
  * @param {unknown} value 待写入的 JSON 值 / JSON value to write.
  * @returns {boolean} 是否符合字段约束 / Whether the value satisfies field constraints.
  */

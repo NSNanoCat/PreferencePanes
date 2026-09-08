@@ -11,8 +11,8 @@ import { SettingsHandler } from "../SettingsHandler.mjs";
 (async () => {
 	let response;
 	try {
-		const { origin, configURL } = qs.parse(globalThis.$argument);
-		const handler = new SettingsHandler({ origin, configURL });
+		const { origin, storageKey, module } = qs.parse(globalThis.$argument);
+		const handler = new SettingsHandler({ origin, storageKey, module });
 		response = await handler.handle(globalThis.$request);
 	} catch (error) {
 		console.error(`PreferencePanes: ${error.message}`);
