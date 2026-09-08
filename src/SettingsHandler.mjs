@@ -10,12 +10,21 @@ import { parseSettingsPathname } from "./lib/settings-path.mjs";
  * Download BoxJS through util, validate fields and handle persistent storage.
  */
 export class SettingsHandler {
+	/** @type {string} 接管来源 / Handled origin. */
 	#origin;
+	/** @type {string} BoxJS 下载地址 / BoxJS download URL. */
 	#configURL;
+	/** @type {string} 页面标记头 / Page marker header. */
 	#requestHeader;
+	/** @type {import("./index.js").SettingsResolver | undefined} 同步 GET 解析器 / Synchronous GET resolver. */
 	#resolveSettings;
 
-	/** @param {import("./index.js").SettingsHandlerOptions} options 来源、配置地址与 GET 解析器 / Origin, config source and GET resolver. */
+	/**
+	 * 校验来源与配置地址，构造时不发出网络请求。
+	 * Validate origin and config URL without network requests during construction.
+	 * @param {import("./index.js").SettingsHandlerOptions} options 来源、配置地址与 GET 解析器 / Origin, config source and GET resolver.
+	 * @throws {TypeError} 地址或标记头不符合契约 / URLs or marker header do not satisfy the contract.
+	 */
 	constructor({ origin, configURL, requestHeader = "X-Settings-Client", resolveSettings }) {
 		const target = new URL(origin);
 		if (target.protocol !== "https:" || target.pathname !== "/" || target.search || target.hash || target.username || target.password) throw new TypeError("origin must be an HTTPS origin");
@@ -29,8 +38,11 @@ export class SettingsHandler {
 	}
 
 	/**
+	 * 按方法处理已声明路径，每次加载配置，写入前读取最新存储根。
+	 * Dispatch declared paths by method, loading config per request and reading the latest root before mutations.
 	 * @param {import("./index.js").SettingsRequest} request 代理请求 / Proxy request.
 	 * @returns {Promise<import("./index.js").SettingsResponse | undefined>} API 响应，非本来源 API 则不处理 / API response, or undefined outside the configured API origin.
+	 * @throws {Error} 非配置类执行错误交给代理入口处理 / Execution errors other than config failures propagate to the proxy entry.
 	 */
 	async handle(request) {
 		const url = new URL(request.url);
@@ -114,17 +126,37 @@ export class SettingsHandler {
 	}
 }
 
+/**
+ * 判断存储节点是否为普通对象。
+ * Determine whether a storage node is a plain object.
+ * @param {unknown} value 待检查值 / Value to inspect.
+ * @returns {value is Record<string, unknown>} 是否为普通对象 / Whether the value is a plain object.
+ */
 function isRecord(value) {
 	return value !== null && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype;
 }
 
+/**
+ * 解码中间存储节点并读取叶子值。
+ * Decode intermediate storage nodes and read a leaf value.
+ * @param {Record<string, unknown>} root 存储根对象 / Storage root object.
+ * @param {string[]} parts 已校验的路径片段 / Validated path segments.
+ * @returns {unknown} 叶子值，缺失为 undefined / Leaf value, or undefined when absent.
+ */
 function pathValue(root, parts) {
 	const parent = settingsParent(root, parts, false);
 	return parent ? _.get(parent, [parts.at(-1)]) : undefined;
 }
 
-// util 的 @root.path 允许序列化中间对象；统一解码并保留相邻键。
-// Decode util-serialized intermediate objects while retaining sibling keys.
+/**
+ * 解码 util 序列化的中间对象，保留相邻键并返回父节点。
+ * Decode util-serialized intermediate objects, retain siblings and return the parent node.
+ * @param {Record<string, unknown>} root 存储根对象 / Storage root object.
+ * @param {string[]} parts 已校验的完整叶子路径 / Validated complete leaf path.
+ * @param {boolean} create 是否创建缺失的父节点 / Whether missing parents should be created.
+ * @returns {Record<string, unknown> | undefined} 父节点或缺失状态 / Parent node, or undefined if absent.
+ * @throws {Error} 中间节点不是对象或 JSON 无效 / Intermediate node is not an object or its JSON is invalid.
+ */
 function settingsParent(root, parts, create) {
 	let parent = root;
 	for (const part of parts.slice(0, -1)) {

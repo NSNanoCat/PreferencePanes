@@ -116,6 +116,8 @@ const response = await handler.handle($request);
 
 ## 打包与示例
 
+Biome 配置对齐 NSNanoCat 的 Util/FlatBufferRoot：tab 缩进、LF、320 列及同组 lint 规则。仅额外排除由生成器维护的 `apifox/*.apifox.json`；`dist/` 通过 Git ignore 排除。类型契约位于 `src/index.d.ts`、`src/browser/index.d.ts`，运行时 JSDoc 使用中英双语；`test/types.mts` 检查公开接口的有效调用与拒绝边界。
+
 ```sh
 npm ci --registry=https://registry.npmjs.org/ --@nsnanocat:registry=https://registry.npmjs.org/
 npm run build

@@ -4,11 +4,20 @@ import { createPreferencesClient } from "./client.mjs";
  * 挂载从 BoxJS 实时生成的设置面板和短暂通知。
  * Mount runtime-generated BoxJS controls and transient notifications.
  * @param {import("./index.js").PreferencesPanelOptions} options 容器与请求；页面路径 /settings/{module} 对应配置 / Container and requests; /settings/{module} selects config.
- * @returns {{destroy(): void}} 清理接口 / Cleanup handle.
+ * @returns {import("./index.js").PreferencesPanel} 面板生命周期句柄 / Panel lifecycle handle.
  */
 export function mountPreferencePanes({ element: root, fetch, title = "Preferences" }) {
 	const document = root.ownerDocument;
 	const window = document.defaultView;
+	/**
+	 * 创建元素，文本统一通过 textContent 写入。
+	 * Create an element and assign text only through textContent.
+	 * @template {keyof HTMLElementTagNameMap} T
+	 * @param {T} tag HTML 标签 / HTML tag.
+	 * @param {string} className 样式类名 / CSS class name.
+	 * @param {string} [text] 纯文本内容 / Plain-text content.
+	 * @returns {HTMLElementTagNameMap[T]} 对应类型的元素 / Element of the corresponding type.
+	 */
 	const node = (tag, className, text) => {
 		const el = document.createElement(tag);
 		el.className = className;
@@ -34,6 +43,12 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
 		saving = false,
 		pendingRoute = false,
 		destroyed = false;
+	/**
+	 * 展示短暂通知，不刷新设置数据。
+	 * Display a transient notification without refreshing settings.
+	 * @param {{kind: "success" | "error", operation?: "write" | "delete", message?: string}} event 操作结果 / Operation result.
+	 * @returns {void} 无返回值 / No return value.
+	 */
 	const notify = event => {
 		if (destroyed) return;
 		switch (true) {
@@ -55,6 +70,13 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
 		}, 2400);
 	};
 	const client = createPreferencesClient({ fetch, notify });
+	/**
+	 * 切换加载或错误视图，按用户的动态效果偏好播放过渡。
+	 * Replace a loading or error view, respecting reduced-motion preferences.
+	 * @param {HTMLElement} view 新视图 / New view.
+	 * @param {number} direction 过渡方向，正数从右侧进入 / Transition direction; positive enters from the right.
+	 * @returns {void} 无返回值 / No return value.
+	 */
 	function replace(view, direction) {
 		const old = viewport.firstElementChild;
 		viewport.replaceChildren(view);
@@ -67,6 +89,12 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
 				{ duration: 180, easing: "ease-out" },
 			);
 	}
+	/**
+	 * 打开模块并忽略已过期的异步结果。
+	 * Open a module and ignore stale asynchronous results.
+	 * @param {string} module 模块标识 / Module identifier.
+	 * @returns {Promise<void>} 视图加载完成，失败显示错误视图 / View load completion; failures display an error view.
+	 */
 	async function open(module) {
 		const version = ++generation;
 		active = module;
@@ -86,11 +114,23 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
 			replace(view, 1);
 		}
 	}
+	/**
+	 * 从会话快照创建控件与操作按钮，不重新读取网络配置。
+	 * Build controls and actions from the session snapshot without fetching config again.
+	 * @returns {void} 无返回值 / No return value.
+	 */
 	function controls() {
 		const { definition, values } = client.snapshot(active);
 		heading.textContent = definition.metadata?.name || active;
 		const view = node("section", "pp-fields");
+		/** @type {Array<() => void>} 挂载后执行的多行高度更新 / Textarea sizing callbacks run after mounting. */
 		const growingInputs = [];
+		/**
+		 * 写入期间统一切换控件禁用状态。
+		 * Toggle all control disabled states during mutations.
+		 * @param {boolean} disabled 是否禁用 / Whether controls are disabled.
+		 * @returns {void} 无返回值 / No return value.
+		 */
 		const disableControls = disabled => {
 			view.querySelectorAll("button,input,select,textarea").forEach(input => {
 				input.disabled = disabled;
@@ -100,6 +140,13 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
 		if (metadata) {
 			const info = node("div", "pp-module-info");
 			const iconURL = metadata.icon || metadata.icons?.[1] || metadata.icons?.[0];
+			/**
+			 * 将元数据地址解析为可显示的 HTTP(S) URL。
+			 * Resolve a metadata address into an HTTP(S) URL suitable for display.
+			 * @param {string} value 绝对或相对地址 / Absolute or relative address.
+			 * @returns {string} 完整地址 / Absolute URL.
+			 * @throws {TypeError} 非 HTTP(S) 协议 / Non-HTTP(S) protocol.
+			 */
 			const resourceURL = value => {
 				const url = new window.URL(value, window.location.href);
 				if (!["http:", "https:"].includes(url.protocol)) throw new TypeError("Module metadata URLs must use HTTP or HTTPS");
@@ -128,7 +175,10 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
 			row.append(node("legend", "", field.name));
 			if (field.description) row.append(node("p", "pp-description", field.description));
 			const value = values[field.key];
-			let read, write;
+			/** @type {() => unknown} 读取尚未保存的输入 / Read the unsaved input. */
+			let read;
+			/** @type {(value: unknown) => void} 更新当前控件 / Update the current control. */
+			let write;
 			switch (true) {
 				case Boolean(field.options) && field.type !== "array": {
 					const select = node("select", "pp-input");
@@ -166,6 +216,11 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
 					input.setAttribute("aria-label", field.name);
 					if (field.placeholder) input.placeholder = field.placeholder;
 					if (multiline && field.rows) input.rows = field.rows;
+					/**
+					 * 在挂载后根据内容调整高度，同时保留基础行数。
+					 * Size mounted textareas to their contents while retaining baseline rows.
+					 * @returns {void} 无返回值 / No return value.
+					 */
 					const grow = () => {
 						if (!multiline || !field.autoGrow || !input.isConnected) return;
 						input.style.height = "auto";
@@ -250,6 +305,11 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
 		viewport.replaceChildren(view);
 		for (const grow of growingInputs) grow();
 	}
+	/**
+	 * 按页面 pathname 切换模块，写入尚未完成时延后导航。
+	 * Route by the page pathname, deferring navigation while a mutation is pending.
+	 * @returns {void} 无返回值 / No return value.
+	 */
 	function route() {
 		if (saving) {
 			pendingRoute = true;
@@ -268,9 +328,20 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
 		}
 		open(match[1]);
 	}
+	/**
+	 * 仅在 pathname 改变时处理历史导航。
+	 * Handle history navigation only when the pathname changes.
+	 * @returns {void} 无返回值 / No return value.
+	 */
 	const onPopState = () => {
 		if (window.location.pathname !== routedPath) route();
 	};
+	/**
+	 * 从浏览器往返缓存恢复时重新读取当前模块。
+	 * Reload the current module when restored from the browser back-forward cache.
+	 * @param {PageTransitionEvent} event 页面恢复事件 / Page restoration event.
+	 * @returns {void} 无返回值 / No return value.
+	 */
 	const onPageShow = event => {
 		if (event.persisted) route();
 	};
@@ -281,6 +352,11 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
 	window.addEventListener("pageshow", onPageShow);
 	route();
 	return {
+		/**
+		 * 移除监听器、定时器、会话和挂载内容。
+		 * Remove listeners, timers, session and mounted content.
+		 * @returns {void} 无返回值 / No return value.
+		 */
 		destroy() {
 			destroyed = true;
 			window.removeEventListener("popstate", onPopState);

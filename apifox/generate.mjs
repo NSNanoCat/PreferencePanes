@@ -1,6 +1,11 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+/**
+ * 从接口声明与说明生成 Apifox 原生文件；--check 只校验，不写文件。
+ * Generate the native Apifox file from declarations and guide; --check validates without writing.
+ * @module apifox/generate
+ */
 const root = path.resolve(import.meta.dirname, "..");
 const moduleId = 8522462;
 const guide = await readFile(path.join(root, "apifox/guide.md"), "utf8");

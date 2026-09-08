@@ -3,6 +3,11 @@ import { done } from "@nsnanocat/util/lib/done.mjs";
 import { qs } from "@nsnanocat/util/polyfill/qs.mjs";
 import { SettingsHandler } from "../SettingsHandler.mjs";
 
+/**
+ * 读取代理参数、执行处理器并将响应交给宿主 done。
+ * Read proxy arguments, execute the handler and pass the response to the host's done function.
+ * @returns {Promise<void>} 代理脚本执行结束 / Proxy script execution completion.
+ */
 (async () => {
 	let response;
 	try {

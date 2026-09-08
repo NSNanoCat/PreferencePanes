@@ -6,6 +6,7 @@ import { validatePathParts } from "./settings-path.mjs";
  * @param {unknown} config BoxJS JSON / BoxJS document.
  * @param {string} module API 第一段模块名 / First API path segment.
  * @returns {import("../index.js").ModuleDefinition} 存储根和字段 / Storage root and fields.
+ * @throws {TypeError} 配置结构、字段路径、默认值或展示属性无效 / Invalid configuration, field path, default or presentation attribute.
  */
 export function normalizeBoxJs(config, module) {
 	validatePathParts([module]);
@@ -82,7 +83,7 @@ export function normalizeBoxJs(config, module) {
  * Normalize BoxJS string persistence without changing free-text values.
  * @param {import("../index.js").SettingsField} field 字段 / Field.
  * @param {unknown} value 存储值 / Stored value.
- * @returns {unknown} 控件值 / Control value.
+ * @returns {unknown} 转换后的控件值；是否允许写入由 validValue 单独校验 / Converted control value; write eligibility is checked separately by validValue.
  */
 export function normalizeStoredValue(field, value) {
 	switch (field.type) {
@@ -105,6 +106,12 @@ export function normalizeStoredValue(field, value) {
 	return value;
 }
 
+/**
+ * 校验支持的标量范围，包括文本长度与数值有限性。
+ * Validate supported scalar bounds, including text length and numeric finiteness.
+ * @param {unknown} value 待检查值 / Value to inspect.
+ * @returns {boolean} 是否为有效标量 / Whether the scalar is valid.
+ */
 function scalar(value) {
 	switch (typeof value) {
 		case "boolean":
@@ -118,6 +125,13 @@ function scalar(value) {
 	}
 }
 
+/**
+ * 检查值类型、数组唯一性及声明的选项，不进行转换。
+ * Check value type, array uniqueness and declared choices without coercion.
+ * @param {import("../index.js").SettingsField} field 归一化字段 / Normalized field.
+ * @param {unknown} value 待写入的 JSON 值 / JSON value to write.
+ * @returns {boolean} 是否符合字段约束 / Whether the value satisfies field constraints.
+ */
 export function validValue(field, value) {
 	if (field.type === "array") {
 		if (!Array.isArray(value) || value.some(item => !scalar(item)) || new Set(value).size !== value.length) return false;

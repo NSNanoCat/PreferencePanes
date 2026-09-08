@@ -3,13 +3,35 @@ import { normalizeBoxJs, normalizeStoredValue, validValue } from "../lib/boxjs.m
 import { validatePathParts } from "../lib/settings-path.mjs";
 
 /**
+ * 单个模块的临时会话；离开页面后丢弃。
+ * Transient module session discarded when leaving the page.
+ * @typedef {object} ModuleSession
+ * @property {AbortController} controller 读取请求的取消控制器 / Abort controller for reads.
+ * @property {import("../index.js").ModuleDefinition | null} definition 加载完成的配置，加载中为 null / Loaded configuration, or null while loading.
+ * @property {import("./index.js").ModuleSnapshot["values"]} values 当前显示值 / Current display values.
+ * @property {boolean} saving 是否正在写入 / Whether a mutation is in progress.
+ */
+
+/**
  * 创建页面会话缓存；打开时重读，选项操作仅在 HTTP 200 后更新缓存。
  * Create a page-session cache; reload on open and mutate cache only after HTTP 200.
  * @param {import("./index.js").PreferencesClientOptions} options 请求与通知 / Requests and notifications.
  * @returns {import("./index.js").PreferencesClient} 通用客户端 / Generic client.
  */
 export function createPreferencesClient({ fetch: request = globalThis.fetch.bind(globalThis), notify = () => {}, timeout = 10000 } = {}) {
+	/** @type {Map<string, ModuleSession>} 模块会话表 / Module session map. */
 	const sessions = new Map();
+	/**
+	 * 发送同源请求，处理超时与取消，并要求 HTTP 200。
+	 * Send a same-origin request with timeout and cancellation, requiring HTTP 200.
+	 * @param {string} path 相对请求路径 / Relative request path.
+	 * @param {"HEAD" | "GET" | "POST" | "DELETE"} method HTTP 方法 / HTTP method.
+	 * @param {unknown} body POST 值，其它方法忽略 / POST value, ignored by other methods.
+	 * @param {AbortSignal | undefined} signal 会话取消信号 / Session cancellation signal.
+	 * @param {boolean} [resource=false] 是否为无标记头的配置资源 / Whether this is a config resource without the marker header.
+	 * @returns {Promise<Response>} 未消费正文的响应 / Response with an unread body.
+	 * @throws {Error} 非 200、超时、取消或网络错误 / Non-200 status, timeout, cancellation or network error.
+	 */
 	async function send(path, method, body, signal, resource = false) {
 		const controller = new AbortController();
 		const abort = () => controller.abort();
@@ -32,15 +54,38 @@ export function createPreferencesClient({ fetch: request = globalThis.fetch.bind
 			signal?.removeEventListener("abort", abort);
 		}
 	}
+	/**
+	 * 由合法模块名生成配置 Mock 路径。
+	 * Build the config Mock path from a valid module name.
+	 * @param {string} module 模块标识 / Module identifier.
+	 * @returns {string} 配置路径 / Config path.
+	 */
 	const configPath = module => {
 		validatePathParts([module]);
 		return `/configs/${encodeURIComponent(module)}`;
 	};
+	/**
+	 * 获取独立快照，避免调用方修改内部缓存。
+	 * Return an independent snapshot so callers cannot mutate the cache.
+	 * @param {string} module 已打开模块 / Open module.
+	 * @returns {import("./index.js").ModuleSnapshot} 会话快照 / Session snapshot.
+	 * @throws {Error} 模块未完成加载 / Module has not finished loading.
+	 */
 	const snapshot = module => {
 		const state = sessions.get(module);
 		if (!state?.definition) throw new Error("Open the module first");
 		return structuredClone({ definition: state.definition, values: state.values });
 	};
+	/**
+	 * 串行修改单键，仅成功后更新仍存活的会话。
+	 * Serialize single-key mutations and update a still-active session only after success.
+	 * @param {string} module 已打开模块 / Open module.
+	 * @param {string} key 完整点分字段路径 / Complete dotted field path.
+	 * @param {"POST" | "DELETE"} method 写入或删除 / Write or delete.
+	 * @param {unknown} value 写入值，删除时忽略 / Write value, ignored for deletion.
+	 * @returns {Promise<void>} 操作完成 / Operation completion.
+	 * @throws {Error} 会话、字段、值或请求错误 / Session, field, value or request error.
+	 */
 	async function change(module, key, method, value) {
 		const state = sessions.get(module);
 		if (!state?.definition) throw new Error("Open the module first");
@@ -65,6 +110,12 @@ export function createPreferencesClient({ fetch: request = globalThis.fetch.bind
 		}
 	}
 	return {
+		/**
+		 * 探测配置 Mock，不读写存储。
+		 * Probe the config Mock without accessing storage.
+		 * @param {string} module 模块标识 / Module identifier.
+		 * @returns {Promise<boolean>} 是否返回 HTTP 200 / Whether HTTP 200 was returned.
+		 */
 		async probe(module) {
 			try {
 				await send(configPath(module), "HEAD", undefined, undefined, true);
@@ -73,6 +124,13 @@ export function createPreferencesClient({ fetch: request = globalThis.fetch.bind
 				return false;
 			}
 		},
+		/**
+		 * 替换旧会话，读取一次配置与一次设置子树。
+		 * Replace the previous session and read config and settings subtree once each.
+		 * @param {string} module 模块标识 / Module identifier.
+		 * @returns {Promise<import("./index.js").ModuleSnapshot>} 新快照 / New snapshot.
+		 * @throws {Error} 读取失败、会话被替换或写入尚未完成 / Read failure, replaced session or unfinished write.
+		 */
 		async open(module) {
 			const previous = sessions.get(module);
 			if (previous?.saving) throw new Error("Cannot refresh while saving");
@@ -97,11 +155,32 @@ export function createPreferencesClient({ fetch: request = globalThis.fetch.bind
 			}
 		},
 		snapshot,
+		/**
+		 * 取消读取并清除会话，不撤销已发送的写入。
+		 * Abort reads and clear the session without undoing dispatched writes.
+		 * @param {string} module 模块标识 / Module identifier.
+		 * @returns {void} 无返回值 / No return value.
+		 */
 		leave(module) {
 			sessions.get(module)?.controller.abort();
 			sessions.delete(module);
 		},
+		/**
+		 * 写入单键并更新当前会话。
+		 * Write one key and update the current session.
+		 * @param {string} module 已打开模块 / Open module.
+		 * @param {string} key 点分字段路径 / Dotted field path.
+		 * @param {import("../index.js").SettingsScalar | import("../index.js").SettingsScalar[]} value 字段值 / Field value.
+		 * @returns {Promise<void>} 写入完成 / Write completion.
+		 */
 		set: (module, key, value) => change(module, key, "POST", value),
+		/**
+		 * 删除单键覆盖值并显示默认值。
+		 * Delete one override and display its default value.
+		 * @param {string} module 已打开模块 / Open module.
+		 * @param {string} key 点分字段路径 / Dotted field path.
+		 * @returns {Promise<void>} 删除完成 / Delete completion.
+		 */
 		remove: (module, key) => change(module, key, "DELETE"),
 	};
 }
