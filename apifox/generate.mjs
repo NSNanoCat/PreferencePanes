@@ -297,7 +297,7 @@ const document = {
 	$schema: { app: "apifox", type: "project", version: "1.2.0" },
 	info: {
 		name: "Preference Panes",
-		description: "前端 BoxJS 设置页面与模块存储桥接、缓存清理及模块重置（0.3.0）",
+		description: "独立通用页面、BoxJS 配置与模块存储桥接、缓存清理及模块重置（0.4.0）",
 		mockRule: { rules: [], enableSystemRule: true },
 	},
 	projectSetting: {

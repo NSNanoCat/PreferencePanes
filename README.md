@@ -7,6 +7,7 @@
 | 目录 | 内容 |
 | --- | --- |
 | src/SettingsHandler.mjs | 模块存储桥接 class |
+| src/PreferencesHandler.mjs | 存储桥接与声明式静态资源响应 |
 | src/browser/ | WebView 控件、内存会话和样式 |
 | src/lib/ | 前端 BoxJS 与通用路径解析 |
 | src/proxy/ | 代理宿主打包入口 |
@@ -66,7 +67,43 @@ const panel = mountPreferencePanes({ element: document.querySelector("#preferenc
 
 模块页底部提供查看/刷新 Caches、清空 Caches 和重置模块。查看缓存按需 GET；清空和重置经确认后 DELETE，成功只更新本页状态。重置后控件显示当前 BoxJS 默认值，再次进入页面才重新读取。模块选择、设置值校验和默认值处理都在前端完成。
 
-业务主菜单由调用项目维护，Biliverse 的入口和四个模块按钮归 Enhanced。未提供对应配置 Mock 的插件入口保持禁用。
+主菜单、导航、控件和样式均由本包实现。调用项目只提供品牌与模块 JSON，不需要维护 HTML、页面 JS、CSS 或专用 Rollup 配置。未提供对应配置 Mock 的插件入口保持禁用。
+
+## 零前端代码接入
+
+部署本包的 `dist/settings/` 到 `/settings/assets/`，将其中 index.html 同时用于 `/settings/` 与 `/settings/{module}`。根菜单读取同目录的 `site.boxjs.json`：
+
+~~~json
+{
+  "name": "Example",
+  "icon": "/assets/logo.png",
+  "sectionTitle": "模块",
+  "apps": [{ "module": "Module", "name": "Example Module", "icon": "/assets/module.png" }]
+}
+~~~
+
+`apps[].module` 明确对应 `/settings/{module}`、`/configs/{module}` 和 `/api/{module}/`，不从名称推断。这个菜单 JSON 只声明入口；实际字段仍从配置 Mock 返回的 BoxJS 生成。菜单可选 `desc`、`iconDark` 和 `stylesheets`；`iconDark` 是显式暗色图标扩展，不能把 BoxJS 的透明/彩色 icons 当成亮暗版本。stylesheets 仅加载接入方指定的 HTTP(S) 样式，不加载业务 JS。
+
+根页面每次进入重新 HEAD 探测，菜单 JSON 在当前文档只读取一次；模块页直接打开时无需先读菜单。图片与额外样式由托管站点提供。
+
+代理优先使用原生 Mock 提供配置和页面。需要请求脚本响应静态资源的平台，直接使用本包的 PreferencesHandler，安装参数也可放在 JSON 中：
+
+~~~js
+import { PreferencesHandler } from "@nsnanocat/preference-panes";
+
+const handler = new PreferencesHandler({
+  origin: "https://example.org",
+  storageKey: "Root",
+  module: "Module",
+  resources: [
+    { pattern: "^/configs/Module$", source: "https://example.org/settings/assets/Module.boxjs.json", contentType: "application/json" },
+    { pattern: "^/settings/(?:[a-zA-Z0-9_-]+/?)?$", source: "https://example.org/settings/assets/index.html", contentType: "text/html" }
+  ]
+});
+const response = await handler.handle($request);
+~~~
+
+资源 pattern 匹配 pathname，下载源必须避开拦截路径。只有命中静态资源的 GET/HEAD 才下载文件；API 由 SettingsHandler 直接处理，读写不会下载 BoxJS。接入方保留宿主请求入口和原生 Mock 规则，将响应交给现有 done 适配；无需自行实现路由、fetch、控件或持久化操作。
 
 ## BoxJS 兼容
 
@@ -92,6 +129,6 @@ npm run apifox:check
 npm pack --dry-run
 ~~~
 
-构建生成 dist/preference-panes.mjs 和 dist/preference-panes.request.js；公开 import 路径由 exports 保持稳定。0.3.0 的安装参数替换 0.2.0 的 configURL，HTTP 读写从声明字段变为模块内的任意数据，是一次契约升级。
+构建生成 dist/preference-panes.mjs、dist/preference-panes.request.js，以及可直接部署的 dist/settings/{index.html,app.mjs,panel.css,home.css}。静态文件也通过 `@nsnanocat/preference-panes/dist/settings/*` 导出，托管仓库直接从依赖包复制，不读取业务插件的前端构建目录。0.4.0 增加完整页面与资源处理器，保留 0.3.1 的存储契约和页面交互。
 
 [完整接口说明](apifox/guide.md) · [Apifox JSON](apifox/preference-panes.apifox.json) · [同步方式](apifox/README.md) · [发布工作流](.github/RELEASING.md)

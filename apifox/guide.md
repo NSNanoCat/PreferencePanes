@@ -1,6 +1,14 @@
-# PreferencePanes 0.3.0 接口契约
+# PreferencePanes 0.4.0 接口契约
 
 前端负责 BoxJS 解析、控件生成和字段输入校验。API 只桥接安装配置指定的持久化根与模块，不下载 BoxJS，不校验字段声明、枚举或控件类型。
+
+## 页面与资源归属
+
+完整 HTML、主菜单、导航、控件、CSS 与资源请求处理器均由 PreferencePanes 提供。托管仓库直接部署 npm 包的 dist/settings/，不依赖业务插件编译前端。接入项目只声明 BoxJS、菜单 JSON 和代理安装映射，保留其 App 入口注入及原生 Mock 规则。
+
+根菜单读取 /settings/assets/site.boxjs.json。其中 name、icon、iconDark、sectionTitle、desc 声明品牌与说明，apps[].module 声明模块路径，apps[].name/icon/iconDark 声明入口展示，stylesheets 可加载业务站点的外部 CSS。菜单定义在当前文档内缓存，各模块可用性每次进入重新 HEAD 探测。实际字段继续由 /configs/{module} 的 BoxJS 生成，不写在菜单 JSON 或 HTML 中。
+
+有原生 Mock 的平台直接按规则返回页面和配置文件。其它平台使用 PreferencesHandler 的 resources 安装参数（pattern/source/contentType）声明同样的资源映射，由包内部下载和响应。API 仍委托 SettingsHandler，仅资源路径触发网络请求。资源下载源与 Mock 拦截地址分离。
 
 ## 路径和参数
 
