@@ -6,7 +6,9 @@ PreferencePanes 负责具体模块的设置页、共享导航和本地持久化 
 
 嵌入的模块页跟随宿主根元素的 `data-theme`（light/dark）和 `--pp-keyboard-height`（CSS 长度），退出时释放观察器。独立页面使用网页自身/系统主题；通用包不再解析 Bilibili 的 User-Agent。
 
-默认表单使用 AppSettings 1.1.2 的原版 VToggle/FormRow CSS 和 b-style 4.0.1 主题，来源及 SHA-256 记录在 `src/browser/vendor/provenance.json`，原文件不做格式化或改写。原有手写开关、行样式和颜色表已删除。控件继续由 BoxJS 动态生成并即改即存；可选 CSS 不在默认样式层内，可覆盖默认外观。原版样式可通过 `@nsnanocat/preference-panes/styles/*` 解析、镜像或导出。
+正式表单仅引用 `src/browser/official-styles.json` 中的官方 Hilo 资源地址，不内嵌、镜像或 Mock App 自带 CSS，也不发布样式下载包。目标环境是能解析这些官方资源的 App WebView，普通公网浏览器不提供资源兜底。原有手写开关、行样式和颜色表已删除；BoxJS 动态生成及修改即保存保持不变。
+
+本地验证可运行 `npm run preview -- --override-official`，显式把官方 URL override 到 `test/fixtures/official-styles/`。副本和 SHA-256 只用于测试，不进入 npm 或 Release；不带此参数的预览与生产一样使用官方地址。
 
 宿主可监听 ModuleFrame 的 `confirm` 事件，调用 `preventDefault()` 接管确认框，再以 `event.detail.resolve(boolean)` 或 `reject(error)` 完成。未接管的独立网页使用浏览器对话框；模块离开后到达的确认结果不会继续写入。
 

@@ -2,11 +2,13 @@ import { readFile } from "node:fs/promises";
 import http from "node:http";
 import vm from "node:vm";
 import { build } from "../src/index.mjs";
+import { loadOfficialOverrides } from "./official-overrides.mjs";
 
 // 测试台不生成项目入口。上传的两个文件只供模块预览，存储为独立内存。
 // The testbench is not a project landing page; uploads feed only module previews with isolated storage.
 const importer = await readFile(new URL("./index.html", import.meta.url), "utf8");
 const script = await readFile(new URL("./importer.mjs", import.meta.url), "utf8");
+const overrides = process.argv.includes("--override-official") ? await loadOfficialOverrides() : null;
 let files = {};
 let configuration;
 let moduleName;
@@ -14,6 +16,12 @@ const store = new Map();
 const server = http.createServer(async (request, reply) => {
     try {
         const url = new URL(request.url, `http://${request.headers.host}`);
+        const fixture = overrides?.asset(url.pathname);
+        if (fixture && ["GET", "HEAD"].includes(request.method)) {
+            reply.writeHead(200, { "Content-Type": "text/css", "Cache-Control": "no-store" });
+            reply.end(request.method === "HEAD" ? "" : fixture);
+            return;
+        }
         if (["/", "/settings/", "/settings"].includes(url.pathname)) {
             reply.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
             reply.end(importer);
@@ -50,7 +58,7 @@ const server = http.createServer(async (request, reply) => {
         if (entry !== undefined && ["GET", "HEAD"].includes(request.method)) {
             const type = path.endsWith(".css") ? "text/css" : path.endsWith(".mjs") || path.endsWith(".js") ? "text/javascript" : path.endsWith(".json") ? "application/json" : "text/html";
             reply.writeHead(200, { "Content-Type": `${type}; charset=utf-8`, "Cache-Control": "no-store" });
-            reply.end(request.method === "HEAD" ? "" : entry);
+            reply.end(request.method === "HEAD" ? "" : overrides ? overrides.rewrite(entry) : entry);
             return;
         }
         if (configuration && url.pathname === `/configs/${moduleName}` && ["HEAD", "GET"].includes(request.method)) {

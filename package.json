@@ -1,6 +1,6 @@
 {
     "name": "@nsnanocat/preference-panes",
-    "version": "0.9.0",
+    "version": "0.9.1",
     "description": "Shared settings API runtime for JavaScript proxy modules",
     "author": "VirgilClyne <Virgil@nanocat.me>",
     "homepage": "https://NSNanoCat.github.io/preference-panes",
@@ -18,7 +18,6 @@
     "type": "module",
     "main": "src/index.mjs",
     "exports": {
-        "./styles/*": "./src/browser/vendor/*",
         ".": {
             "types": "./src/index.d.ts",
             "import": "./src/index.mjs"

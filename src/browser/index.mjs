@@ -4,8 +4,8 @@ import { element, resourceURL } from "./components.mjs";
 import { mountPanel } from "./panel.mjs";
 
 /**
- * 只挂载导入 JSON 对应的模块设置页，默认样式内置，CSS 仅用于该页。
- * Mount only the imported module's settings page with built-in defaults and optional page CSS.
+ * 挂载模块设置页；内置资源只引用官方地址，CSS 输入仅用于该页。
+ * Mount the module page with official resource URLs and optional page-specific CSS.
  * @param {import("../index.js").BoxJSInput} boxjs 单个模块的 BoxJS JSON / BoxJS JSON for one module.
  * @param {string} [css] 可选 CSS 正文 / Optional CSS text.
  * @returns {import("./index.js").MountedPreferences} 模块生命周期句柄 / Module lifecycle handle.
