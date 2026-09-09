@@ -1,6 +1,6 @@
 import { ActionMenu } from "./ActionMenu.mjs";
 import { createPreferencesClient } from "./client.mjs";
-import { errorView, icon, element as node, requestConfirmation, resourceURL } from "./components.mjs";
+import { errorView, fieldControl, icon, element as node, requestConfirmation, resourceURL } from "./components.mjs";
 import { Navigation } from "./Navigation.mjs";
 
 /**
@@ -143,6 +143,14 @@ export function mountPanel(root, catalog) {
         const { definition, values } = client.snapshot(active);
         heading.textContent = definition.metadata?.name || active;
         const view = node("section", "pp-fields");
+        const search = node("input", "");
+        search.type = "search";
+        search.placeholder = "搜索设置项";
+        search.setAttribute("aria-label", "搜索设置");
+        const searchField = fieldControl(search);
+        searchField.classList.add("pp-search");
+        view.append(searchField);
+        const searchRows = [];
         /**
          * 挂载后执行的多行高度更新
          * Textarea sizing callbacks run after mounting.
@@ -245,7 +253,7 @@ export function mountPanel(root, catalog) {
             let eventName = "change";
             switch (true) {
                 case Boolean(field.options) && field.type !== "array": {
-                    const select = node("select", "pp-input");
+                    const select = node("select", "");
                     select.setAttribute("aria-label", field.name);
                     field.options.forEach((option, index) => {
                         const item = node("option", "", option.label);
@@ -255,7 +263,7 @@ export function mountPanel(root, catalog) {
                     write = value => {
                         select.selectedIndex = field.options.findIndex(option => option.key === value);
                     };
-                    row.append(select);
+                    row.append(fieldControl(select));
                     read = () => field.options[select.selectedIndex]?.key;
                     break;
                 }
@@ -321,7 +329,7 @@ export function mountPanel(root, catalog) {
                 }
                 default: {
                     const multiline = field.control === "textarea" || field.type === "array";
-                    const input = node(multiline ? "textarea" : "input", "pp-input");
+                    const input = node(multiline ? "textarea" : "input", "");
                     if (multiline) row.classList.add("pp-multiline");
                     input.setAttribute("aria-label", field.name);
                     if (field.placeholder) input.placeholder = field.placeholder;
@@ -359,7 +367,7 @@ export function mountPanel(root, catalog) {
                                 return input.value;
                         }
                     };
-                    row.append(input);
+                    row.append(fieldControl(input, multiline));
                     break;
                 }
             }
@@ -389,7 +397,18 @@ export function mountPanel(root, catalog) {
             });
             if (eventName === "input") inputContainer.addEventListener("compositionend", event => event.target.dispatchEvent(new window.Event("input", { bubbles: true })));
             groups.get(group).append(row);
+            searchRows.push({ row, text: [field.name, field.key, field.description, ...(field.options ?? []).map(option => option.label)].join(" ").toLocaleLowerCase() });
         }
+        const empty = node("p", "pp-description", "没有匹配的设置项");
+        empty.hidden = true;
+        empty.setAttribute("role", "status");
+        view.append(empty);
+        search.oninput = () => {
+            const words = search.value.trim().toLocaleLowerCase().split(/\s+/);
+            for (const { row, text } of searchRows) row.hidden = !words.every(word => text.includes(word));
+            for (const rows of groups.values()) rows.parentElement.hidden = [...rows.children].every(row => row.hidden);
+            empty.hidden = searchRows.some(({ row }) => !row.hidden);
+        };
         const cachePage = node("section", "pp-cache-page");
         const output = node("pre", "pp-cache");
         output.textContent = "暂无缓存";

@@ -19,6 +19,22 @@ export function element(tag, className, text) {
 }
 
 /**
+ * 搜索、选择和文本控件共用官方 VField 的 DOM 结构。
+ * Share the official VField DOM structure across search, select and text controls.
+ * @param {HTMLElement} control 已创建的原生控件 / Existing native control.
+ * @param {boolean} [multiline] 是否为多行输入 / Whether the control is multiline.
+ * @returns {HTMLDivElement} 字段容器 / Field container.
+ */
+export function fieldControl(control, multiline = false) {
+    const field = element("div", `v-field pp-editor${multiline ? " v-field--textarea" : ""}`);
+    const body = element("div", "v-field__body");
+    control.classList.add("v-field__control");
+    body.append(control);
+    field.append(body);
+    return field;
+}
+
+/**
  * 元数据地址只允许 HTTP(S) 和相对地址。
  * Allow only HTTP(S) and relative metadata addresses.
  * @param {string} value 元数据地址 / Metadata address.

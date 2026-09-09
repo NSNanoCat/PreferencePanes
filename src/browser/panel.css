@@ -142,28 +142,24 @@
     font-size: 22px;
     flex: none;
 }
-.pp-input {
-    font: inherit;
-    color: var(--pp-text);
-    background: var(--pp-surface);
-    border: 1px solid var(--pp-border);
-    border-radius: 6px;
-    padding: 8px;
-    min-width: 0;
-    max-width: 45%;
+.pp-editor {
+    flex: none;
     width: 45%;
+    min-width: 0;
 }
-select.pp-input {
-    text-overflow: ellipsis;
-    font-size: 13px;
+.pp-search {
+    width: 100%;
+    margin-bottom: 12px;
 }
 .pp-panel .pp-multiline {
     display: block;
 }
-.pp-multiline .pp-input {
-    max-width: 100%;
+.pp-multiline .pp-editor {
     width: 100%;
     margin-top: 10px;
+}
+.pp-panel [hidden] {
+    display: none !important;
 }
 .pp-panel .v-toggle {
     border: 0;
