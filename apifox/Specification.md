@@ -62,9 +62,13 @@ X-PreferencePanes-JSON: /configs/Enhanced
 X-PreferencePanes-CSS: /settings/assets/Enhanced.css
 ~~~
 
-代理仅将 Header/URL 输入与当前页面请求地址编码到 HTML 的 meta 中，不下载 JSON/CSS，不读取存储，不接受 Header 改写存储根。浏览器解码输入、下载资源并检查 BoxJS 模块是否与页面模块一致。静态托管 HTML 支持查询参数；Header 入口必须由独立代理脚本响应，不能使用忽略 Header 的静态 HTML Mock。
+代理仅将 Header/URL 输入与当前页面请求地址编码到 HTML 的 meta 中，不下载 JSON/CSS，不读取存储，不接受 Header 改写存储根。静态托管 HTML 直接导航支持查询参数；原生 WebView 的 Header 导航由代理传递输入，同源网页 iframe 则使用 ModuleFrame 容器上下文。
 
-普通网页点击链接无法携带 Header。调用方先创建进入模块的 history 记录，用 fetch 携带 Header 请求模块 HTML，将正文赋给同源 iframe.srcdoc。srcdoc 与宿主隔离 CSS；模块内部只修改自身 URL 的 fragment，不依赖 srcdoc 的 pathname 或宿主 base URL。二级页后退复用模块缓存，再后退由宿主销毁 iframe、展示定制主页并重新探测 JSON。主页刷新或重新进入模块时重新请求 HTML、资源和设置，不在浏览器持久化存储缓存它们。iframe 是样式与文档隔离，不是同源脚本的安全沙箱。
+普通网页点击链接无法携带 Header。调用方使用 `@nsnanocat/preference-panes/navigation` 的 `ModuleFrame(url, options)` 创建模块容器，挂载 element 后调用 load()。容器复用 pageInputs 解析原始 URL/Header，在 iframe 元素的 data-preference-panes 上保存上下文，并将响应 HTML 原样赋给 srcdoc。启动器优先读取同源容器上下文，其次读取代理生成的 meta，最后才解析独立文档 URL；不通过修改 HTML 补路径，不从 about:srcdoc 猜模块。JSON/CSS 与持久化设置仍由模块页读取，存储服务不可用时操作仍失败。
+
+嵌入模式由框架自身布局管理内部标题栏与内容高度。模块通过 preferencepanes:change 向容器发布 title/module/busy/canGoBack，ModuleFrame 暴露 change 事件和 state；back() 遵循模块联合历史，写入期间禁止返回。destroy() 取消加载与订阅，DOM 移除交给 Navigation 的退出动画。宿主无需读取 iframe 内部 DOM，也不注入隐藏样式。
+
+srcdoc 与宿主隔离 CSS；模块内部只修改自身 URL 的 fragment，不依赖 srcdoc 的 pathname 或宿主 base URL。二级页后退复用模块缓存，再后退由宿主销毁 iframe、展示定制主页并重新探测 JSON。主页刷新或重新进入模块时重新请求 HTML、资源和设置，不在浏览器持久化存储缓存它们。iframe 是样式与文档隔离，不是同源脚本的安全沙箱。
 
 ## 入口可用性与导入测试
 

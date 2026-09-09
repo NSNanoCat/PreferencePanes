@@ -46,7 +46,25 @@ X-PreferencePanes-CSS: /theme.css
 
 每个 Header 分别优先于对应查询参数，未提供时使用上述模块约定；CSS 传空字符串时仅使用内置默认样式。资源必须为 HTTP(S) 或相对 URL，跨域资源需要允许浏览器 CORS。模块身份仍需与 BoxJS 一致，不改变存储根绑定。
 
-Header 方式需要独立代理脚本处理页面请求，将输入写入 HTML；静态 HTML Mock 无法读取请求头。普通网页用 fetch 携带 Header，并把返回的 HTML 赋给同源 iframe.srcdoc；不要用 innerHTML。iframe 隔离模块 CSS，模块二级页使用自身 fragment 历史；主页负责建立进入模块的历史记录，返回时销毁 iframe。重新打开或刷新由主页重新 fetch，不用 localStorage/sessionStorage 缓存输入或设置。
+静态 HTML 无法读取请求头。网页使用共用 `ModuleFrame` 容器：它从原始请求 URL/Header 解析模块上下文，保存在 iframe 元素上，HTML 原样加载。启动器读取容器上下文，不从 about:srcdoc 推断模块，不通过修改 HTML 补 meta 或注入 CSS。原生 WebView 直接携带 Header 导航时，仍由代理生成上下文。
+
+```js
+import { ModuleFrame } from "@nsnanocat/preference-panes/navigation";
+
+const frame = new ModuleFrame("/settings/Module", {
+    headers: { "X-PreferencePanes-JSON": "/configs/Module", "X-PreferencePanes-CSS": "/theme.css" },
+    signal,
+});
+container.append(frame.element);
+await frame.load();
+frame.addEventListener("change", () => { title.textContent = frame.state.title; });
+back.onclick = () => frame.back();
+// 离开时取消加载及事件订阅，节点由 Navigation 在动画结束后移除。
+// Cancel loads and subscriptions on departure; Navigation removes the node after its transition.
+frame.destroy();
+```
+
+iframe 隔离模块 CSS，模块二级页使用自身 fragment 历史。嵌入模式由框架自身布局隐藏内部顶栏并使用完整内容高度；容器通过 change/state 报告标题、写入忙碌状态和返回能力，宿主不查询或修改模块内部 DOM。Navigation 负责历史及退出动画，重新进入创建新 ModuleFrame；不使用 localStorage/sessionStorage 缓存输入或设置。
 
 ## 模块页行为
 
