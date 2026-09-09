@@ -1,3 +1,4 @@
+import { BoxJS } from "../BoxJS.mjs";
 import { validatePathParts } from "./settings-path.mjs";
 
 /**
@@ -10,25 +11,12 @@ import { validatePathParts } from "./settings-path.mjs";
  */
 export function normalizeBoxJs(config, module) {
     validatePathParts([module]);
-    const apps = Array.isArray(config) ? [] : (config?.apps ?? [config]);
-    if (!Array.isArray(apps)) throw new TypeError("Expected BoxJS apps array");
-    for (const candidate of apps) {
-        if (!candidate || typeof candidate !== "object") throw new TypeError("Expected BoxJS app object");
-        if (candidate.settings !== undefined && !Array.isArray(candidate.settings)) throw new TypeError("Expected BoxJS settings array");
-    }
-    const owners = apps.filter(candidate => candidate.settings?.some(entry => typeof entry.id === "string" && entry.id.startsWith("@") && entry.id.slice(1).split(".")[1] === module));
-    const entries = Array.isArray(config) ? config : owners.flatMap(candidate => candidate.settings);
-    const app = owners.length === 1 ? owners[0] : undefined;
-    let storageKey;
+    const target = new BoxJS(config).modules.get(module);
+    if (!target) throw new TypeError(`No BoxJS settings for module: ${module}`);
+    const { entries, storageKey, metadata } = target;
     const fields = [];
     for (const entry of entries) {
-        if (typeof entry.id !== "string" || !entry.id.startsWith("@")) throw new TypeError("BoxJS settings require @root.path IDs");
-        const [root, ...parts] = entry.id.slice(1).split(".");
-        if (parts[0] !== module) continue;
-        if (parts.length < 2) throw new TypeError("A BoxJS setting must be below the module root");
-        validatePathParts(parts);
-        if (!root || (storageKey && root !== storageKey)) throw new TypeError("A module must use one storage root");
-        storageKey = root;
+        const parts = entry.id.slice(1).split(".").slice(1);
         const type = { boolean: "boolean", checkboxes: "array", selects: "select", text: "string", textarea: "string", number: "number" }[entry.type];
         if (!type) throw new TypeError(`Unsupported BoxJS control: ${entry.type}`);
         const field = {
@@ -60,16 +48,6 @@ export function normalizeBoxJs(config, module) {
     if (!fields.length) throw new TypeError(`No BoxJS settings for module: ${module}`);
     const common = fields[0].key.split(".").slice(0, -1);
     for (const field of fields) while (!field.key.startsWith(`${common.join(".")}.`)) common.pop();
-    const metadata = {};
-    if (app) {
-        for (const key of ["id", "name", "author", "repo", "script", "icon", "description", "desc", "icons", "descs"]) {
-            if (app[key] === undefined) continue;
-            const multiple = key === "icons" || key === "descs";
-            const values = multiple ? app[key] : [app[key]];
-            if (!Array.isArray(values) || values.some(item => typeof item !== "string")) throw new TypeError(`Invalid BoxJS app ${key}`);
-            metadata[key] = multiple ? [...values] : app[key];
-        }
-    }
     return {
         module,
         storageKey,
