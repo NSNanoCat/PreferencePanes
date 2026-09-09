@@ -93,10 +93,14 @@ import { readFile, writeFile } from "node:fs/promises";
 
 const runtime = await readFile(new URL(import.meta.resolve("@nsnanocat/preference-panes/dist/preference-panes.proxy.js")), "utf8");
 const installation = JSON.parse(await readFile("installation.json", "utf8"));
-await writeFile("Module.request.js", `${runtime}\nPreferencePanes.runPreferences(${JSON.stringify(installation)});\n`);
+await writeFile("PreferencePanes.request.js", `${runtime}\nPreferencePanes.runPreferences(${JSON.stringify(installation)});\n`);
 ~~~
 
-业务插件的代理规则直接引用托管站点的 Module.request.js；无需 npm 依赖、业务 Request 接入代码或额外构建脚本。生成文件把可信安装映射与通用执行端放在一起，不依赖平台是否支持 $argument，Quantumult X 也使用同一文件。所有代理平台判断、done 适配、异常响应、资源下载和读写都由本包完成。API 不下载安装 JSON 或 BoxJS。
+通用运行时由独立 PreferencePanes 代理模块安装一次，统一匹配 /api/ 与页面资源；业务插件不再安装读写或页面规则，只提供 /configs/{module} 的配置 Mock。安装映射的 module 可以是模块名数组，例如 ["Module", "Other"]，统一模块只能访问声明范围。生成文件不依赖 $argument，Quantumult X 也使用同一文件。API 不下载安装 JSON 或 BoxJS。
+
+独立模块不得匹配 /configs/，资源映射也不得为配置 Mock 提供兜底。主菜单每次进入只 HEAD 配置 Mock；HTTP 200 启用入口，打开后 GET 并解析 JSON。配置缺失、无有效字段或解析失败时不读取设置 API、不生成设置表单。API 可达不代表某个业务模块提供了设置界面。
+
+Surge/Loon 的业务插件使用原生 JSON Mock。需要脚本响应配置的平台，由托管站点将包内 dist/preference-panes.config.js 与 `PreferencePanes.mockConfiguration(BoxJS_JSON)` 拼接生成配置响应文件。该文件只支持 GET/HEAD，不包含存储、网络下载或页面处理；它只安装在业务插件的 /configs/{module} 规则中。关闭业务插件后 Mock 消失，独立通用模块继续启用也不会误判该设置入口可用。
 
 以下是包内部处理器接受的安装映射形状；也可供需要手动集成的宿主使用：
 
@@ -108,14 +112,13 @@ const handler = new PreferencesHandler({
   storageKey: "Root",
   module: "Module",
   resources: [
-    { pattern: "^/configs/Module$", source: "https://example.org/settings/assets/Module.boxjs.json", contentType: "application/json" },
     { pattern: "^/settings/(?:[a-zA-Z0-9_-]+/?)?$", source: "https://example.org/settings/assets/index.html", contentType: "text/html" }
   ]
 });
 const response = await handler.handle($request);
 ~~~
 
-资源 pattern 匹配 pathname，下载源必须避开拦截路径。只有命中静态资源的 GET/HEAD 才下载文件；API 由 SettingsHandler 直接处理，读写不会下载 BoxJS。业务插件只保留安装规则和配置 Mock；其业务请求脚本不负责设置接口。
+资源 pattern 匹配 pathname，下载源必须避开拦截路径。只有命中静态资源的 GET/HEAD 才下载文件；API 由 SettingsHandler 直接处理，读写不会下载 BoxJS。业务插件只保留配置 Mock；页面与 API 安装规则全部属于独立 PreferencePanes 模块。
 
 ## BoxJS 兼容
 
@@ -141,6 +144,6 @@ npm run apifox:check
 npm pack --dry-run
 ~~~
 
-构建生成 dist/preference-panes.mjs、读取宿主参数的 dist/preference-panes.request.js、供托管站点配置的 dist/preference-panes.proxy.js，以及可直接部署的 dist/settings/{index.html,app.mjs,panel.css,home.css}。托管仓库直接从依赖包复制，不读取业务插件的前端构建目录。0.5.0 将独立代理执行入口也交给本包，保留既有存储契约与页面交互。
+构建生成 dist/preference-panes.mjs、读取宿主参数的 dist/preference-panes.request.js、供托管站点配置的 dist/preference-panes.proxy.js、仅返回配置的 dist/preference-panes.config.js，以及可直接部署的 dist/settings/{index.html,app.mjs,panel.css,home.css}。0.6.0 支持独立模块统一处理多个业务模块，并将配置 Mock 与通用读写安装彻底分开。
 
 [完整接口说明](apifox/guide.md) · [Apifox JSON](apifox/preference-panes.apifox.json) · [同步方式](apifox/README.md) · [发布工作流](.github/RELEASING.md)
