@@ -18,7 +18,6 @@
     "type": "module",
     "main": "src/index.mjs",
     "exports": {
-        "./styles/*": "./src/browser/vendor/*",
         ".": {
             "types": "./src/index.d.ts",
             "import": "./src/index.mjs"
