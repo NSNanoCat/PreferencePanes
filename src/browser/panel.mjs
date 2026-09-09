@@ -131,7 +131,11 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
 		const { definition, values } = client.snapshot(active);
 		heading.textContent = definition.metadata?.name || active;
 		const view = node("section", "pp-fields");
-		/** @type {Array<() => void>} 挂载后执行的多行高度更新 / Textarea sizing callbacks run after mounting. */
+		/**
+		 * 挂载后执行的多行高度更新
+		 * Textarea sizing callbacks run after mounting.
+		 * @type {Array<() => void>}
+		 */
 		const growingInputs = [];
 		const editors = new Map();
 		const summaries = [];
@@ -185,7 +189,8 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
 					if (!destroyed) success();
 				})
 				.catch(() => {
-					/* 请求层已通知错误 / The request layer has already reported the error. */
+					/* 请求层已通知错误。
+					 * The request layer has already reported the error. */
 					if (!destroyed) failure();
 				})
 				.finally(() => {
@@ -246,9 +251,17 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
 			if (field.description) label.append(node("span", "form-row__subtitle", field.description));
 			row.append(label);
 			const value = values[field.key];
-			/** @type {() => unknown} 读取尚未保存的输入 / Read the unsaved input. */
+			/**
+			 * 读取尚未保存的输入
+			 * Read the unsaved input.
+			 * @type {() => unknown}
+			 */
 			let read;
-			/** @type {(value: unknown) => void} 更新当前控件 / Update the current control. */
+			/**
+			 * 更新当前控件
+			 * Update the current control.
+			 * @type {(value: unknown) => void}
+			 */
 			let write;
 			let inputContainer = row;
 			let eventName = "change";

@@ -18,7 +18,11 @@ import { validatePathParts } from "../lib/settings-path.mjs";
  * @returns {import("./index.js").PreferencesClient} 通用客户端 / Generic client.
  */
 export function createPreferencesClient({ fetch: request = globalThis.fetch.bind(globalThis), notify = () => {}, timeout = 10000 } = {}) {
-	/** @type {Map<string, ModuleSession>} 模块会话表 / Module session map. */
+	/**
+	 * 模块会话表
+	 * Module session map.
+	 * @type {Map<string, ModuleSession>}
+	 */
 	const sessions = new Map();
 	/**
 	 * 发送同源请求，处理超时与取消；数据 GET 的 404 交给调用方处理。

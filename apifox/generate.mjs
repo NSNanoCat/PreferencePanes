@@ -2,13 +2,13 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 /**
- * 从接口声明与说明生成 Apifox 原生文件；--check 只校验，不写文件。
- * Generate the native Apifox file from declarations and guide; --check validates without writing.
+ * 从接口声明与规范生成 Apifox 原生文件；--check 只校验，不写文件。
+ * Generate the native Apifox file from declarations and specification; --check validates without writing.
  * @module apifox/generate
  */
 const root = path.resolve(import.meta.dirname, "..");
 const moduleId = 8522462;
-const guide = await readFile(path.join(root, "apifox/guide.md"), "utf8");
+const specification = await readFile(path.join(root, "apifox/Specification.md"), "utf8");
 const scalar = { oneOf: [{ type: "string", maxLength: 2048 }, { type: "number" }, { type: "boolean" }] };
 const value = { oneOf: [...scalar.oneOf, { type: "array", items: scalar, uniqueItems: true }] };
 const dataValue = { description: "任意 JSON 值；API 不按 BoxJS 校验类型或枚举，POST 替换路径处的完整值。", oneOf: [{ type: "string" }, { type: "number" }, { type: "boolean" }, { type: "null" }, { type: "array", items: {} }, { type: "object", additionalProperties: true }] };
@@ -225,8 +225,8 @@ const apis = declarations.map(entry => {
 		status: "testing",
 		tags: [entry.group],
 		operationId: `preference_panes_${id}`,
-		sourceUrl: "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/guide.md",
-		description: `## 接口用途\n\n${entry.description}\n\n## 请求契约\n\n\`${method.toUpperCase()} ${entry.path}\`\n\nmodule 是必填路径参数，必须属于插件安装配置中的模块。${entry.path.includes("{path}") ? "path 是模块内的相对路径，可包含以 / 分隔的多级目录。" : ""}路径参数不预填业务示例值；具体取值由接入项目决定。${entry.mock ? "该资源由代理 Mock 提供，不需要 X-Settings-Client 请求头。" : "请求需携带 X-Settings-Client: 1；该标记不是认证凭据。"}\n\n${method === "post" ? "正文必须为 application/json，直接传路径处的 JSON 值本身，允许对象、数组和 null。API 不校验 BoxJS 类型或枚举。" : "请求没有正文。"}\n\n${entry.example === undefined ? "" : `## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n\`\`\`${entry.page ? "html" : "json"}\n${entry.page ? entry.example : JSON.stringify(entry.example, null, 2)}\n\`\`\`\n\n`}## 调用流程与具体示例\n\n${guide}`,
+		sourceUrl: "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/Specification.md",
+		description: `## 接口用途\n\n${entry.description}\n\n## 请求契约\n\n\`${method.toUpperCase()} ${entry.path}\`\n\nmodule 是必填路径参数，必须属于插件安装配置中的模块。${entry.path.includes("{path}") ? "path 是模块内的相对路径，可包含以 / 分隔的多级目录。" : ""}路径参数不预填业务示例值；具体取值由接入项目决定。${entry.mock ? "该资源由代理 Mock 提供，不需要 X-Settings-Client 请求头。" : "请求需携带 X-Settings-Client: 1；该标记不是认证凭据。"}\n\n${method === "post" ? "正文必须为 application/json，直接传路径处的 JSON 值本身，允许对象、数组和 null。API 不校验 BoxJS 类型或枚举。" : "请求没有正文。"}\n\n${entry.example === undefined ? "" : `## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n\`\`\`${entry.page ? "html" : "json"}\n${entry.page ? entry.example : JSON.stringify(entry.example, null, 2)}\n\`\`\`\n\n`}## 调用流程与具体示例\n\n${specification}`,
 		parameters: {
 			path: [
 				{

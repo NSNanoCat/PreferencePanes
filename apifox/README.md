@@ -1,6 +1,6 @@
 # 接口文档
 
-- `guide.md`：接口契约、请求示例与缓存时序。
+- `Specification.md`：当前接口规范、请求示例与缓存时序。
 - `generate.mjs`：维护接口定义并生成原生 Apifox JSON，CI 用同一生成器检查是否过期。
 - `preference-panes.apifox.json`：提交到 Git、供 Apifox 导入的原生文档。
 

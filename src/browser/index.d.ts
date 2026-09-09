@@ -4,15 +4,30 @@ import type { ModuleDefinition, SettingsScalar } from "../index.js";
  * Notification for a single-key write or delete, including module and dotted key path.
  */
 export interface Notification {
-	/** 结果类别 / Result kind. */
+	/**
+	 * 结果类别
+	 * Result kind.
+	 */
 	kind: "success" | "error";
-	/** 操作类别 / Operation kind. */
+	/**
+	 * 操作类别
+	 * Operation kind.
+	 */
 	operation: "write" | "delete" | "clearCaches" | "reset";
-	/** 模块标识 / Module identifier. */
+	/**
+	 * 模块标识
+	 * Module identifier.
+	 */
 	module: string;
-	/** 含模块名、不含存储根的点分路径 / Dotted path including the module but excluding the storage root. */
+	/**
+	 * 含模块名、不含存储根的点分路径
+	 * Dotted path including the module but excluding the storage root.
+	 */
 	key: string;
-	/** 失败原因，仅错误事件提供 / Failure reason, provided for errors only. */
+	/**
+	 * 失败原因，仅错误事件提供
+	 * Failure reason, provided for errors only.
+	 */
 	message?: string;
 }
 /**
@@ -20,11 +35,20 @@ export interface Notification {
  * Options for the browser session client.
  */
 export interface PreferencesClientOptions {
-	/** 默认使用浏览器 fetch，可注入同签名传输 / Defaults to browser fetch; an equivalent transport may be supplied. */
+	/**
+	 * 默认使用浏览器 fetch，可注入同签名传输
+	 * Defaults to browser fetch; an equivalent transport may be supplied.
+	 */
 	fetch?: typeof globalThis.fetch;
-	/** 成功写入或失败时调用，不用于读取事件 / Called for successful mutations or failures, not reads. */
+	/**
+	 * 成功写入或失败时调用，不用于读取事件
+	 * Called for successful mutations or failures, not reads.
+	 */
 	notify?: (notification: Notification) => void;
-	/** 单次请求超时，单位毫秒，默认 10000 / Per-request timeout in milliseconds; defaults to 10000. */
+	/**
+	 * 单次请求超时，单位毫秒，默认 10000
+	 * Per-request timeout in milliseconds; defaults to 10000.
+	 */
 	timeout?: number;
 }
 /**
@@ -32,10 +56,16 @@ export interface PreferencesClientOptions {
  * Deep-cloned session snapshot; caller changes cannot alter the cache.
  */
 export interface ModuleSnapshot {
-	/** 当前配置生成的模块定义 / Module definition generated from current config. */
+	/**
+	 * 当前配置生成的模块定义
+	 * Module definition generated from current config.
+	 */
 	definition: ModuleDefinition;
-	/** 点分键到显示值的映射，已包含适用的默认值 / Dotted keys mapped to display values including applicable defaults. */
-	values: Record<string, SettingsScalar | SettingsScalar[]>;
+	/**
+	 * 点分键到显示值的映射，已包含适用的默认值；持久化 null 原样保留。
+	 * Dotted keys mapped to display values including applicable defaults; persisted null is preserved.
+	 */
+	values: Record<string, SettingsScalar | SettingsScalar[] | null>;
 }
 /**
  * 只在页面存活期间维护模块缓存的通用客户端。
@@ -118,11 +148,20 @@ export interface PreferencesClient {
  * Mount options for the WebView panel; the module is read from the page path.
  */
 export interface PreferencesPanelOptions {
-	/** 具有浏览器 window 的挂载元素 / Mount element owned by a document with a browser window. */
+	/**
+	 * 具有浏览器 window 的挂载元素
+	 * Mount element owned by a document with a browser window.
+	 */
 	element: HTMLElement;
-	/** 无有效模块时的标题，默认 Preferences / Title without a valid module; defaults to Preferences. */
+	/**
+	 * 无有效模块时的标题，默认 Preferences
+	 * Title without a valid module; defaults to Preferences.
+	 */
 	title?: string;
-	/** 可选浏览器请求传输 / Optional browser request transport. */
+	/**
+	 * 可选浏览器请求传输
+	 * Optional browser request transport.
+	 */
 	fetch?: typeof globalThis.fetch;
 }
 /**

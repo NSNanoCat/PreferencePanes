@@ -1,4 +1,4 @@
-# 发布 PreferencePanes
+# PreferencePanes 发布流程与历史记录
 
 已发布 `0.3.0`：SettingsHandler 改为安装配置驱动的存储桥接，参数为 origin/storageKey/module，API 不再下载 BoxJS；GET/POST/DELETE 支持模块内任意键和子树。前端增加 Caches 查看/清空与模块重置。由于移除 configURL/resolver 并放开字段限制，消费者必须同步更新安装参数。
 

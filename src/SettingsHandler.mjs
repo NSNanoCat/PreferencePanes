@@ -8,13 +8,29 @@ import { parseSettingsPathname, validatePathParts } from "./lib/settings-path.mj
  * Bridge persistence within the installed root and module without downloading or parsing BoxJS.
  */
 export class SettingsHandler {
-	/** @type {string} 接管来源 / Handled origin. */
+	/**
+	 * 接管来源
+	 * Handled origin.
+	 * @type {string}
+	 */
 	#origin;
-	/** @type {string} 安装配置中的存储根 / Storage root from installation config. */
+	/**
+	 * 安装配置中的存储根
+	 * Storage root from installation config.
+	 * @type {string}
+	 */
 	#storageKey;
-	/** @type {Set<string>} 独立模块允许访问的业务模块 / Business modules allowed by the standalone installation. */
+	/**
+	 * 独立模块允许访问的业务模块
+	 * Business modules allowed by the standalone installation.
+	 * @type {Set<string>}
+	 */
 	#modules;
-	/** @type {string} 页面标记头 / Page marker header. */
+	/**
+	 * 页面标记头
+	 * Page marker header.
+	 * @type {string}
+	 */
 	#requestHeader;
 
 	/**

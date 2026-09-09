@@ -146,4 +146,4 @@ npm pack --dry-run
 
 构建生成 dist/preference-panes.mjs、读取宿主参数的 dist/preference-panes.request.js、供托管站点配置的 dist/preference-panes.proxy.js、仅返回配置的 dist/preference-panes.config.js，以及可直接部署的 dist/settings/{index.html,app.mjs,panel.css,home.css}。0.6.0 支持独立模块统一处理多个业务模块，并将配置 Mock 与通用读写安装彻底分开。
 
-[完整接口说明](apifox/guide.md) · [Apifox JSON](apifox/preference-panes.apifox.json) · [同步方式](apifox/README.md) · [发布工作流](.github/RELEASING.md)
+[接口规范](apifox/Specification.md) · [Apifox JSON](apifox/preference-panes.apifox.json) · [同步方式](apifox/README.md) · [发布工作流](.github/RELEASING.md)

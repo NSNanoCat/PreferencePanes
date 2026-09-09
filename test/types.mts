@@ -1,6 +1,6 @@
 import type { SettingsField, SettingsHandlerOptions } from "@nsnanocat/preference-panes";
 import { normalizeBoxJs, PreferencesHandler, SettingsHandler } from "@nsnanocat/preference-panes";
-import type { Notification, PreferencesPanel } from "@nsnanocat/preference-panes/browser";
+import type { ModuleSnapshot, Notification, PreferencesPanel } from "@nsnanocat/preference-panes/browser";
 
 const definition = normalizeBoxJs([], "Module");
 void definition.storageKey;
@@ -19,6 +19,8 @@ const client = createPreferencesClient({
 	},
 });
 const snapshot = await client.open("Module");
+const nullableSnapshot: ModuleSnapshot = { ...snapshot, values: { "Module.Settings.notes": null } };
+void nullableSnapshot;
 void snapshot.definition.storageKey;
 await client.set("Module", "Module.Settings.enabled", false);
 mountPreferencePanes({ element: document.body }).destroy();

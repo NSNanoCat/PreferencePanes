@@ -1,4 +1,4 @@
-# PreferencePanes 0.6.0 接口契约
+# PreferencePanes 0.6.0 接口规范（Specification）
 
 前端负责 BoxJS 解析、控件生成和字段输入校验。API 只桥接安装配置指定的持久化根与模块，不下载 BoxJS，不校验字段声明、枚举或控件类型。
 
