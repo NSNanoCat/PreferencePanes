@@ -10,6 +10,10 @@
 export function element(tag, className, text) {
     const node = document.createElement(tag);
     node.className = className;
+    // 官方 AppSettings 1.1.2 的作用域标记与原版 CSS 一起固定版本。
+    // Pin official AppSettings 1.1.2 scope attributes together with its unmodified CSS.
+    if (/\bform-row(?:\b|__)/.test(className)) node.setAttribute("data-v-b69aa1ea", "");
+    if (/\bform-group(?:\b|__)/.test(className)) node.setAttribute("data-v-e590be47", "");
     if (text !== undefined) node.textContent = text;
     return node;
 }

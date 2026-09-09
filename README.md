@@ -6,6 +6,8 @@ PreferencePanes 负责具体模块的设置页、共享导航和本地持久化 
 
 嵌入的模块页跟随宿主根元素的 `data-theme`（light/dark）和 `--pp-keyboard-height`（CSS 长度），退出时释放观察器。独立页面使用网页自身/系统主题；通用包不再解析 Bilibili 的 User-Agent。
 
+默认表单使用 AppSettings 1.1.2 的原版 VToggle/FormRow CSS 和 b-style 4.0.1 主题，来源及 SHA-256 记录在 `src/browser/vendor/provenance.json`，原文件不做格式化或改写。原有手写开关、行样式和颜色表已删除。控件继续由 BoxJS 动态生成并即改即存；可选 CSS 不在默认样式层内，可覆盖默认外观。原版样式可通过 `@nsnanocat/preference-panes/styles/*` 解析、镜像或导出。
+
 业务模块安装同一个 `https://github.com/NSNanoCat/PreferencePanes/releases/latest/download/api.js`，不再生成绑定业务配置的读写脚本，也不需要额外安装独立设置插件。该文件由本仓库 Release 工作流发布，自动更新遵循代理工具的缓存周期。
 
 API 为 POST /api/get、/api/set、/api/delete。form 字段名是完整 `@root.path`；读取和删除的值留空，写入值可以是普通文本或 JSON。API 不鉴权，不下载 JSON，也不校验控件和枚举。

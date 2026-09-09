@@ -204,7 +204,7 @@ export function mountPanel(root, catalog) {
             const match = /^\[([^\]]+)\]\s*(.*)$/.exec(field.name);
             const group = match?.[1] ?? "通用";
             if (!groups.has(group)) {
-                const section = node("section", "form-group");
+                const section = node("section", "form-group form-group--has-title");
                 const rows = node("div", "form-group__row");
                 section.append(node("h2", "form-group__title", group), rows);
                 groups.set(group, rows);
@@ -288,6 +288,24 @@ export function mountPanel(root, catalog) {
                     };
                     break;
                 }
+                case field.type === "boolean": {
+                    const toggle = node("button", "v-toggle v-toggle--small form-row__toggle");
+                    toggle.type = "button";
+                    toggle.setAttribute("role", "switch");
+                    toggle.setAttribute("aria-label", field.name);
+                    toggle.append(node("span", "v-toggle__circle"));
+                    write = value => {
+                        toggle.setAttribute("aria-checked", String(value === true));
+                        toggle.classList.toggle("v-toggle--closed", value !== true);
+                    };
+                    read = () => toggle.getAttribute("aria-checked") === "true";
+                    toggle.onclick = () => {
+                        write(!read());
+                        toggle.dispatchEvent(new window.Event("change", { bubbles: true }));
+                    };
+                    row.append(toggle);
+                    break;
+                }
                 default: {
                     const multiline = field.control === "textarea" || field.type === "array";
                     const input = node(multiline ? "textarea" : "input", "pp-input");
@@ -312,32 +330,22 @@ export function mountPanel(root, catalog) {
                         input.addEventListener("input", grow);
                         growingInputs.push(grow);
                     }
-                    if (field.type === "boolean") {
-                        input.type = "checkbox";
-                        input.classList.add("pp-switch");
-                        input.setAttribute("role", "switch");
-                        write = value => {
-                            input.checked = value === true;
-                        };
-                        read = () => input.checked;
-                    } else {
-                        eventName = "input";
-                        if (!multiline) input.type = field.type === "number" ? "number" : "text";
-                        write = value => {
-                            input.value = field.type === "array" ? JSON.stringify(value ?? []) : (value ?? "");
-                            grow();
-                        };
-                        read = () => {
-                            switch (field.type) {
-                                case "array":
-                                    return JSON.parse(input.value);
-                                case "number":
-                                    return input.value === "" ? Number.NaN : Number(input.value);
-                                default:
-                                    return input.value;
-                            }
-                        };
-                    }
+                    eventName = "input";
+                    if (!multiline) input.type = field.type === "number" ? "number" : "text";
+                    write = value => {
+                        input.value = field.type === "array" ? JSON.stringify(value ?? []) : (value ?? "");
+                        grow();
+                    };
+                    read = () => {
+                        switch (field.type) {
+                            case "array":
+                                return JSON.parse(input.value);
+                            case "number":
+                                return input.value === "" ? Number.NaN : Number(input.value);
+                            default:
+                                return input.value;
+                        }
+                    };
                     row.append(input);
                     break;
                 }

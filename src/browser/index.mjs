@@ -30,6 +30,8 @@ export function mount(boxjs, css = "") {
     document.head.append(base, custom);
     const previousTitle = document.title;
     const previousTheme = document.documentElement.dataset.theme;
+    const previousDark = document.documentElement.classList.contains("bili_dark");
+    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
     const previousKeyboard = document.documentElement.style.getPropertyValue("--pp-keyboard-height");
     const host = window.frameElement?.ownerDocument.documentElement;
     /**
@@ -38,13 +40,15 @@ export function mount(boxjs, css = "") {
      * @returns {void} 已同步主题与键盘避让 / Theme and keyboard clearance synchronized.
      */
     const syncAppearance = () => {
-        if (host.dataset.theme === undefined) delete document.documentElement.dataset.theme;
-        else document.documentElement.dataset.theme = host.dataset.theme;
-        document.documentElement.style.setProperty("--pp-keyboard-height", host.style.getPropertyValue("--pp-keyboard-height"));
+        const theme = host?.dataset.theme ?? previousTheme ?? (systemTheme.matches ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.classList.toggle("bili_dark", theme === "dark");
+        if (host) document.documentElement.style.setProperty("--pp-keyboard-height", host.style.getPropertyValue("--pp-keyboard-height"));
     };
     let observer;
+    syncAppearance();
+    systemTheme.addEventListener("change", syncAppearance);
     if (host) {
-        syncAppearance();
         observer = new MutationObserver(syncAppearance);
         observer.observe(host, { attributes: true, attributeFilter: ["data-theme", "style"] });
     }
@@ -58,6 +62,8 @@ export function mount(boxjs, css = "") {
          */
         destroy() {
             observer?.disconnect();
+            systemTheme.removeEventListener("change", syncAppearance);
+            document.documentElement.classList.toggle("bili_dark", previousDark);
             panel?.destroy();
             base.remove();
             custom.remove();
