@@ -41,6 +41,37 @@ export class ModuleFrame extends EventTarget {
 }
 
 /**
+ * HEAD 探测的固定模块状态行。
+ * Fixed module status row backed by HEAD probes.
+ */
+export class ModuleStatus extends EventTarget {
+    /**
+     * 绑定状态行。
+     * Bind a status row.
+     * @param element 状态行节点 / Status row node.
+     */
+    constructor(element: HTMLElement);
+    /**
+     * 当前状态及模块版本。
+     * Current state and module version.
+     */
+    readonly state: { status: "checking" | "installed" | "missing"; version: string | null };
+    /**
+     * 探测配置 Mock。
+     * Probe a configuration Mock.
+     * @param url 配置地址 / Configuration URL.
+     * @returns 探测完成 / Probe completion.
+     */
+    check(url: string | URL): Promise<void>;
+    /**
+     * 取消探测。
+     * Cancel probes.
+     * @returns 无返回值 / No return value.
+     */
+    destroy(): void;
+}
+
+/**
  * 同一文档的根页/子页导航，不定义页面布局或模块业务。
  * Home/detail navigation within a document, without layout or module business rules.
  */

@@ -20,6 +20,8 @@ await fetch("/api/set", {
 
 ## 页面与输入
 
+主页状态行使用 `@nsnanocat/preference-panes/navigation` 的 `ModuleStatus`。组件只 HEAD 配置地址，失败显示“未安装”，成功读取 X-PreferencePanes-Version 显示业务模块版本；旧配置未提供版本头时显示“版本未知”。状态行始终占据第二行，不读取持久化设置。
+
 ```js
 import { mount } from "@nsnanocat/preference-panes/browser";
 const page = mount(boxjs, ".pp-panel { --pp-accent: #16866a; }");

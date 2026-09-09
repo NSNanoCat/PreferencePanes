@@ -55,6 +55,8 @@ get 成功返回原始 JSON 值，缺失返回 404。set 返回 {"saved":true}�
 
 ## 模块页输入与导航
 
+配置 Mock 的 HEAD/GET 响应通过 X-PreferencePanes-Version 提供业务版本。ModuleStatus 共用组件仅发送 HEAD，固定状态行显示“检测中”、业务版本或“未安装”；HTTP 200 但缺少版本头时显示“版本未知”。该版本由业务模块构建提供，不是 PreferencePanes 版本。
+
 JSON/CSS 资源 URL 可通过 json/css 查询参数，或 X-PreferencePanes-JSON / X-PreferencePanes-CSS Header 传入；Header 分别优先。缺省 JSON 为 /configs/{module}，缺省 CSS 为空，使用内置样式。资源只接受 HTTP(S) 或相对地址。浏览器读取 JSON 后根据完整字段 ID 推导存储根与路径，生成 form 请求。
 
 ModuleFrame 在 iframe 元素上保留请求上下文，HTML 原样加载，不根据 about:srcdoc 猜模块，也不补丁式改写返回 HTML。Navigation 统一管理历史、左右切换、滚动保留与退出取消；嵌入布局由框架处理，模块通过事件向常驻顶栏报告状态。

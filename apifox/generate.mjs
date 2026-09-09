@@ -51,7 +51,7 @@ const apis = declarations.map(entry => {
             id: `${entry.id}-${code}`,
             code,
             name: code === 200 ? "成功" : "失败",
-            headers: [],
+            headers: entry.path.startsWith("/configs/") ? [parameter("X-PreferencePanes-Version", "与配置和业务脚本同次构建的版本", true)] : [],
             contentType: entry.method === "head" ? "noContent" : entry.page ? "html" : "json",
             jsonSchema: code === 200 ? {} : { type: "object", properties: { error: { type: "string" } } },
             description: code === 200 ? "get 返回原始 JSON 值；set/delete 返回成功标记" : "格式、路径、方法或存储错误；没有 401/403 鉴权响应",
