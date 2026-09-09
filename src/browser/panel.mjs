@@ -30,15 +30,13 @@ export function mountPanel(root, catalog) {
     const menu = new ActionMenu(id => runAction(id));
     const trailing = node("span", "pp-nav-spacer");
     trailing.append(menu.element);
-    const brand = node("div", "pp-brand");
-    const logo = node("span", "pp-brand-icon");
+    const logo = node("span", "pp-module-logo");
     logo.setAttribute("aria-hidden", "true");
     const image = icon(catalog.module.metadata, "");
     if (image) logo.append(image);
-    brand.append(logo, heading);
     const viewport = node("div", "pp-viewport");
     let toast;
-    header.append(back, brand, trailing);
+    header.append(back, heading, trailing);
     shell.append(header, viewport);
     root.append(shell);
     // 嵌入模式向宿主发布导航状态，宿主不读取或修改模块内部 DOM。
@@ -152,6 +150,7 @@ export function mountPanel(root, catalog) {
         const { definition, values } = client.snapshot(active);
         heading.textContent = definition.metadata?.name || active;
         const view = node("section", "pp-fields");
+        view.append(logo);
         const search = node("input", "");
         search.type = "search";
         search.placeholder = "搜索设置项";
@@ -216,8 +215,6 @@ export function mountPanel(root, catalog) {
         const metadata = definition.metadata;
         if (metadata) {
             const info = node("div", "pp-module-info");
-            const image = icon(metadata, "pp-module-icon");
-            if (image) info.append(image);
             const details = node("div", "pp-module-details");
             for (const description of [metadata.author, metadata.desc ?? metadata.description, ...(metadata.descs ?? [])]) if (description) details.append(node("p", "pp-description", description));
             if (metadata.repo) {
