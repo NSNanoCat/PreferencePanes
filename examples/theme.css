@@ -1,0 +1,8 @@
+/* 仅通过 CSS 覆盖默认风格，不传入主题或布局配置。
+ * Override the default appearance with CSS alone, without theme or layout configuration. */
+.pp-panel {
+    --pp-accent: #16866a;
+}
+.pp-home h1 {
+    color: #16866a;
+}

@@ -9,10 +9,23 @@ import boxjs from "./settings.boxjs.json" with { type: "json" };
 const files = await build(boxjs);
 // 自定义风格时传入 CSS 文件正文。
 // Pass CSS file contents to customize the appearance.
-const themedFiles = await build(boxjs, ":root { --accent: #16866a; }");
+const themedFiles = await build(boxjs, ".pp-panel { --pp-accent: #16866a; }");
 ```
 
 返回值为相对路径到文件正文的映射。调用方写出并托管文件即可，不维护页面代码、菜单 JSON、安装映射、资源规则表或脚本拼接逻辑。
+
+已有 WebView 页面可以直接使用同样的两个输入，样式由包自行挂载，无需额外导入默认 CSS：
+
+```js
+import { mount } from "@nsnanocat/preference-panes/browser";
+
+const page = mount(boxjs, ".pp-panel { --pp-accent: #16866a; }");
+// 离开宿主页面时释放监听器、样式与会话。
+// Release listeners, styles and sessions when leaving the host page.
+page.destroy();
+```
+
+主页的安装工具依据当前页面地址生成代理规则；无需传入域名或配置资源 URL。通用模块与各业务模块的配置 Mock 分开安装，通用模块不接管 `/configs/`。
 
 ## 自动推导
 
@@ -40,6 +53,9 @@ const themedFiles = await build(boxjs, ":root { --accent: #16866a; }");
 npm run check
 npm run apifox:generate
 npm run apifox:check
+npm run preview
 ```
+
+预览也只读取两个输入，可用 `node examples/preview.mjs settings.boxjs.json theme.css` 指定文件。预览执行包生成的代理脚本，存储在独立内存中。
 
 [接口规范](apifox/Specification.md) · [Apifox JSON](apifox/preference-panes.apifox.json)

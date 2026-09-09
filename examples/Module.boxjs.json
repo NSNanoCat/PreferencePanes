@@ -2,7 +2,7 @@
     "id": "example.module",
     "name": "Example Module",
     "author": "Example",
-    "desc": "BoxJS metadata and fields are provided at runtime.",
+    "icon": "https://biliverse.github.io/settings/assets/Enhanced_light.png",
     "settings": [
         { "id": "@Example.Module.Settings.enabled", "name": "启用功能", "type": "boolean", "val": true },
         {
@@ -11,6 +11,13 @@
             "type": "selects",
             "val": "auto",
             "items": [{ "key": "auto", "label": "自动" }, { "key": "manual", "label": "手动" }]
+        },
+        {
+            "id": "@Example.Module.Settings.items",
+            "name": "选项",
+            "type": "checkboxes",
+            "val": ["first"],
+            "items": [{ "key": "first", "label": "第一项" }, { "key": "second", "label": "第二项" }]
         },
         {
             "id": "@Example.Module.Settings.notes",

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { BoxJS } from "../src/BoxJS.mjs";
 import { createPreferencesClient } from "../src/browser/client.mjs";
 import { config } from "./fixtures/module.mjs";
 
@@ -17,6 +18,7 @@ test("missing or invalid BoxJS blocks the form even when the storage API is avai
     for (const body of [null, [], { apps: [] }]) {
         const calls = [];
         const client = createPreferencesClient({
+            catalog: new BoxJS(config),
             fetch: async (path, options) => {
                 calls.push([options.method, path]);
                 if (path.startsWith("/api/")) return Response.json({ count: 9 });
@@ -79,6 +81,7 @@ function fixture() {
         notifications = [];
     const state = { config, stored: { Home: { enabled: "false", mode: "b" }, items: "a,b" }, status: 200 };
     const client = createPreferencesClient({
+        catalog: new BoxJS(config),
         notify: event => notifications.push(event),
         fetch: async (url, options) => {
             calls.push({ url, ...options });
@@ -230,7 +233,7 @@ test("every entry or refresh replaces config and values; failed reopen clears st
 
 test("leaving cancels pending entry; an older entry cannot restore a replaced session", async () => {
     const pending = [];
-    const client = createPreferencesClient({ fetch: (url, options) => new Promise(resolve => pending.push({ url, options, resolve })) });
+    const client = createPreferencesClient({ catalog: new BoxJS(config), fetch: (url, options) => new Promise(resolve => pending.push({ url, options, resolve })) });
     const first = client.open("Module");
     const second = client.open("Module");
     assert.equal(pending[0].options.signal.aborted, true);
@@ -251,6 +254,7 @@ test("writes are serialized and completing after leave cannot resurrect cache", 
     let finish;
     const notifications = [];
     const client = createPreferencesClient({
+        catalog: new BoxJS(config),
         notify: event => notifications.push(event),
         fetch: async (url, options) => {
             if (options.method === "POST")

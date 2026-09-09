@@ -17,14 +17,25 @@ body {
     width: 64px;
     height: 64px;
     margin: auto;
-}
-.brand-logo img {
-    display: block;
-    width: 100%;
-    height: 100%;
     object-fit: contain;
 }
+.pp-install {
+    margin: 0 0 16px;
+    font-size: 13px;
+}
+.pp-install select,
+.pp-install button {
+    max-width: 100%;
+    margin: 8px 8px 0 0;
+    padding: 6px;
+    font: inherit;
+}
+.pp-initial {
+    font-size: 24px;
+    line-height: 36px;
+}
 .pp-home h1 {
+    overflow-wrap: anywhere;
     text-align: center;
     font-size: 26px;
     margin: 12px 0 32px;
@@ -67,6 +78,8 @@ body {
     object-fit: contain;
 }
 .self-panel .self-item.is-zh .name {
+    max-width: 100%;
+    overflow-wrap: anywhere;
     font-size: 13px;
     line-height: 20px;
     margin-top: 8px;

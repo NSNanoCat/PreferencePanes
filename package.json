@@ -24,7 +24,7 @@
         },
         "./browser": {
             "types": "./src/browser/index.d.ts",
-            "import": "./src/browser/index.mjs"
+            "import": "./dist/preference-panes.mjs"
         }
     },
     "types": "src/index.d.ts",
@@ -36,7 +36,9 @@
         "format": "biome check --write .",
         "typecheck": "tsc --noEmit",
         "build": "rollup -c",
+        "prebuild": "node --input-type=module -e \"import { rm } from 'node:fs/promises'; await rm('dist', { recursive: true, force: true });\"",
         "prepack": "npm run build",
+        "preview": "npm run build && node examples/preview.mjs",
         "apifox:generate": "node apifox/generate.mjs",
         "apifox:check": "node apifox/generate.mjs --check"
     },

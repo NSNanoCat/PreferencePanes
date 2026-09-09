@@ -7,17 +7,17 @@ import { validatePathParts } from "../lib/settings-path.mjs";
  * @typedef {object} ModuleSession
  * @property {AbortController} controller 读取请求的取消控制器 / Abort controller for reads.
  * @property {import("../index.js").ModuleDefinition | null} definition 加载完成的配置，加载中为 null / Loaded configuration, or null while loading.
- * @property {import("./index.js").ModuleSnapshot["values"]} values 当前显示值 / Current display values.
+ * @property {import("./client.mjs").ModuleSnapshot["values"]} values 当前显示值 / Current display values.
  * @property {boolean} saving 是否正在写入 / Whether a mutation is in progress.
  */
 
 /**
  * 创建页面会话缓存；打开时重读，选项操作仅在 HTTP 200 后更新缓存。
  * Create a page-session cache; reload on open and mutate cache only after HTTP 200.
- * @param {import("./index.js").PreferencesClientOptions} options 请求与通知 / Requests and notifications.
- * @returns {import("./index.js").PreferencesClient} 通用客户端 / Generic client.
+ * @param {import("./client.mjs").PreferencesClientOptions} options 包内目录、请求与通知 / Internal catalog, requests and notifications.
+ * @returns {import("./client.mjs").PreferencesClient} 通用客户端 / Generic client.
  */
-export function createPreferencesClient({ fetch: request = globalThis.fetch.bind(globalThis), notify = () => {}, timeout = 10000 } = {}) {
+export function createPreferencesClient({ catalog, fetch: request = globalThis.fetch.bind(globalThis), notify = () => {}, timeout = 10000 }) {
     /**
      * 模块会话表
      * Module session map.
@@ -71,7 +71,7 @@ export function createPreferencesClient({ fetch: request = globalThis.fetch.bind
      * 获取独立快照，避免调用方修改内部缓存。
      * Return an independent snapshot so callers cannot mutate the cache.
      * @param {string} module 已打开模块 / Open module.
-     * @returns {import("./index.js").ModuleSnapshot} 会话快照 / Session snapshot.
+     * @returns {import("./client.mjs").ModuleSnapshot} 会话快照 / Session snapshot.
      * @throws {Error} 模块未完成加载 / Module has not finished loading.
      */
     const snapshot = module => {
@@ -142,10 +142,12 @@ export function createPreferencesClient({ fetch: request = globalThis.fetch.bind
          * 替换旧会话，读取一次配置与一次设置子树。
          * Replace the previous session and read config and settings subtree once each.
          * @param {string} module 模块标识 / Module identifier.
-         * @returns {Promise<import("./index.js").ModuleSnapshot>} 新快照 / New snapshot.
+         * @returns {Promise<import("./client.mjs").ModuleSnapshot>} 新快照 / New snapshot.
          * @throws {Error} 读取失败、会话被替换或写入尚未完成 / Read failure, replaced session or unfinished write.
          */
         async open(module) {
+            const binding = catalog.modules.get(module);
+            if (!binding) throw new TypeError(`No BoxJS settings for module: ${module}`);
             const previous = sessions.get(module);
             if (previous?.saving) throw new Error("Cannot refresh while saving");
             previous?.controller.abort();
@@ -153,6 +155,7 @@ export function createPreferencesClient({ fetch: request = globalThis.fetch.bind
             sessions.set(module, state);
             try {
                 const definition = normalizeBoxJs(await (await send(configPath(module), "GET", undefined, state.controller.signal, true)).json(), module);
+                if (definition.storageKey !== binding.storageKey) throw new TypeError("Configuration Mock changed the BoxJS storage root");
                 if (definition.settingsPath.length < 2) throw new TypeError("BoxJS fields must share a settings subtree below the module root");
                 const response = await send(`/api/${definition.settingsPath.map(encodeURIComponent).join("/")}/`, "GET", undefined, state.controller.signal);
                 let subtree = response.status === 404 ? {} : await response.json();

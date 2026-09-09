@@ -1,29 +1,17 @@
 import { createPreferencesClient } from "./client.mjs";
+import { errorView, icon, element as node, resourceURL } from "./components.mjs";
 
 /**
  * 挂载从 BoxJS 实时生成的设置面板和短暂通知。
  * Mount runtime-generated BoxJS controls and transient notifications.
- * @param {import("./index.js").PreferencesPanelOptions} options 容器与请求；页面路径 /settings/{module} 对应配置 / Container and requests; /settings/{module} selects config.
- * @returns {import("./index.js").PreferencesPanel} 面板生命周期句柄 / Panel lifecycle handle.
+ * @param {HTMLElement} root 包内挂载元素 / Internal mount element.
+ * @param {import("../BoxJS.mjs").BoxJS} catalog 包内 BoxJS 目录 / Internal BoxJS catalog.
+ * @returns {import("./index.js").MountedPreferences} 面板生命周期句柄 / Panel lifecycle handle.
  */
-export function mountPreferencePanes({ element: root, fetch, title = "Preferences" }) {
+export function mountPanel(root, catalog) {
+    const title = catalog.metadata.name ?? "Preferences";
     const document = root.ownerDocument;
     const window = document.defaultView;
-    /**
-     * 创建元素，文本统一通过 textContent 写入。
-     * Create an element and assign text only through textContent.
-     * @template {keyof HTMLElementTagNameMap} T
-     * @param {T} tag HTML 标签 / HTML tag.
-     * @param {string} className 样式类名 / CSS class name.
-     * @param {string} [text] 纯文本内容 / Plain-text content.
-     * @returns {HTMLElementTagNameMap[T]} 对应类型的元素 / Element of the corresponding type.
-     */
-    const node = (tag, className, text) => {
-        const el = document.createElement(tag);
-        el.className = className;
-        if (text !== undefined) el.textContent = text;
-        return el;
-    };
     const shell = node("div", "pp-panel");
     const header = node("header", "pp-header");
     const back = node("button", "pp-back", "‹");
@@ -77,7 +65,7 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
             toast.hidden = true;
         }, 2400);
     };
-    const client = createPreferencesClient({ fetch, notify });
+    const client = createPreferencesClient({ catalog, notify });
     /**
      * 切换加载或错误视图，按用户的动态效果偏好播放过渡。
      * Replace a loading or error view, respecting reduced-motion preferences.
@@ -114,12 +102,10 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
             if (version === generation) controls();
         } catch (error) {
             if (version !== generation) return;
-            const view = node("section", "pp-error");
-            view.append(node("p", "", `加载失败：${error.message}`));
-            const retry = node("button", "", "重新读取");
-            retry.onclick = () => open(module);
-            view.append(retry);
-            replace(view, 1);
+            replace(
+                errorView(error, () => open(module)),
+                1,
+            );
         }
     }
     /**
@@ -204,25 +190,8 @@ export function mountPreferencePanes({ element: root, fetch, title = "Preference
         const metadata = definition.metadata;
         if (metadata) {
             const info = node("div", "pp-module-info");
-            const iconURL = metadata.icon || metadata.icons?.[1] || metadata.icons?.[0];
-            /**
-             * 将元数据地址解析为可显示的 HTTP(S) URL。
-             * Resolve a metadata address into an HTTP(S) URL suitable for display.
-             * @param {string} value 绝对或相对地址 / Absolute or relative address.
-             * @returns {string} 完整地址 / Absolute URL.
-             * @throws {TypeError} 非 HTTP(S) 协议 / Non-HTTP(S) protocol.
-             */
-            const resourceURL = value => {
-                const url = new window.URL(value, window.location.href);
-                if (!["http:", "https:"].includes(url.protocol)) throw new TypeError("Module metadata URLs must use HTTP or HTTPS");
-                return url.href;
-            };
-            if (iconURL) {
-                const image = node("img", "pp-module-icon");
-                image.src = resourceURL(iconURL);
-                image.alt = "";
-                info.append(image);
-            }
+            const image = icon(metadata, "pp-module-icon");
+            if (image) info.append(image);
             const details = node("div", "pp-module-details");
             for (const description of [metadata.author, metadata.desc ?? metadata.description, ...(metadata.descs ?? [])]) if (description) details.append(node("p", "pp-description", description));
             if (metadata.repo) {
