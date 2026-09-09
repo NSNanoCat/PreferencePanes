@@ -3,31 +3,59 @@ import http from "node:http";
 import vm from "node:vm";
 import { build } from "../src/index.mjs";
 
-// 预览只导入 BoxJS 和可选 CSS；代理存储使用独立内存，绝不读取用户设置。
-// Preview imports only BoxJS and optional CSS; isolated memory never reads the user's proxy settings.
-const boxjs = JSON.parse(await readFile(process.argv[2] ?? new URL("./Module.boxjs.json", import.meta.url), "utf8"));
-const css = process.argv[3] ? await readFile(process.argv[3], "utf8") : undefined;
-const files = await build(boxjs, css);
+// 测试台不生成项目入口。上传的两个文件只供模块预览，存储为独立内存。
+// The testbench is not a project landing page; uploads feed only module previews with isolated storage.
+const importer = await readFile(new URL("./index.html", import.meta.url), "utf8");
+const script = await readFile(new URL("./importer.mjs", import.meta.url), "utf8");
+let files = {};
 const store = new Map();
 const server = http.createServer(async (request, reply) => {
     try {
         const url = new URL(request.url, `http://${request.headers.host}`);
-        if (url.pathname === "/") {
-            reply.writeHead(302, { Location: "/settings/" });
-            reply.end();
+        if (["/", "/settings/", "/settings"].includes(url.pathname)) {
+            reply.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+            reply.end(importer);
             return;
         }
-        const module = /^\/configs\/([a-zA-Z0-9_-]+)$/.exec(url.pathname)?.[1];
-        const script = module ? files[`settings/assets/${module}.config.js`] : files["settings/assets/PreferencePanes.request.js"];
-        if (!script) {
-            reply.writeHead(404);
-            reply.end();
+        if (url.pathname === "/importer.mjs") {
+            reply.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8" });
+            reply.end(script);
             return;
         }
         let body = "";
         for await (const chunk of request) body += chunk;
+        if (url.pathname === "/preview" && request.method === "POST") {
+            files = {};
+            store.clear();
+            try {
+                const input = JSON.parse(body);
+                files = await build(input.boxjs, input.css);
+                const page = Object.keys(files).find(path => path.endsWith("/index.html"));
+                reply.writeHead(200, { "Content-Type": "application/json" });
+                reply.end(JSON.stringify({ url: `/${page.slice(0, -"index.html".length)}`, module: page.split("/")[1] }));
+            } catch (error) {
+                reply.writeHead(400, { "Content-Type": "application/json" });
+                reply.end(JSON.stringify({ error: error.message }));
+            }
+            return;
+        }
+        const path = url.pathname.slice(1);
+        const entry = files[path] ?? files[`${path.replace(/\/$/, "")}/index.html`];
+        if (entry !== undefined && ["GET", "HEAD"].includes(request.method)) {
+            const type = path.endsWith(".css") ? "text/css" : path.endsWith(".mjs") || path.endsWith(".js") ? "text/javascript" : path.endsWith(".json") ? "application/json" : "text/html";
+            reply.writeHead(200, { "Content-Type": `${type}; charset=utf-8`, "Cache-Control": "no-store" });
+            reply.end(request.method === "HEAD" ? "" : entry);
+            return;
+        }
+        const match = /^\/(api|configs)\/([a-zA-Z0-9_-]+)(?:\/|$)/.exec(url.pathname);
+        const runtime = match && files[`settings/assets/${match[2]}.${match[1] === "configs" ? "config" : "request"}.js`];
+        if (!runtime) {
+            reply.writeHead(404);
+            reply.end();
+            return;
+        }
         const response = await new Promise(resolve =>
-            vm.runInNewContext(script, {
+            vm.runInNewContext(runtime, {
                 $environment: { "surge-version": "preview" },
                 $script: { startTime: Date.now() / 1000 },
                 $persistentStore: {
@@ -52,4 +80,4 @@ const server = http.createServer(async (request, reply) => {
         reply.end("Preview failed");
     }
 });
-server.listen(Number(process.env.PORT ?? 0), "127.0.0.1", () => console.log(`PreferencePanes: http://127.0.0.1:${server.address().port}/settings/`));
+server.listen(Number(process.env.PORT ?? 0), "127.0.0.1", () => console.log(`PreferencePanes import test: http://127.0.0.1:${server.address().port}/`));
