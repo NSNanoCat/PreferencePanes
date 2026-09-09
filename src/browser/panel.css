@@ -106,7 +106,8 @@
     }
 }
 .pp-fields,
-.pp-choice-page {
+.pp-choice-page,
+.pp-cache-page {
     position: absolute;
     inset: 0;
     overflow: auto;
@@ -283,27 +284,13 @@ select.pp-input {
     color: inherit;
     text-decoration: underline;
 }
-.pp-maintenance {
-    margin-top: 24px;
-}
-.pp-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-.pp-actions button,
 .pp-error button {
     min-height: 44px;
     padding: 8px 12px;
     border-radius: 6px;
     background: var(--pp-surface);
 }
-.pp-panel .pp-danger {
-    color: #e45656;
-}
 .pp-cache {
-    max-height: 320px;
-    overflow: auto;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }

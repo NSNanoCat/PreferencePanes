@@ -1,4 +1,6 @@
+export { ActionMenu } from "./ActionMenu.mjs";
 export { ModuleFrame } from "./ModuleFrame.mjs";
+export { ModuleStatus } from "./ModuleStatus.mjs";
 
 /**
  * 同一文档内的主页/子页导航；iframe 各自的实例通过浏览器联合历史协作。

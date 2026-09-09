@@ -1,0 +1,41 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { ModuleStatus } from "../src/browser/ModuleStatus.mjs";
+
+test("status row uses HEAD and displays module versions or not installed", async t => {
+    const element = { dataset: {}, textContent: "", title: "" };
+    const status = new ModuleStatus(element);
+    let response = new Response(null, { status: 200, headers: { "X-PreferencePanes-Version": "dev.abc1234" } });
+    const fetch = t.mock.method(globalThis, "fetch", async () => response);
+    await status.check("https://example.org/configs/Module");
+    assert.equal(fetch.mock.calls[0].arguments[1].method, "HEAD");
+    assert.equal(element.textContent, "dev.abc1234");
+    assert.equal(status.state.status, "installed");
+    response = new Response(null, { status: 404 });
+    await status.check("https://example.org/configs/Module");
+    assert.equal(element.textContent, "未安装");
+    response = new Response(null, { status: 200 });
+    await status.check("https://example.org/configs/Module");
+    assert.equal(element.textContent, "版本未知");
+    assert.equal(status.state.status, "installed");
+    status.destroy();
+});
+
+test("late and cancelled probes cannot overwrite newer status", async t => {
+    const element = { dataset: {} };
+    const status = new ModuleStatus(element);
+    const pending = [];
+    t.mock.method(globalThis, "fetch", () => new Promise(resolve => pending.push(resolve)));
+    const first = status.check("/configs/Module");
+    const second = status.check("/configs/Module");
+    pending[1](new Response(null, { status: 404 }));
+    await second;
+    pending[0](new Response(null, { status: 200 }));
+    await first;
+    assert.equal(element.textContent, "未安装");
+    const last = status.check("/configs/Module");
+    status.destroy();
+    pending[2](new Response(null, { status: 200 }));
+    await last;
+    assert.equal(element.textContent, "检测中");
+});

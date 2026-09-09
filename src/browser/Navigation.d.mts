@@ -19,7 +19,7 @@ export class ModuleFrame extends EventTarget {
      * change 事件对应的导航状态。
      * Navigation state exposed with change events.
      */
-    readonly state: { title: string; module: string; busy: boolean; canGoBack: boolean };
+    readonly state: { title: string; module: string; busy: boolean; canGoBack: boolean; actions: MenuAction[] };
     /**
      * 获取原始 HTML。
      * Fetch unmodified HTML.
@@ -33,8 +33,106 @@ export class ModuleFrame extends EventTarget {
      */
     back(): void;
     /**
+     * 执行模块提供的菜单操作。
+     * Perform a module-provided menu action.
+     * @param id 操作标识 / Action identifier.
+     * @returns 无返回值 / No return value.
+     */
+    perform(id: string): void;
+    /**
      * 取消请求与事件订阅。
      * Cancel requests and subscriptions.
+     * @returns 无返回值 / No return value.
+     */
+    destroy(): void;
+}
+
+/**
+ * 菜单操作描述。
+ * Menu action descriptor.
+ */
+export interface MenuAction {
+    /**
+     * 操作标识。
+     * Action identifier.
+     */
+    id: string;
+    /**
+     * 显示文字。
+     * Display text.
+     */
+    label: string;
+    /**
+     * 危险操作样式。
+     * Destructive action style.
+     */
+    destructive?: boolean;
+}
+
+/**
+ * 共用三点菜单。
+ * Shared overflow menu.
+ */
+export class ActionMenu {
+    /**
+     * 创建菜单。
+     * Create a menu.
+     * @param select 选择回调 / Selection callback.
+     */
+    constructor(select: (id: string) => void);
+    /**
+     * 菜单节点。
+     * Menu element.
+     */
+    readonly element: HTMLElement;
+    /**
+     * 更新操作列表。
+     * Update available actions.
+     * @param items 操作列表 / Actions.
+     * @param disabled 是否忙碌 / Busy state.
+     * @returns 无返回值 / No return value.
+     */
+    update(items: MenuAction[], disabled?: boolean): void;
+    /**
+     * 关闭菜单。
+     * Close the menu.
+     * @returns 无返回值 / No return value.
+     */
+    close(): void;
+    /**
+     * 释放组件。
+     * Release the component.
+     * @returns 无返回值 / No return value.
+     */
+    destroy(): void;
+}
+
+/**
+ * HEAD 探测的固定模块状态行。
+ * Fixed module status row backed by HEAD probes.
+ */
+export class ModuleStatus extends EventTarget {
+    /**
+     * 绑定状态行。
+     * Bind a status row.
+     * @param element 状态行节点 / Status row node.
+     */
+    constructor(element: HTMLElement);
+    /**
+     * 当前状态及模块版本。
+     * Current state and module version.
+     */
+    readonly state: { status: "checking" | "installed" | "missing"; version: string | null };
+    /**
+     * 探测配置 Mock。
+     * Probe a configuration Mock.
+     * @param url 配置地址 / Configuration URL.
+     * @returns 探测完成 / Probe completion.
+     */
+    check(url: string | URL): Promise<void>;
+    /**
+     * 取消探测。
+     * Cancel probes.
      * @returns 无返回值 / No return value.
      */
     destroy(): void;

@@ -20,6 +20,8 @@ await fetch("/api/set", {
 
 ## 页面与输入
 
+主页状态行使用 `@nsnanocat/preference-panes/navigation` 的 `ModuleStatus`。组件只 HEAD 配置地址，失败显示“未安装”，成功读取 X-PreferencePanes-Version 显示业务模块版本；旧配置未提供版本头时显示“版本未知”。状态行始终占据第二行，不读取持久化设置。
+
 ```js
 import { mount } from "@nsnanocat/preference-panes/browser";
 const page = mount(boxjs, ".pp-panel { --pp-accent: #16866a; }");
@@ -46,6 +48,8 @@ frame.destroy();
 ModuleFrame 在 iframe 元素上保存原请求上下文，HTML 原样加载，不从 about:srcdoc 猜模块、不注入临时 CSS。框架自身管理嵌入模式，通过事件发布标题、忙碌状态和返回能力。Navigation 统一管理 fragment 历史、滑动、滚动保留、加载取消及动画结束后释放；项目提供根页、子页工厂和布局。
 
 每次进入模块读取 JSON/CSS 和设置一次。二级多选返回复用内存缓存，修改立即写入；成功提示、失败回滚由公共组件处理。Caches 按需查看/清空，重置只删除指定模块子树。
+
+模块数据操作位于标题栏右侧三点菜单，页面不再平铺维护按钮。`ActionMenu` 为独立页和宿主常驻顶栏共用组件；宿主将 `frame.state.actions` 传给 `menu.update(actions, busy)`，选择时调用 `frame.perform(id)`。缓存查看进入可返回的缓存子页，清空和重置仍要求确认。菜单组件处理外部点击、Escape、方向键与 Tab，宿主不访问 iframe 内部 DOM。
 
 ## 构建与验证
 
