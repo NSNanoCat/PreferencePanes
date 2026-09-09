@@ -79,8 +79,8 @@ export interface SettingsHandlerOptions {
 	origin: string;
 	/** 顶层持久化键，不能使用 @ 路径语法 / Literal top-level storage key, without @ path syntax. */
 	storageKey: string;
-	/** /api/ 后的模块段，只能访问该模块内的数据 / Module segment following /api/; access stays within this module. */
-	module: string;
+	/** /api/ 后允许访问的模块；独立通用模块可声明多个 / Allowed module segments following /api/; a standalone installation can declare several. */
+	module: string | string[];
 	/** 默认 X-Settings-Client，值必须为 1；不是认证凭据 / Defaults to X-Settings-Client with value 1; not an authentication credential. */
 	requestHeader?: string;
 }

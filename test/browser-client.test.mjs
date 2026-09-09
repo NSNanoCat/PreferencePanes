@@ -13,6 +13,26 @@ test("missing or invalid module never sends a request", async () => {
 	assert.equal(calls.length, 0);
 });
 
+test("missing or invalid BoxJS blocks the form even when the storage API is available", async () => {
+	for (const body of [null, [], { apps: [] }]) {
+		const calls = [];
+		const client = createPreferencesClient({
+			fetch: async (path, options) => {
+				calls.push([options.method, path]);
+				if (path.startsWith("/api/")) return Response.json({ count: 9 });
+				return new Response(options.method === "HEAD" ? null : JSON.stringify(body), { status: body === null ? 404 : 200 });
+			},
+		});
+		assert.equal(await client.probe("Module"), body !== null);
+		await assert.rejects(client.open("Module"));
+		assert.throws(() => client.snapshot("Module"), /Open/);
+		assert.deepEqual(calls, [
+			["HEAD", "/configs/Module"],
+			["GET", "/configs/Module"],
+		]);
+	}
+});
+
 test("native subtree reads preserve falsy values and default only for undefined", async () => {
 	const { client, state } = fixture();
 	state.stored = { Home: { enabled: false, mode: "a" }, items: [], count: 0, note: "" };

@@ -128,3 +128,15 @@ test("paths preserve decoding and reject unsafe segments", () => {
 	assert.deepEqual(parseSettingsPath("https://example.org/api/%4Dodule/Settings/key/"), ["Module", "Settings", "key"]);
 	for (const path of ["", "Module//", "Module/a%2fb", "Module/__proto__/x"]) assert.throws(() => parseSettingsPath("https://example.org/api/" + path));
 });
+
+test("one standalone installation routes allowed modules and preserves their storage boundaries", async () => {
+	const handler = new SettingsHandler({ ...options, module: ["Module", "Other"] });
+	assert.throws(() => new SettingsHandler({ ...options, module: [] }));
+	assert.throws(() => new SettingsHandler({ ...options, module: ["Module", "__proto__"] }));
+	assert.equal((await handler.handle(req("POST", "Module/Settings/key", 1))).status, 200);
+	assert.equal((await handler.handle(req("POST", "Other/Settings/key", 2))).status, 200);
+	assert.equal(JSON.parse((await handler.handle(req("GET", "Other/Settings/key"))).body), 2);
+	assert.equal((await handler.handle(req("POST", "Unknown/Settings/key", 3))).status, 404);
+	assert.equal((await handler.handle(req("DELETE", "Module/"))).status, 200);
+	assert.deepEqual(JSON.parse(store.get("Root")), { Other: { Settings: { key: 2 } } });
+});
