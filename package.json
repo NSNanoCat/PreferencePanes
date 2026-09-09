@@ -50,12 +50,10 @@
         "src",
         "dist"
     ],
-    "dependencies": {
-        "@nsnanocat/url": "^1.2.6",
-        "@nsnanocat/util": "^2.7.4"
-    },
     "devDependencies": {
         "@biomejs/biome": "2.1.4",
+        "@nsnanocat/url": "^1.2.6",
+        "@nsnanocat/util": "^2.7.4",
         "@rollup/plugin-node-resolve": "^16.0.3",
         "rollup": "^4.63.1",
         "typescript": "^5.9.3"

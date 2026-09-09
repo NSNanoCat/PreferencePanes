@@ -25,7 +25,7 @@ globalThis.$httpClient = {
 };
 const { Store } = await import("../src/Store.mjs");
 const { BoxJS } = await import("../src/BoxJS.mjs");
-const { parseSettingsPath } = await import("../src/lib/settings-path.mjs");
+const { parseSettingsPathname } = await import("../src/lib/settings-path.mjs");
 const catalog = new BoxJS([{ id: "@Root.Module.Settings.key" }]);
 const req = (method, path = "Module/Settings/key", body = undefined) => ({
     url: `https://example.org/api/${path}`,
@@ -126,8 +126,8 @@ test("storage roots come only from BoxJS, not headers or deployment origin", asy
 });
 
 test("paths preserve decoding and reject unsafe segments", () => {
-    assert.deepEqual(parseSettingsPath("https://example.org/api/%4Dodule/Settings/key/"), ["Module", "Settings", "key"]);
-    for (const path of ["", "Module//", "Module/a%2fb", "Module/__proto__/x"]) assert.throws(() => parseSettingsPath("https://example.org/api/" + path));
+    assert.deepEqual(parseSettingsPathname("/api/%4Dodule/Settings/key/"), ["Module", "Settings", "key"]);
+    for (const path of ["", "Module//", "Module/a%2fb", "Module/__proto__/x"]) assert.throws(() => parseSettingsPathname(`/api/${path}`));
 });
 
 test("one standalone installation routes allowed modules and preserves their storage boundaries", async () => {

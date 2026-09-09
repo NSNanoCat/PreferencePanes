@@ -21,7 +21,7 @@ export async function run(boxjs, css = "") {
         const url = new URL(request.url);
         switch (true) {
             case url.pathname.startsWith("/api/"):
-                result = await new Store(catalog).handle(request);
+                result = await new Store(catalog).handle(request, url);
                 break;
             case url.pathname.startsWith("/configs/"):
                 break;

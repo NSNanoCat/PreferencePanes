@@ -24,10 +24,10 @@ export class Store {
      * GET 返回指定值，POST 替换指定值，DELETE 删除指定键或整个模块。
      * GET returns a value, POST replaces it, and DELETE removes a key or the entire module.
      * @param {import("./index.js").SettingsRequest} request 代理请求 / Proxy request.
+     * @param {URL} [url] 包内复用的已解析地址 / Parsed URL reused within the package.
      * @returns {Promise<import("./index.js").SettingsResponse | undefined>} 响应或非接管请求 / Response, or undefined for an unhandled request.
      */
-    async handle(request) {
-        const url = new URL(request.url);
+    async handle(request, url = new URL(request.url)) {
         if (!url.pathname.startsWith("/api/")) return;
         const reply = (status, data) => response(request, status, data);
         let parts;

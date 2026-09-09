@@ -156,7 +156,6 @@ export function createPreferencesClient({ catalog, fetch: request = globalThis.f
             try {
                 const definition = normalizeBoxJs(await (await send(configPath(module), "GET", undefined, state.controller.signal, true)).json(), module);
                 if (definition.storageKey !== binding.storageKey) throw new TypeError("Configuration Mock changed the BoxJS storage root");
-                if (definition.settingsPath.length < 2) throw new TypeError("BoxJS fields must share a settings subtree below the module root");
                 const response = await send(`/api/${definition.settingsPath.map(encodeURIComponent).join("/")}/`, "GET", undefined, state.controller.signal);
                 let subtree = response.status === 404 ? {} : await response.json();
                 if (typeof subtree === "string") subtree = JSON.parse(subtree);

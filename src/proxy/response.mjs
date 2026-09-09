@@ -8,5 +8,9 @@ import { done } from "@nsnanocat/util/lib/done.mjs";
  * @returns {void} 响应已交给宿主 / Response delivered to the host.
  */
 export function complete(result) {
-    done(!result ? {} : $app === "Quantumult X" ? result : { response: result });
+    if (!result) {
+        done({});
+        return;
+    }
+    done($app === "Quantumult X" ? result : { response: result });
 }

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
 import { build } from "../src/index.mjs";
@@ -12,6 +13,15 @@ const document = {
     ],
 };
 const files = await build(document, ":root { --accent: red; }");
+
+test("published entry points expose only build and mount and discard obsolete artifacts", async () => {
+    assert.deepEqual(Object.keys(await import("../src/index.mjs")), ["build"]);
+    assert.deepEqual(Object.keys(await import("../dist/preference-panes.mjs")), ["mount"]);
+    const browser = await readFile(new URL("../dist/preference-panes.mjs", import.meta.url), "utf8");
+    assert.doesNotMatch(browser, /node:fs|node-fetch|\$persistentStore|@nsnanocat\/util/);
+    assert.doesNotMatch(browser, /site\.boxjs\.json|proxies\.json|runPreferences|mountPreferencePanes/);
+    for (const file of ["preference-panes.request.js", "settings/panel.css", "settings/home.css"]) await assert.rejects(access(new URL(`../dist/${file}`, import.meta.url)), { code: "ENOENT" });
+});
 
 test("two inputs produce all resources and independent config Mocks", async () => {
     assert.deepEqual(JSON.parse(files["settings/assets/boxjs.json"]), document);

@@ -1,16 +1,3 @@
-import { URL } from "@nsnanocat/url";
-
-/**
- * 将 /api/ 后的 URL 路径转换为 util 的路径片段；非 API 路径不处理。
- * Convert URL segments after /api/ to util path segments; ignore non-API paths.
- * @param {string} url 请求完整 URL / Absolute request URL.
- * @returns {string[] | undefined} 键路径片段 / Key path segments.
- * @throws {TypeError} API 路径无效或包含危险片段 / Invalid or unsafe API path.
- */
-export function parseSettingsPath(url) {
-    return parseSettingsPathname(new URL(url).pathname);
-}
-
 /**
  * 解析已经取得的 pathname，避免重复构造 URL。
  * Parse an existing pathname without constructing another URL.

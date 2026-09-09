@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { BoxJS } from "../src/BoxJS.mjs";
 import { createPreferencesClient } from "../src/browser/client.mjs";
@@ -50,32 +49,6 @@ test("native subtree reads preserve falsy values and default only for undefined"
     assert.equal(reopened.values["Module.Settings.count"], 1);
 });
 
-test("template config Mock and API script patterns are disjoint regardless of rule order", async () => {
-    const template = await readFile(new URL("../examples/surge.sgmodule", import.meta.url), "utf8");
-    const mock = new RegExp(
-        template
-            .split("\n")
-            .find(line => line.startsWith("^") && line.includes("/configs/"))
-            .split(" ")[0],
-    );
-    const script = new RegExp(template.match(/pattern=([^,]+)/)[1]);
-    const page = new RegExp(
-        template
-            .split("\n")
-            .find(line => line.startsWith("^") && line.includes("/settings/"))
-            .split(" ")[0],
-    );
-    assert.equal(page.test("https://example.org/settings/Module"), true);
-    assert.equal(page.test("https://example.org/settings/?module=Module"), false);
-    assert.equal(page.test("https://example.org/settings/Other"), true);
-    for (const url of ["https://example.org/configs/Module", "https://example.org/api/Module/", "https://example.org/api/Module/Settings/", "https://example.org/api/Module/Settings/enabled"]) {
-        assert.equal(Number(mock.test(url)) + Number(script.test(url)), 1, url);
-        assert.equal(mock.test(url), url.includes("/configs/"));
-    }
-    assert.equal(script.test("https://example.org/api/ModuleOther/Settings/"), false);
-    assert.equal(mock.test("https://example.org/configs/Other"), false);
-});
-
 function fixture() {
     const calls = [],
         notifications = [];
@@ -105,6 +78,23 @@ test("fresh or reset modules load defaults when their stored subtree is absent",
     state.settingsStatus = 200;
     state.stored = JSON.stringify({ count: 9 });
     assert.equal((await client.open("Module")).values["Module.Settings.count"], 9);
+});
+
+test("BoxJS can address fields directly below the module without a fixed Settings directory", async () => {
+    const { client, state, calls } = fixture();
+    state.config = [{ id: "@Example.Module.flag", name: "Flag", type: "boolean", val: false }];
+    state.stored = { flag: true };
+    const result = await client.open("Module");
+    assert.deepEqual(result.definition.settingsPath, ["Module"]);
+    assert.equal(result.values["Module.flag"], true);
+    assert.equal(calls[1].url, "/api/Module/");
+});
+
+test("a fresh Mock cannot redirect the binding derived from the input JSON", async () => {
+    const { client, state, calls } = fixture();
+    state.config = [{ id: "@Different.Module.flag", name: "Flag", type: "boolean", val: false }];
+    await assert.rejects(client.open("Module"), /changed the BoxJS storage root/);
+    assert.equal(calls.length, 1);
 });
 
 test("cache inspection is explicit; clear and reset use DELETE without follow-up GET", async () => {

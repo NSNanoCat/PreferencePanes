@@ -28,4 +28,5 @@ test("catalog rejects external mappings and ambiguous module roots", () => {
     for (const input of [undefined, "https://example.org/config.json", { origin: "https://example.org", storageKey: "Root", module: "Module" }, { apps: [{ module: "Module", name: "Old menu" }] }]) assert.throws(() => new BoxJS(input));
     assert.throws(() => new BoxJS([{ id: "@One.Module.Settings.a" }, { id: "@Two.Module.Settings.b" }]), /one storage root/);
     assert.equal(new BoxJS([]).modules.size, 0);
+    assert.throws(() => new BoxJS([{ id: "@@One.Module.Settings.a" }]), /literal storage root/);
 });

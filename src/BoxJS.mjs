@@ -25,7 +25,7 @@ export class BoxJS {
                     continue;
                 }
                 const [storageKey, ...parts] = entry.id.slice(1).split(".");
-                if (!storageKey || parts.length < 2) throw new TypeError("A BoxJS setting must be below the module root");
+                if (!storageKey || storageKey.startsWith("@") || parts.length < 2) throw new TypeError("A BoxJS setting must be below a literal storage root and module");
                 validatePathParts(parts);
                 const module = parts[0];
                 let target = this.modules.get(module);

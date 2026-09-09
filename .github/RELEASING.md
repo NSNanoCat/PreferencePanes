@@ -1,5 +1,7 @@
 # PreferencePanes 发布流程与历史记录
 
+当前两输入重构尚未发布。新入口为 build(boxjs, css?) 与 mount(boxjs, css?)，旧安装参数及导出已移除；发布前需使用候选包验证 BoxJS/CSS 构建、默认样式、配置 Mock 与跨根存储。以下版本信息是历史记录，不代表当前输入契约。
+
 已发布 `0.3.0`：SettingsHandler 改为安装配置驱动的存储桥接，参数为 origin/storageKey/module，API 不再下载 BoxJS；GET/POST/DELETE 支持模块内任意键和子树。前端增加 Caches 查看/清空与模块重置。由于移除 configURL/resolver 并放开字段限制，消费者必须同步更新安装参数。
 
 两个 registry 的 `0.3.0` 包 SHA-1 均为 `32232da92719e6f5c7cb7a588b4fd88a8f7ad4c4`。

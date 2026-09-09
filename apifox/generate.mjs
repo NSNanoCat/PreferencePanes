@@ -65,7 +65,7 @@ const header = (name, example, description, required = false) => ({
     example,
     description,
 });
-const headers = [header("X-Settings-Client", "1", "默认页面标记，不是认证凭据；调用方可通过 requestHeader 改名。", true), header("Origin", "", "浏览器请求来源；存在时必须与代理脚本配置的 origin 相同，不预设项目域名。")];
+const headers = [header("X-Settings-Client", "1", "固定页面标记，不是认证凭据，不接受配置改名。", true), header("Origin", "", "浏览器请求来源；存在时必须等于目标请求 URL 的 origin，不需要安装参数。")];
 const descriptions = {
     400: "非法路径或 JSON 值",
     403: "缺标记或异源",
@@ -86,7 +86,7 @@ const declarations = [
         mock: true,
         page: true,
         schema: {},
-        example: '<!doctype html><html><body><main id="preferences"></main><script type="module">import { mountPreferencePanes } from "/resources/preference-panes.mjs"; mountPreferencePanes({ element: document.querySelector("#preferences") });</script></body></html>',
+        example: '<!doctype html><html><body><main id="preferences"></main><script type="module" src="/settings/assets/app.mjs"></script></body></html>',
         description: "同一份 HTML 从 /settings/{module} 路径读取模块标识，按约定 GET /configs/{module} 取得 BoxJS 并生成设置界面。不使用查询参数。缺失、多余或非法路径段不发送请求。",
     },
     {
@@ -228,7 +228,7 @@ const apis = declarations.map(entry => {
         tags: [entry.group],
         operationId: `preference_panes_${id}`,
         sourceUrl: "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/Specification.md",
-        description: `## 接口用途\n\n${entry.description}\n\n## 请求契约\n\n\`${method.toUpperCase()} ${entry.path}\`\n\nmodule 是必填路径参数，必须属于插件安装配置中的模块。${entry.path.includes("{path}") ? "path 是模块内的相对路径，可包含以 / 分隔的多级目录。" : ""}路径参数不预填业务示例值；具体取值由接入项目决定。${entry.mock ? "该资源由代理 Mock 提供，不需要 X-Settings-Client 请求头。" : "请求需携带 X-Settings-Client: 1；该标记不是认证凭据。"}\n\n${method === "post" ? "正文必须为 application/json，直接传路径处的 JSON 值本身，允许对象、数组和 null。API 不校验 BoxJS 类型或枚举。" : "请求没有正文。"}\n\n${entry.example === undefined ? "" : `## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n\`\`\`${entry.page ? "html" : "json"}\n${entry.page ? entry.example : JSON.stringify(entry.example, null, 2)}\n\`\`\`\n\n`}## 调用流程与具体示例\n\n${specification}`,
+        description: `## 接口用途\n\n${entry.description}\n\n## 请求契约\n\n\`${method.toUpperCase()} ${entry.path}\`\n\nmodule 是必填路径参数，必须由输入 BoxJS 的字段 ID 推导得到。${entry.path.includes("{path}") ? "path 是模块内的相对路径，可包含以 / 分隔的多级目录。" : ""}路径参数不预填业务示例值；具体取值由接入项目决定。${entry.mock ? "该资源由代理 Mock 提供，不需要 X-Settings-Client 请求头。" : "请求需携带 X-Settings-Client: 1；该标记不是认证凭据。"}\n\n${method === "post" ? "正文必须为 application/json，直接传路径处的 JSON 值本身，允许对象、数组和 null。API 不校验 BoxJS 类型或枚举。" : "请求没有正文。"}\n\n${entry.example === undefined ? "" : `## 响应示例（仅用于说明）\n\n以下是一个接入项目的示例，不是固定字段、默认请求值或 Mock 规则。\n\n\`\`\`${entry.page ? "html" : "json"}\n${entry.page ? entry.example : JSON.stringify(entry.example, null, 2)}\n\`\`\`\n\n`}## 调用流程与具体示例\n\n${specification}`,
         parameters: {
             path: [
                 {

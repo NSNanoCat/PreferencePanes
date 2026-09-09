@@ -2,7 +2,7 @@ import defaults from "#styles";
 import { BoxJS } from "../BoxJS.mjs";
 import { installation } from "../lib/installation.mjs";
 import { createPreferencesClient } from "./client.mjs";
-import { icon, element as node } from "./components.mjs";
+import { icon, element as node, resourceURL } from "./components.mjs";
 import { mountPanel } from "./panel.mjs";
 
 /**
@@ -15,6 +15,11 @@ import { mountPanel } from "./panel.mjs";
 export function mount(boxjs, css = "") {
     if (typeof css !== "string") throw new TypeError("CSS must be a string");
     const catalog = new BoxJS(boxjs);
+    for (const metadata of [catalog.metadata, ...Array.from(catalog.modules.values(), entry => entry.metadata)]) {
+        const image = metadata.icon || metadata.icons?.[1] || metadata.icons?.[0];
+        if (image) resourceURL(image);
+        if (metadata.repo) resourceURL(metadata.repo);
+    }
     const existing = document.querySelector("#preferences");
     const root = existing ?? node("main", "");
     if (!existing) {
