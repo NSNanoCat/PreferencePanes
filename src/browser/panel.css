@@ -111,7 +111,8 @@
     position: absolute;
     inset: 0;
     overflow: auto;
-    padding: 12px max(16px, calc((100% - 688px) / 2)) calc(28px + env(safe-area-inset-bottom));
+    padding: 12px max(16px, calc((100% - 688px) / 2)) calc(28px + env(safe-area-inset-bottom) + var(--pp-keyboard-height, 0px));
+    scroll-padding-bottom: var(--pp-keyboard-height, 0px);
     background: var(--pp-background);
 }
 .pp-panel .form-group {
