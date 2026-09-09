@@ -28,7 +28,9 @@
     align-items: center;
     background: var(--pp-surface);
     border-bottom: 1px solid var(--pp-border);
-    position: relative;
+    position: sticky;
+    top: 0;
+    z-index: 1;
 }
 .pp-title {
     font-size: 17px;
@@ -37,9 +39,29 @@
     min-width: 0;
     overflow-wrap: anywhere;
 }
-.pp-header .pp-title {
+.pp-brand {
     flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
     text-align: center;
+}
+.pp-brand-icon {
+    display: none;
+    flex: none;
+    width: 28px;
+    height: 28px;
+}
+.pp-brand-icon:not(:empty) {
+    display: block;
+}
+.pp-brand-icon img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
 }
 .pp-nav-spacer {
     width: 44px;

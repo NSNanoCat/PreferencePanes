@@ -44,6 +44,7 @@ function resources() {
  */
 export default [
     { input: "src/browser/index.mjs", output: { file: "dist/preference-panes.mjs", format: "es" } },
+    { input: "src/browser/Navigation.mjs", output: { file: "dist/module/navigation.mjs", format: "es" } },
     { input: "src/proxy/handler.mjs", output: { file: "dist/preference-panes.proxy.js", format: "iife", name: "PreferencePanes" } },
     {
         input: "src/browser/app.mjs",

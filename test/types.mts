@@ -1,6 +1,15 @@
 import type { BoxJSInput, ModuleDefinition, SettingsField } from "@nsnanocat/preference-panes";
 import { build } from "@nsnanocat/preference-panes";
 import { mount } from "@nsnanocat/preference-panes/browser";
+import { Navigation } from "@nsnanocat/preference-panes/navigation";
+
+const navigation = new Navigation(document.body, document.createElement("main"), (_key, signal) => {
+    void signal.aborted;
+    return document.createElement("section");
+});
+navigation.open("detail");
+navigation.back();
+navigation.destroy();
 
 const boxjs: BoxJSInput = { name: "Example", apps: [{ name: "App", settings: [{ id: "@Root.Module.Settings.flag", name: "Flag", type: "boolean", val: true }] }] };
 const files: Record<string, string> = await build(boxjs);
