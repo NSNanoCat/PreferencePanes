@@ -24,31 +24,31 @@ export function createPreferencesClient({ catalog, fetch: request = globalThis.f
      */
     const sessions = new Map();
     /**
-     * 发送同源请求，处理超时与取消；数据 GET 的 404 交给调用方处理。
-     * Send a same-origin request with timeout and cancellation; callers handle missing-data GET responses.
-     * @param {string} path 相对请求路径 / Relative request path.
-     * @param {"HEAD" | "GET" | "POST" | "DELETE"} method HTTP 方法 / HTTP method.
-     * @param {unknown} body POST 值，其它方法忽略 / POST value, ignored by other methods.
+     * 用 form 发送完整存储键；读取 404 交给调用方处理。
+     * Send a complete storage key as form data; callers handle missing reads.
+     * @param {string} path 完整 @root.path / Complete @root.path.
+     * @param {"get" | "set" | "delete"} action 存储操作 / Storage operation.
+     * @param {unknown} body set 值，其它操作忽略 / Set value, ignored by other operations.
      * @param {AbortSignal | undefined} signal 会话取消信号 / Session cancellation signal.
      * @returns {Promise<Response>} 未消费正文的响应 / Response with an unread body.
      * @throws {Error} 非 200 且非数据 GET 404、超时、取消或网络错误 / Non-200 status except missing-data GETs, timeout, cancellation or network error.
      */
-    async function send(path, method, body, signal) {
+    async function send(path, action, body, signal) {
         const controller = new AbortController();
         const abort = () => controller.abort();
         if (signal?.aborted) abort();
         signal?.addEventListener("abort", abort, { once: true });
         const timer = setTimeout(abort, timeout);
         try {
-            const response = await request(path, {
-                method,
+            const response = await request(`/api/${action}`, {
+                method: "POST",
                 credentials: "omit",
                 cache: "no-store",
                 signal: controller.signal,
-                headers: { "X-Settings-Client": "1", ...(method === "POST" ? { "Content-Type": "application/json" } : {}) },
-                ...(method === "POST" ? { body: JSON.stringify(body) } : {}),
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams([[path, action === "set" ? JSON.stringify(body) : ""]]).toString(),
             });
-            if (response.status !== 200 && !(method === "GET" && response.status === 404)) throw new Error(`HTTP ${response.status}`);
+            if (response.status !== 200 && !(action === "get" && response.status === 404)) throw new Error(`HTTP ${response.status}`);
             return response;
         } finally {
             clearTimeout(timer);
@@ -72,21 +72,21 @@ export function createPreferencesClient({ catalog, fetch: request = globalThis.f
      * Serialize single-key mutations and update a still-active session only after success.
      * @param {string} module 已打开模块 / Open module.
      * @param {string} key 完整点分字段路径 / Complete dotted field path.
-     * @param {"POST" | "DELETE"} method 写入或删除 / Write or delete.
+     * @param {"set" | "delete"} action 写入或删除 / Write or delete.
      * @param {unknown} value 写入值，删除时忽略 / Write value, ignored for deletion.
      * @param {"write" | "delete" | "clearCaches" | "reset"} [operation] 操作类型 / Operation kind.
      * @returns {Promise<void>} 操作完成 / Operation completion.
      * @throws {Error} 会话、字段、值或请求错误 / Session, field, value or request error.
      */
-    async function change(module, key, method, value, operation = method === "POST" ? "write" : "delete") {
+    async function change(module, key, action, value, operation = action === "set" ? "write" : "delete") {
         const state = sessions.get(module);
         if (!state?.definition) throw new Error("Open the module first");
         if (state.saving) throw new Error("A settings write is already in progress");
         const field = state.definition.fields.find(field => field.key === key);
         state.saving = true;
         try {
-            if ((operation === "write" || operation === "delete") && (!field || (method === "POST" && !validValue(field, value)))) throw new TypeError("Invalid setting value");
-            await send(`/api/${key.split(".").map(encodeURIComponent).join("/")}`, method, value);
+            if ((operation === "write" || operation === "delete") && (!field || (action === "set" && !validValue(field, value)))) throw new TypeError("Invalid setting value");
+            await send(`@${state.definition.storageKey}.${key}`, action, value);
             if (sessions.get(module) === state) {
                 switch (operation) {
                     case "write":
@@ -129,7 +129,7 @@ export function createPreferencesClient({ catalog, fetch: request = globalThis.f
             sessions.set(module, state);
             try {
                 const definition = normalizeBoxJs(catalog.select(module), module);
-                const response = await send(`/api/${definition.settingsPath.map(encodeURIComponent).join("/")}/`, "GET", undefined, state.controller.signal);
+                const response = await send(`@${definition.storageKey}.${definition.settingsPath.join(".")}`, "get", undefined, state.controller.signal);
                 let subtree = response.status === 404 ? {} : await response.json();
                 if (typeof subtree === "string") subtree = JSON.parse(subtree);
                 if (!subtree || typeof subtree !== "object" || Array.isArray(subtree)) throw new TypeError("Expected a settings subtree object");
@@ -159,7 +159,7 @@ export function createPreferencesClient({ catalog, fetch: request = globalThis.f
         async readCaches(module) {
             const state = sessions.get(module);
             if (!state?.definition) throw new Error("Open the module first");
-            const response = await send(`/api/${encodeURIComponent(module)}/Caches`, "GET", undefined, state.controller.signal);
+            const response = await send(`@${state.definition.storageKey}.${module}.Caches`, "get", undefined, state.controller.signal);
             return response.status === 404 ? undefined : response.json();
         },
         /**
@@ -168,14 +168,14 @@ export function createPreferencesClient({ catalog, fetch: request = globalThis.f
          * @param {string} module 已打开模块 / Open module.
          * @returns {Promise<void>} 清理完成 / Cleanup completion.
          */
-        clearCaches: module => change(module, `${module}.Caches`, "DELETE", undefined, "clearCaches"),
+        clearCaches: module => change(module, `${module}.Caches`, "delete", undefined, "clearCaches"),
         /**
          * 删除整个模块持久化节点，以当前 BoxJS 默认值重置页面缓存。
          * Delete module persistence and reset the page cache using current BoxJS defaults.
          * @param {string} module 已打开模块 / Open module.
          * @returns {Promise<void>} 重置完成 / Reset completion.
          */
-        reset: module => change(module, module, "DELETE", undefined, "reset"),
+        reset: module => change(module, module, "delete", undefined, "reset"),
         /**
          * 取消读取并清除会话，不撤销已发送的写入。
          * Abort reads and clear the session without undoing dispatched writes.
@@ -194,7 +194,7 @@ export function createPreferencesClient({ catalog, fetch: request = globalThis.f
          * @param {import("../index.js").SettingsScalar | import("../index.js").SettingsScalar[]} value 字段值 / Field value.
          * @returns {Promise<void>} 写入完成 / Write completion.
          */
-        set: (module, key, value) => change(module, key, "POST", value),
+        set: (module, key, value) => change(module, key, "set", value),
         /**
          * 删除单键覆盖值并显示默认值。
          * Delete one override and display its default value.
@@ -202,6 +202,6 @@ export function createPreferencesClient({ catalog, fetch: request = globalThis.f
          * @param {string} key 点分字段路径 / Dotted field path.
          * @returns {Promise<void>} 删除完成 / Delete completion.
          */
-        remove: (module, key) => change(module, key, "DELETE"),
+        remove: (module, key) => change(module, key, "delete"),
     };
 }

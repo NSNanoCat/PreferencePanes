@@ -2,83 +2,70 @@ import { URL } from "@nsnanocat/url";
 import { Lodash as _ } from "@nsnanocat/util/polyfill/Lodash.mjs";
 import { Storage } from "@nsnanocat/util/polyfill/Storage";
 import { response } from "./lib/response.mjs";
-import { parseSettingsPathname } from "./lib/settings-path.mjs";
+import { validatePathParts } from "./lib/settings-path.mjs";
 
 /**
- * 根据 BoxJS 目录桥接持久化存储，不下载配置或解析控件。
- * Bridge persistence using the BoxJS catalog without downloading configuration or interpreting controls.
+ * 无配置绑定的本地存储桥接；form 字段名就是完整 @root.path。
+ * Unbound local storage bridge; the form field name is the complete @root.path.
  */
 export class Store {
-    #catalog;
-
     /**
-     * 复用包内已解析的目录，构造时不访问网络或存储。
-     * Reuse the parsed internal catalog without network or persistence access during construction.
-     * @param {import("./BoxJS.mjs").BoxJS} catalog BoxJS 路径目录 / BoxJS path catalog.
-     */
-    constructor(catalog) {
-        this.#catalog = catalog;
-    }
-
-    /**
-     * GET 返回指定值，POST 替换指定值，DELETE 删除指定键或整个模块。
-     * GET returns a value, POST replaces it, and DELETE removes a key or the entire module.
+     * POST /api/get、set、delete；不下载配置、不解析控件、不鉴权。
+     * POST /api/get, set or delete without config downloads, control parsing or authentication.
      * @param {import("./index.js").SettingsRequest} request 代理请求 / Proxy request.
-     * @param {URL} [url] 包内复用的已解析地址 / Parsed URL reused within the package.
-     * @returns {Promise<import("./index.js").SettingsResponse | undefined>} 响应或非接管请求 / Response, or undefined for an unhandled request.
+     * @param {URL} [url] 已解析地址 / Parsed URL.
+     * @returns {Promise<import("./index.js").SettingsResponse | undefined>} 操作结果 / Operation result.
      */
     async handle(request, url = new URL(request.url)) {
         if (!url.pathname.startsWith("/api/")) return;
         const reply = (status, data) => response(request, status, data);
-        let parts;
+        const action = url.pathname.slice(5);
+        if (!["get", "set", "delete"].includes(action)) return reply(404, { error: "Unknown action" });
+        if (request.method !== "POST") return reply(405, { error: "Use POST with a form body" });
+        const headers = Object.fromEntries(Object.entries(request.headers ?? {}).map(([key, value]) => [key.toLowerCase(), value]));
+        if (headers["content-type"]?.split(";")[0].trim().toLowerCase() !== "application/x-www-form-urlencoded") return reply(415, { error: "Expected application/x-www-form-urlencoded" });
+        if (typeof request.body !== "string" || request.body.length > 65536) return reply(400, { error: "Expected a form body up to 65536 characters" });
+        let parts, value;
         try {
-            parts = parseSettingsPathname(url.pathname);
+            const fields = request.body.split("&");
+            if (fields.length !== 1) throw new TypeError("Send exactly one storage key");
+            const separator = fields[0].indexOf("=");
+            if (separator < 0) throw new TypeError("Expected @root.path=value");
+            const key = decodeURIComponent(fields[0].slice(0, separator).replace(/\+/g, " "));
+            value = decodeURIComponent(fields[0].slice(separator + 1).replace(/\+/g, " "));
+            if (!key.startsWith("@")) throw new TypeError("Storage keys must start with @");
+            parts = validatePathParts(key.slice(1).split("."));
+            if (parts.length < 2) throw new TypeError("Specify a storage root and child path");
         } catch (error) {
             return reply(400, { error: error.message });
         }
-        const binding = this.#catalog.modules.get(parts[0]);
-        if (!binding) return reply(404, { error: "Module is not declared in BoxJS" });
-        const requestHeaders = Object.fromEntries(Object.entries(request.headers ?? {}).map(([key, value]) => [key.toLowerCase(), value]));
-        if (requestHeaders["x-settings-client"] !== "1" || (requestHeaders.origin && requestHeaders.origin !== url.origin)) return reply(403, { error: "Forbidden settings client" });
-        let value;
-        switch (request.method) {
-            case "HEAD":
-                return reply(200, undefined);
-            case "GET":
-            case "DELETE":
-                break;
-            case "POST":
-                if (requestHeaders["content-type"]?.split(";")[0].trim().toLowerCase() !== "application/json") return reply(415, { error: "Expected application/json" });
-                if (typeof request.body !== "string") return reply(400, { error: "Expected a JSON string body" });
-                if (request.body.length > 65536) return reply(413, { error: "Body exceeds 65536 UTF-16 code units" });
-                try {
-                    value = JSON.parse(request.body);
-                } catch {
-                    return reply(400, { error: "Invalid JSON" });
-                }
-                break;
-            default:
-                return { ...reply(405, { error: "Method not allowed" }), headers: { ...reply(405).headers, Allow: "HEAD, GET, POST, DELETE" } };
+        if (action === "set") {
+            try {
+                value = JSON.parse(value);
+            } catch (error) {
+                if (!(error instanceof SyntaxError)) throw error;
+            }
         }
+        const [storageKey, ...path] = parts;
         try {
-            const root = Storage.getItem(binding.storageKey, {});
-            if (!isRecord(root)) throw new TypeError("stored root must be an object");
-            const parent = storageParent(root, parts, request.method === "POST");
-            const key = parts.at(-1);
-            switch (request.method) {
-                case "GET": {
+            const root = Storage.getItem(storageKey, {});
+            if (!isRecord(root)) throw new TypeError("Stored root must be an object");
+            const parent = storageParent(root, path, action === "set");
+            const key = path.at(-1);
+            switch (action) {
+                case "get": {
                     const result = parent ? _.get(parent, [key]) : undefined;
                     return result === undefined ? reply(404, { error: "Stored path does not exist" }) : reply(200, result);
                 }
-                case "POST":
+                case "set":
                     _.set(parent, [key], value);
                     break;
-                case "DELETE":
+                case "delete":
                     if (parent) _.unset(parent, [key]);
                     break;
             }
-            if (!Storage.setItem(binding.storageKey, root)) throw new Error("Storage write failed");
-            return reply(200, request.method === "POST" ? { saved: true } : { deleted: true });
+            if (!Storage.setItem(storageKey, root)) throw new Error("Storage write failed");
+            return reply(200, action === "set" ? { saved: true } : { deleted: true });
         } catch (error) {
             return reply(500, { error: error.message });
         }

@@ -111,8 +111,8 @@ export interface PreferencesClient {
      */
     set(module: string, key: string, value: SettingsScalar | SettingsScalar[]): Promise<void>;
     /**
-     * DELETE 单个覆盖值，HTTP 200 后显示默认值，不追加 GET。
-     * DELETE an override and display its default after HTTP 200, without a follow-up GET.
+     * POST /api/delete 删除覆盖值，200 后显示默认值，不追加读取。
+     * POST /api/delete removes an override and displays its default after 200, without rereading.
      * @param module 已打开的模块 / Open module.
      * @param key 完整点分字段路径 / Complete dotted field path.
      * @returns 操作完成 / Completion of the operation.

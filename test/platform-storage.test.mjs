@@ -12,12 +12,11 @@ for (const platform of ["node", "quantumult"])
         const script = `
     ${globals}
     const {Store}=await import(${JSON.stringify(new URL("../src/Store.mjs", import.meta.url).href)});
-    const {BoxJS}=await import(${JSON.stringify(new URL("../src/BoxJS.mjs", import.meta.url).href)});
-    const handler=new Store(new BoxJS([{id:"@Root.Module.Settings.enabled"}]));
-    const req={url:'https://example.org/api/Module/Settings/enabled',method:'POST',body:'false',headers:{'X-Settings-Client':'1','Content-Type':'application/json'}};
+    const handler=new Store();
+    const req={url:'https://example.org/api/set',method:'POST',body:'@Root.Module.Settings.enabled=false',headers:{'Content-Type':'application/x-www-form-urlencoded'}};
     if((await handler.handle(req)).status!==200)throw Error('write failed');
-    console.log((await handler.handle({...req,method:'GET'})).body);
-    if((await handler.handle({...req,method:'DELETE'})).status!==200)throw Error('delete failed');
+    console.log((await handler.handle({...req,url:'https://example.org/api/get'})).body);
+    if((await handler.handle({...req,url:'https://example.org/api/delete'})).status!==200)throw Error('delete failed');
   `;
         assert.equal(execFileSync(process.execPath, ["--input-type=module", "-e", script], { cwd, encoding: "utf8" }).trim(), "false");
     });
