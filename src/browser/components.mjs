@@ -10,8 +10,28 @@
 export function element(tag, className, text) {
     const node = document.createElement(tag);
     node.className = className;
+    // 官方 AppSettings 1.1.2 的作用域标记与原版 CSS 一起固定版本。
+    // Pin official AppSettings 1.1.2 scope attributes together with its unmodified CSS.
+    if (/\bform-row(?:\b|__)/.test(className)) node.setAttribute("data-v-b69aa1ea", "");
+    if (/\bform-group(?:\b|__)/.test(className)) node.setAttribute("data-v-e590be47", "");
     if (text !== undefined) node.textContent = text;
     return node;
+}
+
+/**
+ * 搜索、选择和文本控件共用官方 VField 的 DOM 结构。
+ * Share the official VField DOM structure across search, select and text controls.
+ * @param {HTMLElement} control 已创建的原生控件 / Existing native control.
+ * @param {boolean} [multiline] 是否为多行输入 / Whether the control is multiline.
+ * @returns {HTMLDivElement} 字段容器 / Field container.
+ */
+export function fieldControl(control, multiline = false) {
+    const field = element("div", `v-field pp-editor${multiline ? " v-field--textarea" : ""}`);
+    const body = element("div", "v-field__body");
+    control.classList.add("v-field__control");
+    body.append(control);
+    field.append(body);
+    return field;
 }
 
 /**
@@ -56,4 +76,22 @@ export function errorView(error, retry) {
     button.onclick = retry;
     view.append(element("p", "", `加载失败：${error.message}`), button);
     return view;
+}
+
+/**
+ * 请求宿主确认；独立网页使用浏览器对话框。
+ * Request confirmation from the host, using the browser dialog for standalone pages.
+ * @param {Window} host 模块窗口 / Module window.
+ * @param {string} message 确认内容 / Confirmation message.
+ * @returns {Promise<boolean>} 用户是否确认 / Whether the user confirmed.
+ */
+export function requestConfirmation(host, message) {
+    return new Promise((resolve, reject) => {
+        const frame = host.frameElement;
+        if (frame) {
+            const event = new frame.ownerDocument.defaultView.CustomEvent("preferencepanes:confirm", { cancelable: true, detail: { message, resolve, reject } });
+            if (!frame.dispatchEvent(event)) return;
+        }
+        resolve(host.confirm(message));
+    });
 }

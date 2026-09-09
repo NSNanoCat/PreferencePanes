@@ -17,8 +17,9 @@ function resources() {
         async load(id) {
             switch (id) {
                 case "#styles": {
-                    const styles = await readFile(new URL("./src/browser/panel.css", import.meta.url), "utf8");
-                    return `export default ${JSON.stringify(styles)};`;
+                    const sources = ["vendor/theme.min.css", "vendor/b-style.min.css", "vendor/messageSettingsLayout-ltzQ1gMi.css", "vendor/message-settings-BD3N1lqQ.css", "panel.css"];
+                    const styles = await Promise.all(sources.map(file => readFile(new URL(`./src/browser/${file}`, import.meta.url), "utf8")));
+                    return `export default ${JSON.stringify(`@layer preference-panes {\n${styles.join("\n")}\n}`)};`;
                 }
                 case "#assets": {
                     const bundle = await rollup({ input: "src/browser/app.mjs", plugins: [nodeResolve({ browser: true }), resources()] });

@@ -30,8 +30,28 @@ export function mount(boxjs, css = "") {
     document.head.append(base, custom);
     const previousTitle = document.title;
     const previousTheme = document.documentElement.dataset.theme;
-    const theme = navigator.userAgent.match(/themeId\/(\d+)/)?.[1];
-    if (theme) document.documentElement.dataset.theme = theme === "2" ? "dark" : "light";
+    const previousDark = document.documentElement.classList.contains("bili_dark");
+    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
+    const previousKeyboard = document.documentElement.style.getPropertyValue("--pp-keyboard-height");
+    const host = window.frameElement?.ownerDocument.documentElement;
+    /**
+     * 跟随嵌入宿主的通用环境状态，不识别业务 App 或解析其 UA。
+     * Follow generic host appearance without detecting a business app or parsing its user agent.
+     * @returns {void} 已同步主题与键盘避让 / Theme and keyboard clearance synchronized.
+     */
+    const syncAppearance = () => {
+        const theme = host?.dataset.theme ?? previousTheme ?? (systemTheme.matches ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.classList.toggle("bili_dark", theme === "dark");
+        if (host) document.documentElement.style.setProperty("--pp-keyboard-height", host.style.getPropertyValue("--pp-keyboard-height"));
+    };
+    let observer;
+    syncAppearance();
+    systemTheme.addEventListener("change", syncAppearance);
+    if (host) {
+        observer = new MutationObserver(syncAppearance);
+        observer.observe(host, { attributes: true, attributeFilter: ["data-theme", "style"] });
+    }
     document.title = metadata.name ?? catalog.module.module;
     let panel;
     const view = {
@@ -41,6 +61,9 @@ export function mount(boxjs, css = "") {
          * @returns {void} 无返回值 / No return value.
          */
         destroy() {
+            observer?.disconnect();
+            systemTheme.removeEventListener("change", syncAppearance);
+            document.documentElement.classList.toggle("bili_dark", previousDark);
             panel?.destroy();
             base.remove();
             custom.remove();
@@ -49,6 +72,7 @@ export function mount(boxjs, css = "") {
             document.title = previousTitle;
             if (previousTheme === undefined) delete document.documentElement.dataset.theme;
             else document.documentElement.dataset.theme = previousTheme;
+            document.documentElement.style.setProperty("--pp-keyboard-height", previousKeyboard);
         },
     };
     try {

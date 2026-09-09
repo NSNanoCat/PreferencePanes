@@ -1,6 +1,6 @@
 import { ActionMenu } from "./ActionMenu.mjs";
 import { createPreferencesClient } from "./client.mjs";
-import { errorView, icon, element as node, resourceURL } from "./components.mjs";
+import { errorView, fieldControl, icon, element as node, requestConfirmation, resourceURL } from "./components.mjs";
 import { Navigation } from "./Navigation.mjs";
 
 /**
@@ -27,7 +27,7 @@ export function mountPanel(root, catalog) {
         { id: "clearCaches", label: "清空缓存", destructive: true },
         { id: "reset", label: "重置模块", destructive: true },
     ];
-    const menu = new ActionMenu(id => handlers.get(id)());
+    const menu = new ActionMenu(id => runAction(id));
     const trailing = node("span", "pp-nav-spacer");
     trailing.append(menu.element);
     const brand = node("div", "pp-brand");
@@ -57,7 +57,7 @@ export function mountPanel(root, catalog) {
         );
     };
     const onAction = event => {
-        if (!saving && handlers.has(event.detail)) handlers.get(event.detail)();
+        if (!saving && handlers.has(event.detail)) runAction(event.detail);
     };
     window.frameElement?.addEventListener("preferencepanes:action", onAction);
     let timer,
@@ -100,6 +100,19 @@ export function mountPanel(root, catalog) {
     };
     const client = createPreferencesClient({ catalog, notify });
     /**
+     * 两种菜单入口共用异步错误处理，包含宿主确认框错误。
+     * Share async error handling between both menus, including host-dialog errors.
+     * @param {string} id 操作标识 / Action identifier.
+     * @returns {Promise<void>} 操作已处理 / Action handled.
+     */
+    async function runAction(id) {
+        try {
+            await handlers.get(id)();
+        } catch (error) {
+            notify({ kind: "error", message: error.message });
+        }
+    }
+    /**
      * 打开模块并忽略已过期的异步结果。
      * Open a module and ignore stale asynchronous results.
      * @param {string} module 模块标识 / Module identifier.
@@ -130,6 +143,14 @@ export function mountPanel(root, catalog) {
         const { definition, values } = client.snapshot(active);
         heading.textContent = definition.metadata?.name || active;
         const view = node("section", "pp-fields");
+        const search = node("input", "");
+        search.type = "search";
+        search.placeholder = "搜索设置项";
+        search.setAttribute("aria-label", "搜索设置");
+        const searchField = fieldControl(search);
+        searchField.classList.add("pp-search");
+        view.append(searchField);
+        const searchRows = [];
         /**
          * 挂载后执行的多行高度更新
          * Textarea sizing callbacks run after mounting.
@@ -204,7 +225,7 @@ export function mountPanel(root, catalog) {
             const match = /^\[([^\]]+)\]\s*(.*)$/.exec(field.name);
             const group = match?.[1] ?? "通用";
             if (!groups.has(group)) {
-                const section = node("section", "form-group");
+                const section = node("section", "form-group form-group--has-title");
                 const rows = node("div", "form-group__row");
                 section.append(node("h2", "form-group__title", group), rows);
                 groups.set(group, rows);
@@ -232,7 +253,7 @@ export function mountPanel(root, catalog) {
             let eventName = "change";
             switch (true) {
                 case Boolean(field.options) && field.type !== "array": {
-                    const select = node("select", "pp-input");
+                    const select = node("select", "");
                     select.setAttribute("aria-label", field.name);
                     field.options.forEach((option, index) => {
                         const item = node("option", "", option.label);
@@ -242,7 +263,7 @@ export function mountPanel(root, catalog) {
                     write = value => {
                         select.selectedIndex = field.options.findIndex(option => option.key === value);
                     };
-                    row.append(select);
+                    row.append(fieldControl(select));
                     read = () => field.options[select.selectedIndex]?.key;
                     break;
                 }
@@ -288,9 +309,27 @@ export function mountPanel(root, catalog) {
                     };
                     break;
                 }
+                case field.type === "boolean": {
+                    const toggle = node("button", "v-toggle v-toggle--small form-row__toggle");
+                    toggle.type = "button";
+                    toggle.setAttribute("role", "switch");
+                    toggle.setAttribute("aria-label", field.name);
+                    toggle.append(node("span", "v-toggle__circle"));
+                    write = value => {
+                        toggle.setAttribute("aria-checked", String(value === true));
+                        toggle.classList.toggle("v-toggle--closed", value !== true);
+                    };
+                    read = () => toggle.getAttribute("aria-checked") === "true";
+                    toggle.onclick = () => {
+                        write(!read());
+                        toggle.dispatchEvent(new window.Event("change", { bubbles: true }));
+                    };
+                    row.append(toggle);
+                    break;
+                }
                 default: {
                     const multiline = field.control === "textarea" || field.type === "array";
-                    const input = node(multiline ? "textarea" : "input", "pp-input");
+                    const input = node(multiline ? "textarea" : "input", "");
                     if (multiline) row.classList.add("pp-multiline");
                     input.setAttribute("aria-label", field.name);
                     if (field.placeholder) input.placeholder = field.placeholder;
@@ -312,33 +351,23 @@ export function mountPanel(root, catalog) {
                         input.addEventListener("input", grow);
                         growingInputs.push(grow);
                     }
-                    if (field.type === "boolean") {
-                        input.type = "checkbox";
-                        input.classList.add("pp-switch");
-                        input.setAttribute("role", "switch");
-                        write = value => {
-                            input.checked = value === true;
-                        };
-                        read = () => input.checked;
-                    } else {
-                        eventName = "input";
-                        if (!multiline) input.type = field.type === "number" ? "number" : "text";
-                        write = value => {
-                            input.value = field.type === "array" ? JSON.stringify(value ?? []) : (value ?? "");
-                            grow();
-                        };
-                        read = () => {
-                            switch (field.type) {
-                                case "array":
-                                    return JSON.parse(input.value);
-                                case "number":
-                                    return input.value === "" ? Number.NaN : Number(input.value);
-                                default:
-                                    return input.value;
-                            }
-                        };
-                    }
-                    row.append(input);
+                    eventName = "input";
+                    if (!multiline) input.type = field.type === "number" ? "number" : "text";
+                    write = value => {
+                        input.value = field.type === "array" ? JSON.stringify(value ?? []) : (value ?? "");
+                        grow();
+                    };
+                    read = () => {
+                        switch (field.type) {
+                            case "array":
+                                return JSON.parse(input.value);
+                            case "number":
+                                return input.value === "" ? Number.NaN : Number(input.value);
+                            default:
+                                return input.value;
+                        }
+                    };
+                    row.append(fieldControl(input, multiline));
                     break;
                 }
             }
@@ -368,7 +397,18 @@ export function mountPanel(root, catalog) {
             });
             if (eventName === "input") inputContainer.addEventListener("compositionend", event => event.target.dispatchEvent(new window.Event("input", { bubbles: true })));
             groups.get(group).append(row);
+            searchRows.push({ row, text: [field.name, field.key, field.description, ...(field.options ?? []).map(option => option.label)].join(" ").toLocaleLowerCase() });
         }
+        const empty = node("p", "pp-description", "没有匹配的设置项");
+        empty.hidden = true;
+        empty.setAttribute("role", "status");
+        view.append(empty);
+        search.oninput = () => {
+            const words = search.value.trim().toLocaleLowerCase().split(/\s+/);
+            for (const { row, text } of searchRows) row.hidden = !words.every(word => text.includes(word));
+            for (const rows of groups.values()) rows.parentElement.hidden = [...rows.children].every(row => row.hidden);
+            empty.hidden = searchRows.some(({ row }) => !row.hidden);
+        };
         const cachePage = node("section", "pp-cache-page");
         const output = node("pre", "pp-cache");
         output.textContent = "暂无缓存";
@@ -393,9 +433,9 @@ export function mountPanel(root, catalog) {
                 },
             );
         });
-        handlers.set("clearCaches", () => {
+        handlers.set("clearCaches", async () => {
             if (saving) return;
-            if (!window.confirm(`清空 ${active} 的全部 Caches？`)) return;
+            if (!(await requestConfirmation(window, `清空 ${active} 的全部 Caches？`)) || destroyed || saving) return;
             return perform(
                 () => client.clearCaches(active),
                 () => {
@@ -403,9 +443,9 @@ export function mountPanel(root, catalog) {
                 },
             );
         });
-        handlers.set("reset", () => {
+        handlers.set("reset", async () => {
             if (saving) return;
-            if (!window.confirm(`重置 ${active}？这将删除该模块的 Settings、Caches 和其它持久化数据。`)) return;
+            if (!(await requestConfirmation(window, `重置 ${active}？这将删除该模块的 Settings、Caches 和其它持久化数据。`)) || destroyed || saving) return;
             return perform(() => client.reset(active), controls);
         });
         navigation?.destroy();

@@ -1,6 +1,8 @@
 /**
  * 原始 HTML 的模块 iframe 容器；通过元素传递请求上下文。
  * Iframe container preserving module HTML and carrying context on the element.
+ * confirm 事件可 preventDefault 后通过 detail.resolve/reject 完成宿主确认。
+ * Prevent default on confirm events and settle host dialogs through detail.resolve/reject.
  */
 export class ModuleFrame extends EventTarget {
     /**
@@ -45,6 +47,32 @@ export class ModuleFrame extends EventTarget {
      * @returns 无返回值 / No return value.
      */
     destroy(): void;
+}
+
+/**
+ * 宿主确认事件的数据。
+ * Host confirmation event detail.
+ */
+export interface ConfirmationRequest {
+    /**
+     * 确认内容。
+     * Confirmation message.
+     */
+    message: string;
+    /**
+     * 返回选择。
+     * Return the user's choice.
+     * @param confirmed 是否确认 / Whether confirmed.
+     * @returns 无返回值 / No return value.
+     */
+    resolve(confirmed: boolean): void;
+    /**
+     * 返回失败。
+     * Return a failure.
+     * @param error 错误 / Error.
+     * @returns 无返回值 / No return value.
+     */
+    reject(error: Error): void;
 }
 
 /**
