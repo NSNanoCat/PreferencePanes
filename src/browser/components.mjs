@@ -21,7 +21,7 @@ export function element(tag, className, text) {
  * @returns {string} 完整地址 / Absolute address.
  */
 export function resourceURL(value) {
-    const url = new URL(value, location.href);
+    const url = new URL(value, document.baseURI);
     if (!["http:", "https:"].includes(url.protocol)) throw new TypeError("Metadata URLs must use HTTP(S)");
     return url.href;
 }

@@ -12,9 +12,10 @@ export async function build(boxjs, css = "") {
     if (typeof css !== "string") throw new TypeError("CSS must be a string");
     const catalog = new BoxJS(boxjs);
     const module = catalog.module.module;
-    const [html, app, proxy, mock] = await Promise.all([
+    const [html, app, navigation, proxy, mock] = await Promise.all([
         readFile(new URL("../dist/module/index.html", import.meta.url), "utf8"),
         readFile(new URL("../dist/module/app.mjs", import.meta.url), "utf8"),
+        readFile(new URL("../dist/module/navigation.mjs", import.meta.url), "utf8"),
         readFile(new URL("../dist/preference-panes.proxy.js", import.meta.url), "utf8"),
         readFile(new URL("../dist/preference-panes.config.js", import.meta.url), "utf8"),
     ]);
@@ -23,6 +24,7 @@ export async function build(boxjs, css = "") {
         [`settings/${module}/index.html`]: html,
         [`settings/assets/${module}.html`]: html,
         "settings/assets/app.mjs": app,
+        "settings/assets/navigation.mjs": navigation,
         [`settings/assets/${module}.boxjs.json`]: config,
         [`settings/assets/${module}.css`]: css,
         [`settings/assets/${module}.request.js`]: `${proxy}\nPreferencePanes.run(${config},${JSON.stringify(css)});\n`,

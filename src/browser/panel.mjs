@@ -1,5 +1,6 @@
 import { createPreferencesClient } from "./client.mjs";
 import { errorView, icon, element as node, resourceURL } from "./components.mjs";
+import { Navigation } from "./Navigation.mjs";
 
 /**
  * 挂载已导入 BoxJS 对应的模块表单和短暂通知。
@@ -13,20 +14,38 @@ export function mountPanel(root, catalog) {
     const document = root.ownerDocument;
     const window = document.defaultView;
     const shell = node("div", "pp-panel");
+    shell.dataset.module = catalog.module.module;
     const header = node("header", "pp-header");
     const back = node("button", "pp-back", "‹");
     back.setAttribute("aria-label", "返回");
     back.type = "button";
     const heading = node("h1", "pp-title", title);
+    const brand = node("div", "pp-brand");
+    const logo = node("span", "pp-brand-icon");
+    logo.setAttribute("aria-hidden", "true");
+    const image = icon(catalog.module.metadata, "");
+    if (image) logo.append(image);
+    brand.append(logo, heading);
     const viewport = node("div", "pp-viewport");
     const toast = node("div", "pp-toast");
     toast.setAttribute("role", "status");
     toast.hidden = true;
-    header.append(back, heading, node("span", "pp-nav-spacer"));
+    header.append(back, brand, node("span", "pp-nav-spacer"));
     shell.append(header, viewport, toast);
     root.append(shell);
+    // 嵌入模式向宿主发布导航状态，宿主不读取或修改模块内部 DOM。
+    // Embedded mode publishes navigation state without host reads or mutations of the module DOM.
+    const publishNavigation = () => {
+        const frame = window.frameElement;
+        if (!frame?.dataset.preferencePanes) return;
+        frame.dispatchEvent(
+            new frame.ownerDocument.defaultView.CustomEvent("preferencepanes:change", {
+                detail: { title: heading.textContent, module: catalog.module.module, busy: saving, canGoBack: !back.disabled },
+            }),
+        );
+    };
     let timer,
-        secondaryRoute,
+        navigation,
         generation = 0,
         active = null,
         saving = false,
@@ -65,25 +84,6 @@ export function mountPanel(root, catalog) {
     };
     const client = createPreferencesClient({ catalog, notify });
     /**
-     * 切换加载或错误视图，按用户的动态效果偏好播放过渡。
-     * Replace a loading or error view, respecting reduced-motion preferences.
-     * @param {HTMLElement} view 新视图 / New view.
-     * @param {number} direction 过渡方向，正数从右侧进入 / Transition direction; positive enters from the right.
-     * @returns {void} 无返回值 / No return value.
-     */
-    function replace(view, direction) {
-        const old = viewport.firstElementChild;
-        viewport.replaceChildren(view);
-        if (old && !window.matchMedia("(prefers-reduced-motion: reduce)").matches)
-            view.animate(
-                [
-                    { opacity: 0.4, transform: `translateX(${direction * 24}px)` },
-                    { opacity: 1, transform: "translateX(0)" },
-                ],
-                { duration: 180, easing: "ease-out" },
-            );
-    }
-    /**
      * 打开模块并忽略已过期的异步结果。
      * Open a module and ignore stale asynchronous results.
      * @param {string} module 模块标识 / Module identifier.
@@ -94,16 +94,15 @@ export function mountPanel(root, catalog) {
         active = module;
         back.disabled = window.history.length <= 1;
         heading.textContent = module;
-        replace(node("p", "pp-loading", "读取设置…"), 1);
+        publishNavigation();
+        viewport.replaceChildren(node("p", "pp-loading", "读取设置…"));
         try {
             await client.open(module);
             if (version === generation) controls();
         } catch (error) {
             if (version !== generation) return;
-            replace(
-                errorView(error, () => open(module)),
-                1,
-            );
+            viewport.replaceChildren(errorView(error, () => open(module)));
+            publishNavigation();
         }
     }
     /**
@@ -124,37 +123,19 @@ export function mountPanel(root, catalog) {
         const editors = new Map();
         const summaries = [];
         const groups = new Map();
-        const scrollPositions = new WeakMap();
-        let activeEditor;
         let queue = Promise.resolve(),
             pendingWrites = 0;
         /**
-         * 根据 hash 切换多选页，保留上级 DOM 和滚动位置。
-         * Switch multi-select views by hash while retaining parent DOM and scroll position.
+         * 导航组件处理页面切换，表单只更新当前标题与返回按钮。
+         * Let navigation own transitions; the form only updates the title and back button.
          * @returns {void} 无返回值 / No return value.
          */
-        const showEditor = () => {
-            let key;
-            try {
-                key = decodeURIComponent(window.location.hash.slice(1));
-            } catch {
-                key = "";
-            }
-            const editor = editors.get(key);
-            const previous = activeEditor?.node ?? view;
-            const next = editor?.node ?? view;
-            if (previous !== next) {
-                scrollPositions.set(previous, previous.scrollTop);
-                previous.remove();
-                viewport.append(next);
-                next.scrollTop = scrollPositions.get(next) ?? 0;
-                if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) next.animate([{ transform: `translateX(${editor ? 100 : -100}%)` }, { transform: "translateX(0)" }], { duration: 260, easing: "cubic-bezier(.22,.61,.36,1)" });
-            }
-            activeEditor = editor;
+        const updateNavigation = () => {
+            const editor = editors.get(navigation.current);
             heading.textContent = editor?.title ?? definition.metadata?.name ?? active;
-            back.disabled = saving || (!editor && window.history.length <= 1);
+            back.disabled = saving || !navigation.canGoBack;
+            publishNavigation();
         };
-        secondaryRoute = showEditor;
         /**
          * 串行执行模块操作，保持输入可编辑。
          * Serialize module actions while keeping inputs editable.
@@ -167,6 +148,7 @@ export function mountPanel(root, catalog) {
             pendingWrites++;
             saving = true;
             back.disabled = true;
+            publishNavigation();
             return (queue = queue
                 .then(action)
                 .then(() => {
@@ -181,7 +163,8 @@ export function mountPanel(root, catalog) {
                     pendingWrites--;
                     saving = pendingWrites > 0;
                     if (destroyed && !saving) client.leave(active);
-                    back.disabled = saving || (!activeEditor && window.history.length <= 1);
+                    back.disabled = saving || !navigation.canGoBack;
+                    publishNavigation();
                 }));
         }
         const metadata = definition.metadata;
@@ -270,10 +253,7 @@ export function mountPanel(root, catalog) {
                     };
                     summaries.push(refresh);
                     refresh();
-                    link.onclick = () => {
-                        window.history.pushState({ ...window.history.state, preferencePane: active }, "", `#${encodeURIComponent(field.key)}`);
-                        showEditor();
-                    };
+                    link.onclick = () => navigation.open(field.key);
                     row.addEventListener("click", event => {
                         if (!link.contains(event.target)) link.click();
                     });
@@ -420,26 +400,22 @@ export function mountPanel(root, catalog) {
         actions.append(cacheView, cacheClear, reset);
         maintenance.append(actions, output);
         view.append(maintenance);
-        viewport.replaceChildren(view);
+        navigation?.destroy();
+        navigation = new Navigation(viewport, view, key => editors.get(key)?.node);
+        navigation.addEventListener("change", updateNavigation);
         for (const grow of growingInputs) grow();
-        showEditor();
+        updateNavigation();
     }
     /**
-     * 历史导航只切换当前模块的二级页，不接管项目主页或跨模块路由。
-     * History navigation switches only this module's subpages, never project or cross-module routes.
+     * 已加载的表单交由导航组件返回；加载阶段可以返回先前文档。
+     * Loaded forms delegate back to navigation; loading views can return to the previous document.
      * @returns {void} 无返回值 / No return value.
      */
-    const onPopState = () => secondaryRoute?.();
-    const onHashChange = () => secondaryRoute?.();
     back.onclick = () => {
         if (saving) return;
-        if (window.location.hash && window.history.state?.preferencePane !== active) {
-            window.history.replaceState(window.history.state, "", window.location.pathname);
-            secondaryRoute?.();
-        } else window.history.back();
+        if (navigation) navigation.back();
+        else window.history.back();
     };
-    window.addEventListener("popstate", onPopState);
-    window.addEventListener("hashchange", onHashChange);
     open(catalog.module.module);
     return {
         /**
@@ -449,8 +425,7 @@ export function mountPanel(root, catalog) {
          */
         destroy() {
             destroyed = true;
-            window.removeEventListener("popstate", onPopState);
-            window.removeEventListener("hashchange", onHashChange);
+            navigation?.destroy();
             generation++;
             if (active && !saving) client.leave(active);
             clearTimeout(timer);

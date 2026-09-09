@@ -32,7 +32,65 @@ const files = await build(boxjs, css);
 
 直接访问 `/settings/{module}` 时，启动器先导入 `/configs/{module}` JSON 与该模块 CSS，再调用 mount。JSON 缺失或与 URL 不符时不生成表单。项目主页可自行 HEAD `/configs/{module}` 判断入口可用性；PreferencePanes 不接管主页探测逻辑。
 
+也支持为模块页传入 JSON/CSS **资源 URL**：
+
+```http
+GET /settings/Module?json=%2Fconfigs%2FModule&css=%2Ftheme.css
+```
+
+```http
+GET /settings/Module
+X-PreferencePanes-JSON: /configs/Module
+X-PreferencePanes-CSS: /theme.css
+```
+
+每个 Header 分别优先于对应查询参数，未提供时使用上述模块约定；CSS 传空字符串时仅使用内置默认样式。资源必须为 HTTP(S) 或相对 URL，跨域资源需要允许浏览器 CORS。模块身份仍需与 BoxJS 一致，不改变存储根绑定。
+
+静态 HTML 无法读取请求头。网页使用共用 `ModuleFrame` 容器：它从原始请求 URL/Header 解析模块上下文，保存在 iframe 元素上，HTML 原样加载。启动器读取容器上下文，不从 about:srcdoc 推断模块，不通过修改 HTML 补 meta 或注入 CSS。原生 WebView 直接携带 Header 导航时，仍由代理生成上下文。
+
+```js
+import { ModuleFrame } from "@nsnanocat/preference-panes/navigation";
+
+const frame = new ModuleFrame("/settings/Module", {
+    headers: { "X-PreferencePanes-JSON": "/configs/Module", "X-PreferencePanes-CSS": "/theme.css" },
+    signal,
+});
+container.append(frame.element);
+await frame.load();
+frame.addEventListener("change", () => { title.textContent = frame.state.title; });
+back.onclick = () => frame.back();
+// 离开时取消加载及事件订阅，节点由 Navigation 在动画结束后移除。
+// Cancel loads and subscriptions on departure; Navigation removes the node after its transition.
+frame.destroy();
+```
+
+iframe 隔离模块 CSS，模块二级页使用自身 fragment 历史。嵌入模式由框架自身布局隐藏内部顶栏并使用完整内容高度；容器通过 change/state 报告标题、写入忙碌状态和返回能力，宿主不查询或修改模块内部 DOM。Navigation 负责历史及退出动画，重新进入创建新 ModuleFrame；不使用 localStorage/sessionStorage 缓存输入或设置。
+
 ## 模块页行为
+
+### 共用导航组件
+
+模块二级页与外部定制主页复用 `Navigation`，通过独立导出使用，不引入表单、BoxJS 或品牌目录：
+
+```js
+import { Navigation } from "@nsnanocat/preference-panes/navigation";
+
+const navigation = new Navigation(container, home, (key, signal) => {
+    // 返回由项目创建的子页节点；异步加载监听 signal，在退出时取消。
+    // Return the project's detail node; async loads observe signal for cancellation on departure.
+    return detailViews.get(key);
+});
+navigation.open("detail");
+navigation.addEventListener("change", () => { back.disabled = !navigation.canGoBack; });
+back.onclick = () => navigation.back();
+// 卸载整个组件时释放监听器和页面。
+// Release listeners and views when unmounting the entire component.
+navigation.destroy();
+```
+
+工厂返回 HTMLElement，未知键返回 undefined；布局、背景与内容由调用方 CSS/DOM 定义。容器内只放导航管理的节点，组件接管其子节点。根页一直保留，子页 280ms 滑入/滑出，返回动画结束后移除。模块内部返回缓存节点保留控件值与滚动；外部主页每次创建新 iframe，重新读取设置。快速切换会取消旧加载与动画，减少动态效果时立即切换。历史记录、书签初始根页和 srcdoc fragment 只在组件中处理；实例之间依靠浏览器联合历史，不跨 iframe 操作 DOM。
+
+`build` 额外输出公共 `settings/assets/navigation.mjs`，静态主页可直接导入该地址；它不生成或接管主页内容。
 
 渲染器使用已导入的 JSON 创建控件，只 GET 一次设置子树；不会再次请求配置或探测其它模块。打开/刷新模块文档重新导入，再读取设置。单选为下拉框，多选为二级选项页；二级返回不刷新设置值。
 
@@ -48,6 +106,6 @@ npm run preview
 
 ## 维护
 
-遵循 AGENTS.md 与通用 Biome 配置。运行 `npm run check` 和 `npm run apifox:check` 验证代码、类型、行为与文档。0.7.0 采用单模块双输入接口，运行时无额外 npm 依赖；旧的主页生成和安装对象接口不再提供。
+遵循 AGENTS.md 与通用 Biome 配置。运行 `npm run check` 和 `npm run apifox:check` 验证代码、类型、行为与文档。0.7.2 通过 ModuleFrame 保留 iframe 请求上下文，并与常驻顶栏同步导航状态；JSON/CSS 输入及存储接口保持不变，运行时无额外 npm 依赖。
 
 [接口规范](apifox/Specification.md) · [Apifox JSON](apifox/preference-panes.apifox.json)

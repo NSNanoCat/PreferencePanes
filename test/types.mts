@@ -1,6 +1,21 @@
 import type { BoxJSInput, ModuleDefinition, SettingsField } from "@nsnanocat/preference-panes";
 import { build } from "@nsnanocat/preference-panes";
 import { mount } from "@nsnanocat/preference-panes/browser";
+import { ModuleFrame, Navigation } from "@nsnanocat/preference-panes/navigation";
+
+const frame = new ModuleFrame("/settings/Module", { headers: { "X-PreferencePanes-JSON": "/configs/Module" }, signal: new AbortController().signal });
+document.body.append(frame.element);
+await frame.load();
+frame.back();
+frame.destroy();
+
+const navigation = new Navigation(document.body, document.createElement("main"), (_key, signal) => {
+    void signal.aborted;
+    return document.createElement("section");
+});
+navigation.open("detail");
+navigation.back();
+navigation.destroy();
 
 const boxjs: BoxJSInput = { name: "Example", apps: [{ name: "App", settings: [{ id: "@Root.Module.Settings.flag", name: "Flag", type: "boolean", val: true }] }] };
 const files: Record<string, string> = await build(boxjs);

@@ -1,6 +1,7 @@
 import { URL } from "@nsnanocat/url";
 import assets from "#assets";
 import { BoxJS } from "../BoxJS.mjs";
+import { pageInputs } from "../lib/page-inputs.mjs";
 import { response } from "../lib/response.mjs";
 import { Store } from "../Store.mjs";
 import { complete } from "./response.mjs";
@@ -26,12 +27,19 @@ export async function run(boxjs, css = "") {
                 break;
             case url.pathname.startsWith("/configs/"):
                 break;
+            case url.pathname === `/settings/${module}` || url.pathname === `/settings/${module}/`: {
+                // Header 由代理传入文档，浏览器再下载 JSON/CSS；代理不获取外部资源。
+                // Carry headers into the document; only the browser downloads external JSON/CSS.
+                const inputs = encodeURIComponent(JSON.stringify(pageInputs(url, request.headers)));
+                const html = assets.page.body.replace("</head>", `<meta name="preference-panes-inputs" content="${inputs}"></head>`);
+                result = response(request, 200, html, "text/html");
+                break;
+            }
             case url.pathname === `/settings/assets/${module}.css`:
                 result = response(request, 200, css, "text/css");
                 break;
             default: {
-                const path = url.pathname === `/settings/${module}` || url.pathname === `/settings/${module}/` ? "page" : url.pathname;
-                const asset = assets[path];
+                const asset = assets[url.pathname];
                 if (asset) result = response(request, 200, asset.body, asset.type);
             }
         }

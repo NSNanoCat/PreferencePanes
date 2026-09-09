@@ -55,17 +55,17 @@ const boxjsApp = {
 const boxjs = {
     oneOf: [boxjsFields, boxjsApp, { type: "object", required: ["apps"], properties: { apps: { type: "array", items: boxjsApp } } }],
 };
-const header = (name, example, description, required = false) => ({
+const parameter = (name, example, description, required = false) => ({
     id: `${name}#0`,
     name,
     type: "string",
     schema: { type: "string" },
     required,
-    enable: true,
+    enable: required || Boolean(example),
     example,
     description,
 });
-const headers = [header("X-Settings-Client", "1", "固定页面标记，不是认证凭据，不接受配置改名。", true), header("Origin", "", "浏览器请求来源；存在时必须等于目标请求 URL 的 origin，不需要安装参数。")];
+const headers = [parameter("X-Settings-Client", "1", "固定页面标记，不是认证凭据，不接受配置改名。", true), parameter("Origin", "", "浏览器请求来源；存在时必须等于目标请求 URL 的 origin，不需要安装参数。")];
 const descriptions = {
     400: "非法路径或 JSON 值",
     403: "缺标记或异源",
@@ -87,7 +87,7 @@ const declarations = [
         page: true,
         schema: {},
         example: '<!doctype html><html><body><main id="preferences"></main><script type="module" src="/settings/assets/app.mjs"></script></body></html>',
-        description: "同一份 HTML 从 /settings/{module} 路径读取模块标识，按约定 GET /configs/{module} 取得 BoxJS 并生成设置界面。不使用查询参数。缺失、多余或非法路径段不发送请求。",
+        description: "模块页接收 json/css 查询参数或 X-PreferencePanes-JSON/CSS 请求头，值均为资源 URL。每个 Header 分别优先于同名查询参数；未提供时沿用模块约定。代理只将来源写入 HTML，浏览器下载 JSON/CSS 并渲染。普通链接使用查询参数，Header 方式使用 fetch 后将返回 HTML 放入同源 iframe.srcdoc。",
     },
     {
         id: "pp-config-head",
@@ -216,6 +216,17 @@ const declarations = [
 const apis = declarations.map(entry => {
     const { method, id } = entry;
     const codes = entry.mock ? [200, 404] : [200, 400, 403, 404, 405, ...(method === "post" ? [413, 415, 500] : method === "head" ? [] : [500])];
+    let requestHeaders;
+    switch (true) {
+        case entry.page:
+            requestHeaders = [parameter("X-PreferencePanes-JSON", "", "JSON 资源 URL，优先于 json 查询参数。"), parameter("X-PreferencePanes-CSS", "", "CSS 资源 URL，优先于 css 查询参数；空字符串表示仅使用内置默认样式。")];
+            break;
+        case entry.mock:
+            requestHeaders = [];
+            break;
+        default:
+            requestHeaders = headers;
+    }
     return {
         id,
         method,
@@ -256,9 +267,9 @@ const apis = declarations.map(entry => {
                       ]
                     : []),
             ],
-            query: [],
+            query: entry.page ? [parameter("json", "", "BoxJS JSON 资源 URL；相对于模块页请求 URL 解析。默认 /configs/{module}。"), parameter("css", "", "可选 CSS 资源 URL；默认 /settings/assets/{module}.css，传空字符串仅使用内置默认样式。")] : [],
             cookie: [],
-            header: entry.mock ? [] : headers,
+            header: requestHeaders,
         },
         requestBody:
             method === "post"
@@ -323,7 +334,7 @@ const document = {
             moduleId,
             parentId: 0,
             serverId: "default",
-            items: ["通用设置页面", "模块配置", "持久化读写"].map((group, index) => ({
+            items: ["模块设置页面", "模块配置", "持久化读写"].map((group, index) => ({
                 id: `pp-folder-${index}`,
                 name: group,
                 moduleId,
