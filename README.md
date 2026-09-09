@@ -48,6 +48,6 @@ npm run preview
 
 ## 维护
 
-遵循 AGENTS.md 与通用 Biome 配置。运行 `npm run check` 和 `npm run apifox:check` 验证代码、类型、行为与文档。运行时无额外 npm 依赖；本轮修改尚未发布。
+遵循 AGENTS.md 与通用 Biome 配置。运行 `npm run check` 和 `npm run apifox:check` 验证代码、类型、行为与文档。0.7.0 采用单模块双输入接口，运行时无额外 npm 依赖；旧的主页生成和安装对象接口不再提供。
 
 [接口规范](apifox/Specification.md) · [Apifox JSON](apifox/preference-panes.apifox.json)
