@@ -1,3 +1,4 @@
+import styleURLs from "#style-urls";
 import defaults from "#styles";
 import { BoxJS } from "../BoxJS.mjs";
 import { element, resourceURL } from "./components.mjs";
@@ -23,11 +24,19 @@ export function mount(boxjs, css = "") {
         root.id = "preferences";
         document.body.append(root);
     }
+    // 远程视觉资源与基础布局分开加载，网络状态不控制分页定位。
+    // Load remote visual resources separately so network state cannot control page positioning.
+    const links = styleURLs.map(url => {
+        const link = element("link", "");
+        link.rel = "stylesheet";
+        link.href = url;
+        return link;
+    });
     const base = element("style", ""),
         custom = element("style", "");
     base.textContent = defaults;
     custom.textContent = css;
-    document.head.append(base, custom);
+    document.head.append(...links, base, custom);
     const previousTitle = document.title;
     const previousTheme = document.documentElement.dataset.theme;
     const previousDark = document.documentElement.classList.contains("bili_dark");
@@ -65,6 +74,7 @@ export function mount(boxjs, css = "") {
             systemTheme.removeEventListener("change", syncAppearance);
             document.documentElement.classList.toggle("bili_dark", previousDark);
             panel?.destroy();
+            for (const link of links) link.remove();
             base.remove();
             custom.remove();
             if (existing) root.replaceChildren();

@@ -6,7 +6,7 @@ PreferencePanes 负责具体模块的设置页、共享导航和本地持久化 
 
 嵌入的模块页跟随宿主根元素的 `data-theme`（light/dark）和 `--pp-keyboard-height`（CSS 长度），退出时释放观察器。独立页面使用网页自身/系统主题；通用包不再解析 Bilibili 的 User-Agent。
 
-正式表单仅引用 `src/browser/official-styles.json` 中的官方 Hilo 资源地址，不内嵌、镜像或 Mock App 自带 CSS，也不发布样式下载包。目标环境是能解析这些官方资源的 App WebView，普通公网浏览器不提供资源兜底。原有手写开关、行样式和颜色表已删除；BoxJS 动态生成及修改即保存保持不变。
+正式表单通过独立 stylesheet 链接引用 `src/browser/official-styles.json` 中的官方 b-style 与主题 CDN，不内嵌、镜像或 Mock 官方 CSS。基础分页布局单独打包，不依赖远程样式加载。设置行由公开 b-style 工具类组成，不使用 Hilo 内置页面的编译作用域。开关采用标准 checkbox 的 switch 属性及 switch 语义，由浏览器呈现原生控件（[Safari/iOS 17.4 起显示开关](https://webkit.org/blog/15054/an-html-switch-control/)，其他浏览器保留可操作的复选框）；单选使用 select，多选保留二级页面。BoxJS 动态生成及修改即保存保持不变。
 
 本地验证可运行 `npm run preview -- --override-official`，显式把官方 URL override 到 `test/fixtures/official-styles/`。副本和 SHA-256 只用于测试，不进入 npm 或 Release；不带此参数的预览与生产一样使用官方地址。
 
@@ -14,7 +14,7 @@ PreferencePanes 负责具体模块的设置页、共享导航和本地持久化 
 
 宿主也可监听 `notice` 事件，通过 `preventDefault()` 接管 `{kind, message}` 提示；被接管时模块不创建网页 Toast、不启用提示计时器。独立使用的通用面板仍提供默认通知。
 
-设置页顶部使用官方 VField 外观搜索当前字段的名称、说明、路径和选项标签。搜索只隐藏现有行，不重新生成控件、不追加网络读取；文本框、多行输入和下拉框也共用相同字段结构。
+设置页顶部使用标准 search 控件搜索当前字段的名称、说明、路径和选项标签。搜索只隐藏现有行，不重新生成控件、不追加网络读取；文本框、多行输入和下拉框共用官方配色、间距和原生输入结构。
 
 业务模块安装同一个 `https://github.com/NSNanoCat/PreferencePanes/releases/latest/download/api.js`，不再生成绑定业务配置的读写脚本，也不需要额外安装独立设置插件。该文件由本仓库 Release 工作流发布，自动更新遵循代理工具的缓存周期。
 

@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { loadOfficialOverrides } from "../examples/official-overrides.mjs";
 
-test("official styles remain byte-identical to the recorded app assets", async () => {
+test("official styles remain byte-identical to the recorded CDN assets", async () => {
     const root = new URL("./fixtures/official-styles/", import.meta.url);
     const manifest = JSON.parse(await readFile(new URL("provenance.json", root), "utf8"));
     for (const { file, sha256 } of manifest.files) {
@@ -18,6 +18,7 @@ test("production artifacts contain only official URLs, never fixture CSS or loca
     for (const file of ["api.js", "module/app.mjs", "preference-panes.mjs"]) {
         const source = await readFile(new URL(`../dist/${file}`, import.meta.url), "utf8");
         for (const url of urls) assert.ok(source.includes(url), `${file}: ${url}`);
+        assert.doesNotMatch(source, /@import|@layer|hilo\.bilibili|data-v-b69aa1ea|v-toggle/);
         assert.doesNotMatch(source, /@bilibili\/b-style|--Ga0:|v-toggle--small\{width|__official__|official-styles\.zip|settings\/official\//);
     }
 });

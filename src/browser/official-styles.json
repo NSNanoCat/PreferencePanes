@@ -1,6 +1,4 @@
 {
-    "https://hilo.bilibili.com/h5_common/theme.min.css": "theme.min.css",
-    "https://hilo.bilibili.com/h5_common/b-style.min.css": "b-style.min.css",
-    "https://hilo.bilibili.com/app_settings/assets/messageSettingsLayout-ltzQ1gMi.css": "messageSettingsLayout-ltzQ1gMi.css",
-    "https://hilo.bilibili.com/app_settings/assets/message-settings-BD3N1lqQ.css": "message-settings-BD3N1lqQ.css"
+    "https://s1.hdslb.com/bfs/seed/jinkela/short/b-style/theme.min.css": "theme.min.css",
+    "https://s1.hdslb.com/bfs/seed/jinkela/short/b-style/b-style.min.css": "b-style.min.css"
 }
