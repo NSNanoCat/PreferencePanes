@@ -55,6 +55,16 @@ export class BoxJS {
         const apps = [...target.owners].map(app => ({ ...app, settings: app.settings.filter(entry => target.entries.includes(entry)) }));
         return this.document.apps ? { ...this.document, apps } : apps[0];
     }
+
+    /**
+     * 取得本次导入的唯一模块，避免把模块数据变成项目目录。
+     * Get the single imported module without turning module data into a project directory.
+     * @returns {object} 唯一模块的目录项 / The single module entry.
+     */
+    get module() {
+        if (this.modules.size !== 1) throw new TypeError("Import BoxJS JSON for exactly one module");
+        return this.modules.values().next().value;
+    }
 }
 
 /**

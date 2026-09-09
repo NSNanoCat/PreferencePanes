@@ -39,7 +39,7 @@ export interface PreferencesClientOptions {
      * 包内从 BoxJS 推导的目录。
      * Internal catalog derived from BoxJS.
      */
-    catalog: { modules: ReadonlyMap<string, { storageKey: string }> };
+    catalog: { modules: ReadonlyMap<string, { storageKey: string }>; select(module: string): unknown };
     /**
      * 默认使用浏览器 fetch，可注入同签名传输
      * Defaults to browser fetch; an equivalent transport may be supplied.
@@ -78,15 +78,8 @@ export interface ModuleSnapshot {
  */
 export interface PreferencesClient {
     /**
-     * HEAD 探测配置 Mock，不读取持久化数据。
-     * Probe the config Mock with HEAD without reading persistence.
-     * @param module 模块标识 / Module identifier.
-     * @returns 仅 HTTP 200 为 true；无效模块或请求失败为 false / True only for HTTP 200; false for invalid modules or failed requests.
-     */
-    probe(module: string): Promise<boolean>;
-    /**
-     * 替换会话，各读取一次配置与设置子树。
-     * Replace the session and fetch config and settings subtree once each.
+     * 使用已导入的 JSON 替换会话，只读取一次设置值。
+     * Replace the session from imported JSON and read stored settings once.
      * @param module 模块标识 / Module identifier.
      * @returns 新会话的独立快照 / Independent snapshot of the new session.
      * @throws {Error} 写入进行中、请求或配置无效、会话被替换 / Active write, invalid request or config, or replaced session.

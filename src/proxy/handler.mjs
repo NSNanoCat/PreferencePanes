@@ -6,8 +6,8 @@ import { Store } from "../Store.mjs";
 import { complete } from "./response.mjs";
 
 /**
- * 仅以 BoxJS 和可选 CSS 启动完整的页面与存储服务。
- * Start the complete page and storage service from only BoxJS and optional CSS.
+ * 仅为导入的模块提供页面与存储服务，项目主页由调用方自行托管。
+ * Serve only the imported module's page and persistence; callers host their own project landing pages.
  * @param {unknown} boxjs BoxJS JSON / BoxJS JSON.
  * @param {string} [css] 自定义 CSS 正文 / Custom CSS text.
  * @returns {Promise<void>} 已提交宿主响应 / Delivered host response.
@@ -18,6 +18,7 @@ export async function run(boxjs, css = "") {
     try {
         if (typeof css !== "string") throw new TypeError("CSS must be a string");
         const catalog = new BoxJS(boxjs);
+        const module = catalog.module.module;
         const url = new URL(request.url);
         switch (true) {
             case url.pathname.startsWith("/api/"):
@@ -25,14 +26,11 @@ export async function run(boxjs, css = "") {
                 break;
             case url.pathname.startsWith("/configs/"):
                 break;
-            case url.pathname === "/settings/assets/boxjs.json":
-                result = response(request, 200, catalog.document);
-                break;
-            case url.pathname === "/settings/assets/custom.css":
+            case url.pathname === `/settings/assets/${module}.css`:
                 result = response(request, 200, css, "text/css");
                 break;
             default: {
-                const path = /^\/settings\/(?:[a-zA-Z0-9_-]+\/?)?$/.test(url.pathname) ? "/settings/" : url.pathname;
+                const path = url.pathname === `/settings/${module}` || url.pathname === `/settings/${module}/` ? "page" : url.pathname;
                 const asset = assets[path];
                 if (asset) result = response(request, 200, asset.body, asset.type);
             }

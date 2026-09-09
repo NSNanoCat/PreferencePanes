@@ -17,15 +17,15 @@ function resources() {
         async load(id) {
             switch (id) {
                 case "#styles": {
-                    const styles = await Promise.all(["panel.css", "home.css"].map(name => readFile(new URL(`./src/browser/${name}`, import.meta.url), "utf8")));
-                    return `export default ${JSON.stringify(styles.join("\n"))};`;
+                    const styles = await readFile(new URL("./src/browser/panel.css", import.meta.url), "utf8");
+                    return `export default ${JSON.stringify(styles)};`;
                 }
                 case "#assets": {
                     const bundle = await rollup({ input: "src/browser/app.mjs", plugins: [nodeResolve({ browser: true }), resources()] });
                     try {
                         const { output } = await bundle.generate({ format: "es" });
                         const html = (await readFile(new URL("./src/browser/site.html", import.meta.url), "utf8")).replaceAll("__VERSION__", pkg.version);
-                        return `export default ${JSON.stringify({ "/settings/": { type: "text/html", body: html }, "/settings/assets/app.mjs": { type: "text/javascript", body: output[0].code } })};`;
+                        return `export default ${JSON.stringify({ page: { type: "text/html", body: html }, "/settings/assets/app.mjs": { type: "text/javascript", body: output[0].code } })};`;
                     } finally {
                         await bundle.close();
                     }

@@ -1,8 +1,8 @@
 import type { BoxJSInput } from "../index.js";
 
 /**
- * 整个设置应用的生命周期句柄。
- * Lifecycle handle for the complete preferences application.
+ * 具体模块设置页的生命周期句柄。
+ * Lifecycle handle for a concrete module settings page.
  */
 export interface MountedPreferences {
     /**
@@ -13,9 +13,9 @@ export interface MountedPreferences {
     destroy(): void;
 }
 /**
- * 仅以 BoxJS 和可选 CSS 挂载完整设置应用。
- * Mount the complete settings application using only BoxJS and optional CSS.
- * @param boxjs BoxJS JSON / BoxJS JSON.
+ * 仅以 BoxJS 和可选 CSS 挂载一个模块页，不生成项目主页。
+ * Mount one module page using BoxJS and optional CSS, without a project landing page.
+ * @param boxjs 恰好包含一个模块的 BoxJS JSON / BoxJS JSON describing exactly one module.
  * @param css 可选 CSS 正文；默认样式始终内置 / Optional CSS text; default styles are built in.
  * @returns 生命周期句柄 / Lifecycle handle.
  */

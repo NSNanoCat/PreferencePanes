@@ -269,9 +269,9 @@ export interface BoxJSSubscription extends BoxJSMetadata {
  */
 export type BoxJSInput = BoxJSSetting[] | BoxJSApp | BoxJSSubscription;
 /**
- * 由包生成完整页面、代理和配置 Mock，调用方仅写出这些产物。
- * Build complete pages, proxy and config Mocks; callers only write the artifacts.
- * @param boxjs BoxJS JSON / BoxJS JSON.
+ * 生成具体模块的页面、代理和配置 Mock，不生成项目入口页。
+ * Build a concrete module's page, proxy and config Mock without a project landing page.
+ * @param boxjs 恰好包含一个模块的 BoxJS JSON / BoxJS JSON describing exactly one module.
  * @param css 可选 CSS 正文 / Optional CSS text.
  * @returns 相对路径到文件内容的映射 / Relative paths mapped to file contents.
  */

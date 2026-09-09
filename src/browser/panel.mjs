@@ -2,14 +2,14 @@ import { createPreferencesClient } from "./client.mjs";
 import { errorView, icon, element as node, resourceURL } from "./components.mjs";
 
 /**
- * 挂载从 BoxJS 实时生成的设置面板和短暂通知。
- * Mount runtime-generated BoxJS controls and transient notifications.
+ * 挂载已导入 BoxJS 对应的模块表单和短暂通知。
+ * Mount the imported BoxJS module form and transient notifications.
  * @param {HTMLElement} root 包内挂载元素 / Internal mount element.
  * @param {import("../BoxJS.mjs").BoxJS} catalog 包内 BoxJS 目录 / Internal BoxJS catalog.
  * @returns {import("./index.js").MountedPreferences} 面板生命周期句柄 / Panel lifecycle handle.
  */
 export function mountPanel(root, catalog) {
-    const title = catalog.metadata.name ?? "Preferences";
+    const title = catalog.module.metadata.name ?? catalog.module.module;
     const document = root.ownerDocument;
     const window = document.defaultView;
     const shell = node("div", "pp-panel");
@@ -27,11 +27,9 @@ export function mountPanel(root, catalog) {
     root.append(shell);
     let timer,
         secondaryRoute,
-        routedPath,
         generation = 0,
         active = null,
         saving = false,
-        pendingRoute = false,
         destroyed = false;
     /**
      * 展示短暂通知，不刷新设置数据。
@@ -158,8 +156,8 @@ export function mountPanel(root, catalog) {
         };
         secondaryRoute = showEditor;
         /**
-         * 串行执行页面操作，输入可继续编辑，完成后处理延后导航。
-         * Serialize page actions while inputs remain editable, then process deferred navigation.
+         * 串行执行模块操作，保持输入可编辑。
+         * Serialize module actions while keeping inputs editable.
          * @param {() => Promise<void>} action 请求或写入 / Request or mutation.
          * @param {() => void} success 成功后的局部更新 / Local update after success.
          * @param {() => void} [failure] 失败后恢复当前输入 / Restore the current input on failure.
@@ -184,7 +182,6 @@ export function mountPanel(root, catalog) {
                     saving = pendingWrites > 0;
                     if (destroyed && !saving) client.leave(active);
                     back.disabled = saving || (!activeEditor && window.history.length <= 1);
-                    if (!saving && !destroyed && pendingRoute) route();
                 }));
         }
         const metadata = definition.metadata;
@@ -428,48 +425,12 @@ export function mountPanel(root, catalog) {
         showEditor();
     }
     /**
-     * 按页面 pathname 切换模块，写入尚未完成时延后导航。
-     * Route by the page pathname, deferring navigation while a mutation is pending.
+     * 历史导航只切换当前模块的二级页，不接管项目主页或跨模块路由。
+     * History navigation switches only this module's subpages, never project or cross-module routes.
      * @returns {void} 无返回值 / No return value.
      */
-    function route() {
-        if (saving) {
-            pendingRoute = true;
-            return;
-        }
-        pendingRoute = false;
-        secondaryRoute = undefined;
-        if (active) client.leave(active);
-        routedPath = window.location.pathname;
-        const match = /^\/settings\/([a-zA-Z0-9_-]+)\/?$/.exec(routedPath);
-        if (!match) {
-            generation++;
-            active = null;
-            heading.textContent = title;
-            replace(node("p", "pp-error", "页面地址应为 /settings/模块标识。"), 1);
-            return;
-        }
-        open(match[1]);
-    }
-    /**
-     * 仅在 pathname 改变时处理历史导航。
-     * Handle history navigation only when the pathname changes.
-     * @returns {void} 无返回值 / No return value.
-     */
-    const onPopState = () => {
-        if (window.location.pathname !== routedPath) route();
-        else secondaryRoute?.();
-    };
+    const onPopState = () => secondaryRoute?.();
     const onHashChange = () => secondaryRoute?.();
-    /**
-     * 从浏览器往返缓存恢复时重新读取当前模块。
-     * Reload the current module when restored from the browser back-forward cache.
-     * @param {PageTransitionEvent} event 页面恢复事件 / Page restoration event.
-     * @returns {void} 无返回值 / No return value.
-     */
-    const onPageShow = event => {
-        if (event.persisted) route();
-    };
     back.onclick = () => {
         if (saving) return;
         if (window.location.hash && window.history.state?.preferencePane !== active) {
@@ -478,9 +439,8 @@ export function mountPanel(root, catalog) {
         } else window.history.back();
     };
     window.addEventListener("popstate", onPopState);
-    window.addEventListener("pageshow", onPageShow);
     window.addEventListener("hashchange", onHashChange);
-    route();
+    open(catalog.module.module);
     return {
         /**
          * 移除监听器、定时器、会话和挂载内容。
@@ -490,7 +450,6 @@ export function mountPanel(root, catalog) {
         destroy() {
             destroyed = true;
             window.removeEventListener("popstate", onPopState);
-            window.removeEventListener("pageshow", onPageShow);
             window.removeEventListener("hashchange", onHashChange);
             generation++;
             if (active && !saving) client.leave(active);

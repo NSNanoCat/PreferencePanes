@@ -1,5 +1,4 @@
 import { normalizeBoxJs, normalizeStoredValue, validValue } from "../lib/boxjs.mjs";
-import { validatePathParts } from "../lib/settings-path.mjs";
 
 /**
  * 单个模块的临时会话；离开页面后丢弃。
@@ -31,11 +30,10 @@ export function createPreferencesClient({ catalog, fetch: request = globalThis.f
      * @param {"HEAD" | "GET" | "POST" | "DELETE"} method HTTP 方法 / HTTP method.
      * @param {unknown} body POST 值，其它方法忽略 / POST value, ignored by other methods.
      * @param {AbortSignal | undefined} signal 会话取消信号 / Session cancellation signal.
-     * @param {boolean} [resource=false] 是否为无标记头的配置资源 / Whether this is a config resource without the marker header.
      * @returns {Promise<Response>} 未消费正文的响应 / Response with an unread body.
      * @throws {Error} 非 200 且非数据 GET 404、超时、取消或网络错误 / Non-200 status except missing-data GETs, timeout, cancellation or network error.
      */
-    async function send(path, method, body, signal, resource = false) {
+    async function send(path, method, body, signal) {
         const controller = new AbortController();
         const abort = () => controller.abort();
         if (signal?.aborted) abort();
@@ -47,26 +45,16 @@ export function createPreferencesClient({ catalog, fetch: request = globalThis.f
                 credentials: "omit",
                 cache: "no-store",
                 signal: controller.signal,
-                headers: resource ? {} : { "X-Settings-Client": "1", ...(method === "POST" ? { "Content-Type": "application/json" } : {}) },
+                headers: { "X-Settings-Client": "1", ...(method === "POST" ? { "Content-Type": "application/json" } : {}) },
                 ...(method === "POST" ? { body: JSON.stringify(body) } : {}),
             });
-            if (response.status !== 200 && !(!resource && method === "GET" && response.status === 404)) throw new Error(`HTTP ${response.status}`);
+            if (response.status !== 200 && !(method === "GET" && response.status === 404)) throw new Error(`HTTP ${response.status}`);
             return response;
         } finally {
             clearTimeout(timer);
             signal?.removeEventListener("abort", abort);
         }
     }
-    /**
-     * 由合法模块名生成配置 Mock 路径。
-     * Build the config Mock path from a valid module name.
-     * @param {string} module 模块标识 / Module identifier.
-     * @returns {string} 配置路径 / Config path.
-     */
-    const configPath = module => {
-        validatePathParts([module]);
-        return `/configs/${encodeURIComponent(module)}`;
-    };
     /**
      * 获取独立快照，避免调用方修改内部缓存。
      * Return an independent snapshot so callers cannot mutate the cache.
@@ -125,22 +113,8 @@ export function createPreferencesClient({ catalog, fetch: request = globalThis.f
     }
     return {
         /**
-         * 探测配置 Mock，不读写存储。
-         * Probe the config Mock without accessing storage.
-         * @param {string} module 模块标识 / Module identifier.
-         * @returns {Promise<boolean>} 是否返回 HTTP 200 / Whether HTTP 200 was returned.
-         */
-        async probe(module) {
-            try {
-                await send(configPath(module), "HEAD", undefined, undefined, true);
-                return true;
-            } catch {
-                return false;
-            }
-        },
-        /**
-         * 替换旧会话，读取一次配置与一次设置子树。
-         * Replace the previous session and read config and settings subtree once each.
+         * 从已导入的 JSON 创建新会话，只读取一次设置值。
+         * Create a session from imported JSON and read stored settings once.
          * @param {string} module 模块标识 / Module identifier.
          * @returns {Promise<import("./client.mjs").ModuleSnapshot>} 新快照 / New snapshot.
          * @throws {Error} 读取失败、会话被替换或写入尚未完成 / Read failure, replaced session or unfinished write.
@@ -154,8 +128,7 @@ export function createPreferencesClient({ catalog, fetch: request = globalThis.f
             const state = { controller: new AbortController(), definition: null, values: {}, saving: false };
             sessions.set(module, state);
             try {
-                const definition = normalizeBoxJs(await (await send(configPath(module), "GET", undefined, state.controller.signal, true)).json(), module);
-                if (definition.storageKey !== binding.storageKey) throw new TypeError("Configuration Mock changed the BoxJS storage root");
+                const definition = normalizeBoxJs(catalog.select(module), module);
                 const response = await send(`/api/${definition.settingsPath.map(encodeURIComponent).join("/")}/`, "GET", undefined, state.controller.signal);
                 let subtree = response.status === 404 ? {} : await response.json();
                 if (typeof subtree === "string") subtree = JSON.parse(subtree);
