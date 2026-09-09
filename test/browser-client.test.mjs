@@ -45,8 +45,9 @@ function fixture(input = config) {
         fetch: async (url, options) => {
             calls.push({ url, ...options });
             if (state.error) throw state.error;
-            const data = url === "/api/Module/Caches" ? state.caches : state.stored;
-            const status = options.method === "GET" && url === "/api/Module/Settings/" ? (state.settingsStatus ?? state.status) : state.status;
+            const key = [...new URLSearchParams(options.body).keys()][0];
+            const data = key.endsWith(".Caches") ? state.caches : state.stored;
+            const status = url === "/api/get" && key.endsWith(".Settings") ? (state.settingsStatus ?? state.status) : state.status;
             const body = options.method === "HEAD" || status === 204 ? null : JSON.stringify(data);
             return new Response(body, { status });
         },
@@ -72,7 +73,7 @@ test("imported JSON supports direct module fields without a fixed Settings direc
     const result = await client.open("Module");
     assert.deepEqual(result.definition.settingsPath, ["Module"]);
     assert.equal(result.values["Module.flag"], true);
-    assert.equal(calls[0].url, "/api/Module/");
+    assert.equal(calls[0].url, "/api/get");
 });
 
 test("cache inspection is explicit; clear and reset use DELETE without follow-up GET", async () => {
@@ -89,9 +90,9 @@ test("cache inspection is explicit; clear and reset use DELETE without follow-up
     assert.deepEqual(
         calls.slice(1).map(({ method, url }) => [method, url]),
         [
-            ["GET", "/api/Module/Caches"],
-            ["DELETE", "/api/Module/Caches"],
-            ["DELETE", "/api/Module"],
+            ["POST", "/api/get"],
+            ["POST", "/api/delete"],
+            ["POST", "/api/delete"],
         ],
     );
     assert.deepEqual(
@@ -111,9 +112,9 @@ test("opening uses the supplied JSON and only requests its stored values", async
     assert.equal(values["Module.Settings.Home.enabled"], false);
     assert.deepEqual(
         calls.map(call => [call.method, call.url]),
-        [["GET", "/api/Module/Settings/"]],
+        [["POST", "/api/get"]],
     );
-    assert.equal(calls[0].headers["X-Settings-Client"], "1");
+    assert.equal(calls[0].headers["Content-Type"], "application/x-www-form-urlencoded");
     assert.equal(calls[0].cache, "no-store");
 });
 
@@ -132,8 +133,8 @@ test("HTTP 200 writes and deletes update isolated cache without GET", async () =
     assert.deepEqual(
         calls.slice(1).map(call => [call.method, call.url, call.body]),
         [
-            ["POST", "/api/Module/Settings/Home/mode", '"a"'],
-            ["DELETE", "/api/Module/Settings/items", undefined],
+            ["POST", "/api/set", new URLSearchParams([["@Example.Module.Settings.Home.mode", '"a"']]).toString()],
+            ["POST", "/api/delete", new URLSearchParams([["@Example.Module.Settings.items", ""]]).toString()],
         ],
     );
     assert.deepEqual(
@@ -203,7 +204,7 @@ test("writes are serialized and completing after leave cannot resurrect cache", 
         catalog: new BoxJS(config),
         notify: event => notifications.push(event),
         fetch: async (url, options) => {
-            if (options.method === "POST")
+            if (url === "/api/set")
                 return new Promise(resolve => {
                     finish = resolve;
                 });

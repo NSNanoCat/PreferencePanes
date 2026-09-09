@@ -1,43 +1,29 @@
 import { URL } from "@nsnanocat/url";
 import assets from "#assets";
-import { BoxJS } from "../BoxJS.mjs";
 import { pageInputs } from "../lib/page-inputs.mjs";
 import { response } from "../lib/response.mjs";
 import { Store } from "../Store.mjs";
 import { complete } from "./response.mjs";
 
 /**
- * 仅为导入的模块提供页面与存储服务，项目主页由调用方自行托管。
- * Serve only the imported module's page and persistence; callers host their own project landing pages.
- * @param {unknown} boxjs BoxJS JSON / BoxJS JSON.
- * @param {string} [css] 自定义 CSS 正文 / Custom CSS text.
- * @returns {Promise<void>} 已提交宿主响应 / Delivered host response.
+ * 通用代理入口：提供无鉴权 form 存储 API 及模块页面，不含业务配置。
+ * Generic proxy entry serving unauthenticated form storage and module pages without business configuration.
+ * @returns {Promise<void>} 已交给代理宿主的响应 / Response delivered to the proxy host.
  */
-export async function run(boxjs, css = "") {
+async function run() {
     const request = globalThis.$request;
     let result;
     try {
-        if (typeof css !== "string") throw new TypeError("CSS must be a string");
-        const catalog = new BoxJS(boxjs);
-        const module = catalog.module.module;
         const url = new URL(request.url);
         switch (true) {
             case url.pathname.startsWith("/api/"):
-                result = await new Store(catalog).handle(request, url);
+                result = await new Store().handle(request, url);
                 break;
-            case url.pathname.startsWith("/configs/"):
-                break;
-            case url.pathname === `/settings/${module}` || url.pathname === `/settings/${module}/`: {
-                // Header 由代理传入文档，浏览器再下载 JSON/CSS；代理不获取外部资源。
-                // Carry headers into the document; only the browser downloads external JSON/CSS.
+            case /^\/settings\/[a-zA-Z0-9_-]+\/?$/.test(url.pathname): {
                 const inputs = encodeURIComponent(JSON.stringify(pageInputs(url, request.headers)));
-                const html = assets.page.body.replace("</head>", `<meta name="preference-panes-inputs" content="${inputs}"></head>`);
-                result = response(request, 200, html, "text/html");
+                result = response(request, 200, assets.page.body.replace("</head>", `<meta name="preference-panes-inputs" content="${inputs}"></head>`), "text/html");
                 break;
             }
-            case url.pathname === `/settings/assets/${module}.css`:
-                result = response(request, 200, css, "text/css");
-                break;
             default: {
                 const asset = assets[url.pathname];
                 if (asset) result = response(request, 200, asset.body, asset.type);
@@ -46,7 +32,8 @@ export async function run(boxjs, css = "") {
         if (result && !url.pathname.startsWith("/api/") && !["GET", "HEAD"].includes(request.method)) result = response(request, 405, { error: "Method not allowed" });
     } catch (error) {
         console.error(`PreferencePanes: ${error.message}`);
-        result = response(request, 500, { error: "Settings execution failed" });
+        result = response(request, 500, { error: error.message });
     }
     complete(result);
 }
+run();

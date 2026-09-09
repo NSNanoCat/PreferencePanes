@@ -92,8 +92,8 @@ export interface SettingsRequest {
      */
     headers?: Record<string, string | undefined>;
     /**
-     * POST 的正文为 JSON 值本身；DELETE 无正文
-     * POST contains the JSON value itself; DELETE has no body.
+     * POST 的正文为一个 form 字段，字段名是完整 @root.path
+     * POST contains one form field whose name is the complete @root.path.
      */
     body?: string;
 }
@@ -113,8 +113,8 @@ export interface SettingsResponse {
      */
     headers: Record<string, string>;
     /**
-     * JSON 文本；HEAD 始终为空字符串
-     * JSON text; always an empty string for HEAD.
+     * JSON 或页面资源正文
+     * JSON or page resource body.
      */
     body: string;
 }
@@ -269,8 +269,8 @@ export interface BoxJSSubscription extends BoxJSMetadata {
  */
 export type BoxJSInput = BoxJSSetting[] | BoxJSApp | BoxJSSubscription;
 /**
- * 生成具体模块的页面、代理和配置 Mock，不生成项目入口页。
- * Build a concrete module's page, proxy and config Mock without a project landing page.
+ * 生成模块前端文件，不复制配置、不生成绑定模块的代理脚本。
+ * Build module frontend files without copying configuration or producing bound proxy scripts.
  * @param boxjs 恰好包含一个模块的 BoxJS JSON / BoxJS JSON describing exactly one module.
  * @param css 可选 CSS 正文 / Optional CSS text.
  * @returns 相对路径到文件内容的映射 / Relative paths mapped to file contents.

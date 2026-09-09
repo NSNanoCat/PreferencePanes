@@ -45,7 +45,7 @@ function resources() {
 export default [
     { input: "src/browser/index.mjs", output: { file: "dist/preference-panes.mjs", format: "es" } },
     { input: "src/browser/Navigation.mjs", output: { file: "dist/module/navigation.mjs", format: "es" } },
-    { input: "src/proxy/handler.mjs", output: { file: "dist/preference-panes.proxy.js", format: "iife", name: "PreferencePanes" } },
+    { input: "src/proxy/handler.mjs", output: { file: "dist/api.js", format: "iife" } },
     {
         input: "src/browser/app.mjs",
         output: { file: "dist/module/app.mjs", format: "es" },
@@ -59,7 +59,6 @@ export default [
             },
         ],
     },
-    { input: "src/proxy/config.mjs", output: { file: "dist/preference-panes.config.js", format: "iife", name: "PreferencePanes" } },
 ].map(config => ({
     ...config,
     plugins: [nodeResolve({ browser: true }), resources(), ...(config.plugins ?? [])],

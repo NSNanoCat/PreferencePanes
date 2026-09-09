@@ -12,3 +12,5 @@ npm run apifox:check
 项目为 [NSNanoCat / Preference Panes](https://app.apifox.com/project/8803052)。已绑定 GitHub 仓库的 `main` 和 `dev`，分别导入 Apifox 同名分支；文件路径固定为 `apifox/preference-panes.apifox.json`。这些绑定由 Apifox 管理，不需要在仓库保留首次创建请求或运行流水。
 
 原生格式按 Method 与 Path 匹配接口并覆盖；接口模式为 `methodAndPath`，文档和数据模型模式为 `name`。保持“删除未匹配资源”关闭。导入在本机客户端每 30 分钟执行，也可在绑定数据源页面立即导入；推送后应按分支回读确认，不能仅凭导入时间判断成功。
+
+本次开发版将旧 /api/{module}/{path} 替换为 POST /api/get、set、delete。生成文件只含新接口；同步远端 Apifox 时需明确移除已废弃的旧路径，不能将旧接口与新接口并存当作完成迁移。form 字段名使用 {{storageKey}} 变量，示例写在说明中。

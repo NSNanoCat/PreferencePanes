@@ -1,56 +1,37 @@
 # @nsnanocat/preference-panes
 
-PreferencePanes **只负责具体模块的设置页**。外部输入为这个模块的 BoxJS JSON 和可选 CSS；省略 CSS 使用默认样式。
+PreferencePanes 负责具体模块的设置页、共享导航和本地持久化 API。模块页面只接受 BoxJS JSON 与可选 CSS；业务模块自己发布版本对应的 JSON，项目网站维护定制主页、入口探测和主题。
 
-项目定制主页由 github.io 等调用方独立维护。主页只探测各模块的 JSON 是否可访问，并提供入口；它的布局、品牌、按钮目录不属于 PreferencePanes。本包不生成主页、模块选择目录或安装选择器。
+## 通用 API（0.8.0 form 契约）
 
-## 导入一个模块
+业务模块安装同一个 `https://github.com/NSNanoCat/PreferencePanes/releases/latest/download/api.js`，不再生成绑定业务配置的读写脚本，也不需要额外安装独立设置插件。该文件由本仓库 Release 工作流发布，自动更新遵循代理工具的缓存周期。
+
+API 为 POST /api/get、/api/set、/api/delete。form 字段名是完整 `@root.path`；读取和删除的值留空，写入值可以是普通文本或 JSON。API 不鉴权，不下载 JSON，也不校验控件和枚举。
+
+```js
+await fetch("/api/set", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams([["@BiliBili.Enhanced.Settings.Home.Top_left", JSON.stringify("mine")]]),
+});
+```
+
+前端统一 JSON.stringify 再做 form 编码，保留字符串、布尔值、数值、null、数组和对象的区别。API 通过 util Storage/Lodash 读取根、操作目标路径、写回一次；不会在写入后额外读取。缺失键返回 404，写入/删除成功返回 200。旧 /api/{module}/{path} 接口移除。
+
+## 页面与输入
 
 ```js
 import { mount } from "@nsnanocat/preference-panes/browser";
-import boxjs from "./Module.boxjs.json" with { type: "json" };
-
 const page = mount(boxjs, ".pp-panel { --pp-accent: #16866a; }");
-// 离开模块页时释放视图、样式、监听器和会话。
-// Release the view, styles, listeners and session when leaving the module page.
 page.destroy();
 ```
 
-调用后直接显示该 JSON 对应的模块设置，不先显示入口页，也不按当前 URL 选择其它模块。一次输入必须恰好包含一个可推导模块；多模块文件会报错，不会生成菜单。支持字段数组、单 app 和只包含该模块的 apps 订阅。
+支持字段数组、单 app 和仅包含一个模块的 apps 订阅。控件、名称、图标和默认值从 BoxJS 解析；`@Root.Module.Settings.key` 直接给出存储根与键路径，不需要额外映射配置。省略 CSS 使用内置样式。
 
-`@Root.Module.Settings.key` 推导根、模块和字段路径；app 的 id/name 不替代存储映射。模块名、标题、说明、图标和选项来自 BoxJS。CSS 是正文字符串，作用于该模块文档；嵌入项目主页时应使用独立模块页面或 iframe，避免样式作用到宿主。
-
-## 构建模块产物
+`/settings/{module}` 由通用 api.js 返回模块文档。页面可通过 json/css 查询参数或 X-PreferencePanes-JSON/CSS Header 指定资源 URL；默认 JSON 是 /configs/{module}，CSS 默认空。Header 分别优先。
 
 ```js
-import { build } from "@nsnanocat/preference-panes";
-
-const files = await build(boxjs, css);
-```
-
-返回相对路径到正文的映射，调用方写出并托管即可。每次只生成该模块的 HTML、CSS、BoxJS、读写脚本、配置 Mock 和公共启动 JS。模块文件名独立，可以合并不同模块的产物；不会输出或覆盖项目的 `settings/index.html`。
-
-直接访问 `/settings/{module}` 时，启动器先导入 `/configs/{module}` JSON 与该模块 CSS，再调用 mount。JSON 缺失或与 URL 不符时不生成表单。项目主页可自行 HEAD `/configs/{module}` 判断入口可用性；PreferencePanes 不接管主页探测逻辑。
-
-也支持为模块页传入 JSON/CSS **资源 URL**：
-
-```http
-GET /settings/Module?json=%2Fconfigs%2FModule&css=%2Ftheme.css
-```
-
-```http
-GET /settings/Module
-X-PreferencePanes-JSON: /configs/Module
-X-PreferencePanes-CSS: /theme.css
-```
-
-每个 Header 分别优先于对应查询参数，未提供时使用上述模块约定；CSS 传空字符串时仅使用内置默认样式。资源必须为 HTTP(S) 或相对 URL，跨域资源需要允许浏览器 CORS。模块身份仍需与 BoxJS 一致，不改变存储根绑定。
-
-静态 HTML 无法读取请求头。网页使用共用 `ModuleFrame` 容器：它从原始请求 URL/Header 解析模块上下文，保存在 iframe 元素上，HTML 原样加载。启动器读取容器上下文，不从 about:srcdoc 推断模块，不通过修改 HTML 补 meta 或注入 CSS。原生 WebView 直接携带 Header 导航时，仍由代理生成上下文。
-
-```js
-import { ModuleFrame } from "@nsnanocat/preference-panes/navigation";
-
+import { ModuleFrame, Navigation } from "@nsnanocat/preference-panes/navigation";
 const frame = new ModuleFrame("/settings/Module", {
     headers: { "X-PreferencePanes-JSON": "/configs/Module", "X-PreferencePanes-CSS": "/theme.css" },
     signal,
@@ -59,53 +40,17 @@ container.append(frame.element);
 await frame.load();
 frame.addEventListener("change", () => { title.textContent = frame.state.title; });
 back.onclick = () => frame.back();
-// 离开时取消加载及事件订阅，节点由 Navigation 在动画结束后移除。
-// Cancel loads and subscriptions on departure; Navigation removes the node after its transition.
 frame.destroy();
 ```
 
-iframe 隔离模块 CSS，模块二级页使用自身 fragment 历史。嵌入模式由框架自身布局隐藏内部顶栏并使用完整内容高度；容器通过 change/state 报告标题、写入忙碌状态和返回能力，宿主不查询或修改模块内部 DOM。Navigation 负责历史及退出动画，重新进入创建新 ModuleFrame；不使用 localStorage/sessionStorage 缓存输入或设置。
+ModuleFrame 在 iframe 元素上保存原请求上下文，HTML 原样加载，不从 about:srcdoc 猜模块、不注入临时 CSS。框架自身管理嵌入模式，通过事件发布标题、忙碌状态和返回能力。Navigation 统一管理 fragment 历史、滑动、滚动保留、加载取消及动画结束后释放；项目提供根页、子页工厂和布局。
 
-## 模块页行为
+每次进入模块读取 JSON/CSS 和设置一次。二级多选返回复用内存缓存，修改立即写入；成功提示、失败回滚由公共组件处理。Caches 按需查看/清空，重置只删除指定模块子树。
 
-### 共用导航组件
+## 构建与验证
 
-模块二级页与外部定制主页复用 `Navigation`，通过独立导出使用，不引入表单、BoxJS 或品牌目录：
+`npm run build` 生成无业务配置的 dist/api.js 和公共前端；Release 工作流上传 api.js、index.html、app.mjs、navigation.mjs。`build(boxjs, css?)` 仅用于生成模块前端文件，不再输出配置副本或模块绑定脚本。
 
-```js
-import { Navigation } from "@nsnanocat/preference-panes/navigation";
-
-const navigation = new Navigation(container, home, (key, signal) => {
-    // 返回由项目创建的子页节点；异步加载监听 signal，在退出时取消。
-    // Return the project's detail node; async loads observe signal for cancellation on departure.
-    return detailViews.get(key);
-});
-navigation.open("detail");
-navigation.addEventListener("change", () => { back.disabled = !navigation.canGoBack; });
-back.onclick = () => navigation.back();
-// 卸载整个组件时释放监听器和页面。
-// Release listeners and views when unmounting the entire component.
-navigation.destroy();
-```
-
-工厂返回 HTMLElement，未知键返回 undefined；布局、背景与内容由调用方 CSS/DOM 定义。容器内只放导航管理的节点，组件接管其子节点。根页一直保留，子页 280ms 滑入/滑出，返回动画结束后移除。模块内部返回缓存节点保留控件值与滚动；外部主页每次创建新 iframe，重新读取设置。快速切换会取消旧加载与动画，减少动态效果时立即切换。历史记录、书签初始根页和 srcdoc fragment 只在组件中处理；实例之间依靠浏览器联合历史，不跨 iframe 操作 DOM。
-
-`build` 额外输出公共 `settings/assets/navigation.mjs`，静态主页可直接导入该地址；它不生成或接管主页内容。
-
-渲染器使用已导入的 JSON 创建控件，只 GET 一次设置子树；不会再次请求配置或探测其它模块。打开/刷新模块文档重新导入，再读取设置。单选为下拉框，多选为二级选项页；二级返回不刷新设置值。
-
-修改立即串行 POST，200 后更新当前内存并通知；失败恢复已保存值。保留 Caches 查看/清空和模块重置，不展示逐字段保存或删除按钮。API 按 BoxJS 根和模块用 util 读写任意 JSON 路径，不重复校验控件或枚举。
-
-## 文件导入测试台
-
-```sh
-npm run preview
-```
-
-浏览器中选择一个模块的 JSON、可选 CSS，点击“生成”，在独立 iframe 查看模块页。不会自动装入示例，不会生成项目主页。CSS 隔离在预览文档内；测试数据只保存在内存，不访问用户代理存储。
-
-## 维护
-
-遵循 AGENTS.md 与通用 Biome 配置。运行 `npm run check` 和 `npm run apifox:check` 验证代码、类型、行为与文档。0.7.2 通过 ModuleFrame 保留 iframe 请求上下文，并与常驻顶栏同步导航状态；JSON/CSS 输入及存储接口保持不变，运行时无额外 npm 依赖。
+`npm run preview` 提供文件导入测试台，上传 JSON/CSS 后在隔离 iframe 预览；测试存储只在内存中。`npm run check` 检查代码、类型、行为；`npm run apifox:generate` 和 `npm run apifox:check` 维护原生接口文档。
 
 [接口规范](apifox/Specification.md) · [Apifox JSON](apifox/preference-panes.apifox.json)

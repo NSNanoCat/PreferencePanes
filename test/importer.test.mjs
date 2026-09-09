@@ -26,7 +26,7 @@ test("import testbench starts empty and generates only the uploaded module", { t
         const boxjs = [{ id: "@Root.Module.flag", name: "Flag", type: "boolean", val: true }];
         const result = await fetch(`${base}preview`, { method: "POST", body: JSON.stringify({ boxjs, css: "body { color: green; }" }) });
         assert.equal(result.status, 200);
-        assert.deepEqual(await result.json(), { url: "/settings/Module/", module: "Module" });
+        assert.deepEqual(await result.json(), { url: "/settings/Module/?css=/settings/assets/Module.css", module: "Module" });
         assert.deepEqual(await (await fetch(`${base}configs/Module`)).json(), boxjs);
         assert.equal(await (await fetch(`${base}settings/assets/Module.css`)).text(), "body { color: green; }");
         assert.equal((await fetch(`${base}configs/Other`)).status, 404);

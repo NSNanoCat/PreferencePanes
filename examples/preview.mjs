@@ -8,6 +8,8 @@ import { build } from "../src/index.mjs";
 const importer = await readFile(new URL("./index.html", import.meta.url), "utf8");
 const script = await readFile(new URL("./importer.mjs", import.meta.url), "utf8");
 let files = {};
+let configuration;
+let moduleName;
 const store = new Map();
 const server = http.createServer(async (request, reply) => {
     try {
@@ -26,13 +28,17 @@ const server = http.createServer(async (request, reply) => {
         for await (const chunk of request) body += chunk;
         if (url.pathname === "/preview" && request.method === "POST") {
             files = {};
+            configuration = undefined;
+            moduleName = undefined;
             store.clear();
             try {
                 const input = JSON.parse(body);
                 files = await build(input.boxjs, input.css);
                 const page = Object.keys(files).find(path => path.endsWith("/index.html"));
+                configuration = input.boxjs;
+                moduleName = page.split("/")[1];
                 reply.writeHead(200, { "Content-Type": "application/json" });
-                reply.end(JSON.stringify({ url: `/${page.slice(0, -"index.html".length)}`, module: page.split("/")[1] }));
+                reply.end(JSON.stringify({ url: `/${page.slice(0, -"index.html".length)}?css=/settings/assets/${moduleName}.css`, module: moduleName }));
             } catch (error) {
                 reply.writeHead(400, { "Content-Type": "application/json" });
                 reply.end(JSON.stringify({ error: error.message }));
@@ -47,13 +53,17 @@ const server = http.createServer(async (request, reply) => {
             reply.end(request.method === "HEAD" ? "" : entry);
             return;
         }
-        const match = /^\/(api|configs)\/([a-zA-Z0-9_-]+)(?:\/|$)/.exec(url.pathname);
-        const runtime = match && files[`settings/assets/${match[2]}.${match[1] === "configs" ? "config" : "request"}.js`];
-        if (!runtime) {
+        if (configuration && url.pathname === `/configs/${moduleName}` && ["HEAD", "GET"].includes(request.method)) {
+            reply.writeHead(200, { "Content-Type": "application/json" });
+            reply.end(request.method === "HEAD" ? "" : JSON.stringify(configuration));
+            return;
+        }
+        if (!url.pathname.startsWith("/api/")) {
             reply.writeHead(404);
             reply.end();
             return;
         }
+        const runtime = await readFile(new URL("../dist/api.js", import.meta.url), "utf8");
         const response = await new Promise(resolve =>
             vm.runInNewContext(runtime, {
                 $environment: { "surge-version": "preview" },
