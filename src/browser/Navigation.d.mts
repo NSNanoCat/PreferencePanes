@@ -3,6 +3,8 @@
  * Iframe container preserving module HTML and carrying context on the element.
  * confirm 事件可 preventDefault 后通过 detail.resolve/reject 完成宿主确认。
  * Prevent default on confirm events and settle host dialogs through detail.resolve/reject.
+ * notice 事件可 preventDefault 后交由宿主显示，模块不再创建网页 Toast。
+ * Prevent default on notice events to display them in the host without a module web Toast.
  */
 export class ModuleFrame extends EventTarget {
     /**
@@ -73,6 +75,23 @@ export interface ConfirmationRequest {
      * @returns 无返回值 / No return value.
      */
     reject(error: Error): void;
+}
+
+/**
+ * 操作结果通知。
+ * Operation result notice.
+ */
+export interface Notice {
+    /**
+     * 结果类型。
+     * Result kind.
+     */
+    kind: "success" | "error";
+    /**
+     * 已格式化的提示文字。
+     * Formatted notice text.
+     */
+    message: string;
 }
 
 /**

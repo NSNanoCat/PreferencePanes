@@ -37,11 +37,9 @@ export function mountPanel(root, catalog) {
     if (image) logo.append(image);
     brand.append(logo, heading);
     const viewport = node("div", "pp-viewport");
-    const toast = node("div", "pp-toast");
-    toast.setAttribute("role", "status");
-    toast.hidden = true;
+    let toast;
     header.append(back, brand, trailing);
-    shell.append(header, viewport, toast);
+    shell.append(header, viewport);
     root.append(shell);
     // 嵌入模式向宿主发布导航状态，宿主不读取或修改模块内部 DOM。
     // Embedded mode publishes navigation state without host reads or mutations of the module DOM.
@@ -74,23 +72,34 @@ export function mountPanel(root, catalog) {
      */
     const notify = event => {
         if (destroyed) return;
+        let message;
         switch (true) {
             case event.kind === "error":
-                toast.textContent = `操作失败：${event.message}`;
+                message = `操作失败：${event.message}`;
                 break;
             case event.operation === "delete":
-                toast.textContent = "删除成功";
+                message = "删除成功";
                 break;
             case event.operation === "clearCaches":
-                toast.textContent = "Caches 已清空";
+                message = "Caches 已清空";
                 break;
             case event.operation === "reset":
-                toast.textContent = "模块已重置";
+                message = "模块已重置";
                 break;
             default:
-                toast.textContent = "修改成功";
+                message = "修改成功";
                 break;
         }
+        // 宿主接管时不创建网页 Toast，也不运行其计时器。
+        // A host-owned notice creates no web Toast and starts no local timer.
+        const frame = window.frameElement;
+        if (frame && !frame.dispatchEvent(new frame.ownerDocument.defaultView.CustomEvent("preferencepanes:notice", { cancelable: true, detail: { kind: event.kind, message } }))) return;
+        if (!toast) {
+            toast = node("div", "pp-toast");
+            toast.setAttribute("role", "status");
+            shell.append(toast);
+        }
+        toast.textContent = message;
         toast.dataset.kind = event.kind;
         toast.hidden = false;
         clearTimeout(timer);
