@@ -1,40 +1,68 @@
 import { readFile } from "node:fs/promises";
 import { nodeResolve } from "@rollup/plugin-node-resolve";
+import { rollup } from "rollup";
 import pkg from "./package.json" with { type: "json" };
 
 /**
- * 分别构建浏览器 ESM 与代理 IIFE，不把 Node 专用适配打入包中。
- * Build browser ESM and proxy IIFE separately without bundling Node-specific adapters.
+ * 页面资源由包自身编译，代理和静态站点使用同一套产物。
+ * Compile page resources inside the package for both proxy and static hosting.
+ * @returns {import("rollup").Plugin} 内部资源插件 / Internal resource plugin.
+ */
+function resources() {
+    return {
+        name: "preference-resources",
+        resolveId(id) {
+            if (id === "#styles" || id === "#assets") return id;
+        },
+        async load(id) {
+            switch (id) {
+                case "#styles": {
+                    const styles = await readFile(new URL("./src/browser/panel.css", import.meta.url), "utf8");
+                    return `export default ${JSON.stringify(styles)};`;
+                }
+                case "#assets": {
+                    const bundle = await rollup({ input: "src/browser/app.mjs", plugins: [nodeResolve({ browser: true }), resources()] });
+                    try {
+                        const { output } = await bundle.generate({ format: "es" });
+                        const html = (await readFile(new URL("./src/browser/module.html", import.meta.url), "utf8")).replaceAll("__VERSION__", pkg.version);
+                        return `export default ${JSON.stringify({ page: { type: "text/html", body: html }, "/settings/assets/app.mjs": { type: "text/javascript", body: output[0].code } })};`;
+                    } finally {
+                        await bundle.close();
+                    }
+                }
+                default:
+                    return null;
+            }
+        },
+    };
+}
+
+/**
+ * 前端不包含代理 polyfill；代理资源与脚本由包统一打包。
+ * Keep proxy polyfills out of the browser and bundle all proxy resources inside the package.
  * @type {import("rollup").RollupOptions[]}
  */
 export default [
-	{ input: "src/browser/index.mjs", output: { file: "dist/preference-panes.mjs", format: "es" } },
-	{ input: "src/proxy/request.mjs", output: { file: "dist/preference-panes.request.js", format: "iife" } },
-	{
-		input: "src/browser/app.mjs",
-		output: { file: "dist/settings/app.mjs", format: "es" },
-		plugins: [
-			{
-				name: "settings-assets",
-				async generateBundle() {
-					for (const [fileName, source] of [
-						["index.html", "site.html"],
-						["panel.css", "panel.css"],
-						["home.css", "home.css"],
-					]) {
-						const content = await readFile(new URL(`./src/browser/${source}`, import.meta.url), "utf8");
-						this.emitFile({ type: "asset", fileName, source: content.replaceAll("__VERSION__", pkg.version) });
-					}
-				},
-			},
-		],
-	},
-	{ input: "src/proxy/handler.mjs", output: { file: "dist/preference-panes.proxy.js", format: "iife", name: "PreferencePanes" } },
-	{ input: "src/proxy/config.mjs", output: { file: "dist/preference-panes.config.js", format: "iife", name: "PreferencePanes" } },
+    { input: "src/browser/index.mjs", output: { file: "dist/preference-panes.mjs", format: "es" } },
+    { input: "src/proxy/handler.mjs", output: { file: "dist/preference-panes.proxy.js", format: "iife", name: "PreferencePanes" } },
+    {
+        input: "src/browser/app.mjs",
+        output: { file: "dist/module/app.mjs", format: "es" },
+        plugins: [
+            {
+                name: "page-shell",
+                async generateBundle() {
+                    const html = await readFile(new URL("./src/browser/module.html", import.meta.url), "utf8");
+                    this.emitFile({ type: "asset", fileName: "index.html", source: html.replaceAll("__VERSION__", pkg.version) });
+                },
+            },
+        ],
+    },
+    { input: "src/proxy/config.mjs", output: { file: "dist/preference-panes.config.js", format: "iife", name: "PreferencePanes" } },
 ].map(config => ({
-	...config,
-	plugins: [nodeResolve({ browser: true }), ...(config.plugins ?? [])],
-	onwarn(warning) {
-		throw new Error(warning.message);
-	},
+    ...config,
+    plugins: [nodeResolve({ browser: true }), resources(), ...(config.plugins ?? [])],
+    onwarn(warning) {
+        throw new Error(warning.message);
+    },
 }));

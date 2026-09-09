@@ -1,17 +1,36 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Preferences</title>
-    <link rel="stylesheet" href="/resources/panel.css" />
-  </head>
-  <body>
-    <main id="preferences"></main>
-    <script type="module">
-      import { mountPreferencePanes } from "/resources/preference-panes.mjs";
-
-      mountPreferencePanes({ element: document.querySelector("#preferences") });
-    </script>
-  </body>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>PreferencePanes 模块测试</title>
+        <style>
+            body { margin: 0; color: #202124; background: #f4f5f7; font: 14px/1.5 system-ui, sans-serif; }
+            header { padding: 16px 20px; background: white; border-bottom: 1px solid #ddd; }
+            h1 { margin: 0 0 12px; font-size: 20px; }
+            form { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+            label { display: grid; gap: 4px; min-width: 0; }
+            input { max-width: 100%; }
+            button { padding: 6px 14px; font: inherit; }
+            #status { margin: 8px 0 0; }
+            #error { color: #b3261e; }
+            iframe { display: block; width: 100%; height: calc(100vh - 170px); min-height: 560px; border: 0; background: white; }
+            iframe[hidden] { display: none; }
+        </style>
+    </head>
+    <body>
+        <header>
+            <h1>PreferencePanes 模块测试</h1>
+            <form id="import">
+                <label>BoxJS JSON<input id="boxjs" type="file" accept=".json,application/json" required></label>
+                <label>CSS（可选）<input id="css" type="file" accept=".css,text/css"></label>
+                <button id="clear-css" type="button">清除 CSS</button>
+                <button id="generate" type="submit" disabled>生成</button>
+            </form>
+            <p id="status" role="status">选择文件后点击生成。</p>
+            <p id="error" role="alert" hidden></p>
+        </header>
+        <iframe id="preview" title="模块设置预览" hidden></iframe>
+        <script type="module" src="/importer.mjs"></script>
+    </body>
 </html>

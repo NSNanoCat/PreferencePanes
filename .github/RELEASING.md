@@ -1,4 +1,6 @@
-# 发布 PreferencePanes
+# PreferencePanes 发布流程与历史记录
+
+0.7.0 的 build(boxjs, css?) 与 mount(boxjs, css?) 只生成具体模块设置页，不生成项目主页或入口目录。发布前应在文件导入测试台验证 JSON、可选 CSS、iframe 隔离、模块保存与二级多选。以下版本信息是历史记录，不代表当前输入契约。
 
 已发布 `0.3.0`：SettingsHandler 改为安装配置驱动的存储桥接，参数为 origin/storageKey/module，API 不再下载 BoxJS；GET/POST/DELETE 支持模块内任意键和子树。前端增加 Caches 查看/清空与模块重置。由于移除 configURL/resolver 并放开字段限制，消费者必须同步更新安装参数。
 
