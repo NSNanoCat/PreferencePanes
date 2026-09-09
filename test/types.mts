@@ -1,7 +1,13 @@
 import type { BoxJSInput, ModuleDefinition, SettingsField } from "@nsnanocat/preference-panes";
 import { build } from "@nsnanocat/preference-panes";
 import { mount } from "@nsnanocat/preference-panes/browser";
-import { Navigation } from "@nsnanocat/preference-panes/navigation";
+import { ModuleFrame, Navigation } from "@nsnanocat/preference-panes/navigation";
+
+const frame = new ModuleFrame("/settings/Module", { headers: { "X-PreferencePanes-JSON": "/configs/Module" }, signal: new AbortController().signal });
+document.body.append(frame.element);
+await frame.load();
+frame.back();
+frame.destroy();
 
 const navigation = new Navigation(document.body, document.createElement("main"), (_key, signal) => {
     void signal.aborted;

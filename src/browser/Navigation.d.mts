@@ -1,4 +1,46 @@
 /**
+ * 原始 HTML 的模块 iframe 容器；通过元素传递请求上下文。
+ * Iframe container preserving module HTML and carrying context on the element.
+ */
+export class ModuleFrame extends EventTarget {
+    /**
+     * 创建容器。
+     * Create a container.
+     * @param url 模块地址 / Module URL.
+     * @param options 原生请求参数 / Native request options.
+     */
+    constructor(url: string | URL, options?: RequestInit);
+    /**
+     * 宿主挂载节点。
+     * Host-mounted element.
+     */
+    readonly element: HTMLIFrameElement;
+    /**
+     * change 事件对应的导航状态。
+     * Navigation state exposed with change events.
+     */
+    readonly state: { title: string; module: string; busy: boolean; canGoBack: boolean };
+    /**
+     * 获取原始 HTML。
+     * Fetch unmodified HTML.
+     * @returns 加载完成 / Load completion.
+     */
+    load(): Promise<void>;
+    /**
+     * 沿模块历史返回。
+     * Go back through module history.
+     * @returns 无返回值 / No return value.
+     */
+    back(): void;
+    /**
+     * 取消请求与事件订阅。
+     * Cancel requests and subscriptions.
+     * @returns 无返回值 / No return value.
+     */
+    destroy(): void;
+}
+
+/**
  * 同一文档的根页/子页导航，不定义页面布局或模块业务。
  * Home/detail navigation within a document, without layout or module business rules.
  */

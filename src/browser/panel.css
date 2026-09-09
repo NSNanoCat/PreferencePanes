@@ -91,9 +91,18 @@
     height: calc(100vh - 52px - env(safe-area-inset-top));
     overflow: hidden;
 }
+:root[data-preference-panes-embedded] .pp-header {
+    display: none;
+}
+:root[data-preference-panes-embedded] .pp-viewport {
+    height: 100vh;
+}
 @supports (height: 100dvh) {
     .pp-viewport {
         height: calc(100dvh - 52px - env(safe-area-inset-top));
+    }
+    :root[data-preference-panes-embedded] .pp-viewport {
+        height: 100dvh;
     }
 }
 .pp-fields,

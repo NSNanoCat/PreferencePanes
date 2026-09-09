@@ -33,6 +33,17 @@ export function mountPanel(root, catalog) {
     header.append(back, brand, node("span", "pp-nav-spacer"));
     shell.append(header, viewport, toast);
     root.append(shell);
+    // 嵌入模式向宿主发布导航状态，宿主不读取或修改模块内部 DOM。
+    // Embedded mode publishes navigation state without host reads or mutations of the module DOM.
+    const publishNavigation = () => {
+        const frame = window.frameElement;
+        if (!frame?.dataset.preferencePanes) return;
+        frame.dispatchEvent(
+            new frame.ownerDocument.defaultView.CustomEvent("preferencepanes:change", {
+                detail: { title: heading.textContent, module: catalog.module.module, busy: saving, canGoBack: !back.disabled },
+            }),
+        );
+    };
     let timer,
         navigation,
         generation = 0,
@@ -83,6 +94,7 @@ export function mountPanel(root, catalog) {
         active = module;
         back.disabled = window.history.length <= 1;
         heading.textContent = module;
+        publishNavigation();
         viewport.replaceChildren(node("p", "pp-loading", "读取设置…"));
         try {
             await client.open(module);
@@ -90,6 +102,7 @@ export function mountPanel(root, catalog) {
         } catch (error) {
             if (version !== generation) return;
             viewport.replaceChildren(errorView(error, () => open(module)));
+            publishNavigation();
         }
     }
     /**
@@ -121,6 +134,7 @@ export function mountPanel(root, catalog) {
             const editor = editors.get(navigation.current);
             heading.textContent = editor?.title ?? definition.metadata?.name ?? active;
             back.disabled = saving || !navigation.canGoBack;
+            publishNavigation();
         };
         /**
          * 串行执行模块操作，保持输入可编辑。
@@ -134,6 +148,7 @@ export function mountPanel(root, catalog) {
             pendingWrites++;
             saving = true;
             back.disabled = true;
+            publishNavigation();
             return (queue = queue
                 .then(action)
                 .then(() => {
@@ -149,6 +164,7 @@ export function mountPanel(root, catalog) {
                     saving = pendingWrites > 0;
                     if (destroyed && !saving) client.leave(active);
                     back.disabled = saving || !navigation.canGoBack;
+                    publishNavigation();
                 }));
         }
         const metadata = definition.metadata;

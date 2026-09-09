@@ -14,7 +14,19 @@ async function start() {
         view?.destroy();
         view = undefined;
         const context = document.querySelector('meta[name="preference-panes-inputs"]');
-        const inputs = context ? JSON.parse(decodeURIComponent(context.content)) : pageInputs(new URL(location.href));
+        const embedded = window.frameElement?.dataset.preferencePanes;
+        let inputs;
+        switch (true) {
+            case embedded !== undefined:
+                inputs = JSON.parse(embedded);
+                document.documentElement.dataset.preferencePanesEmbedded = "";
+                break;
+            case context !== null:
+                inputs = JSON.parse(decodeURIComponent(context.content));
+                break;
+            default:
+                inputs = pageInputs(new URL(location.href));
+        }
         const resources = [inputs.json, inputs.css].map(source => {
             if (!source) return null;
             const url = new URL(source, inputs.url);
