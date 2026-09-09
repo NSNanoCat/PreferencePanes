@@ -1,3 +1,4 @@
+export { ActionMenu } from "./ActionMenu.mjs";
 export { ModuleFrame } from "./ModuleFrame.mjs";
 export { ModuleStatus } from "./ModuleStatus.mjs";
 

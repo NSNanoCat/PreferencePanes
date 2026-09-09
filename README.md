@@ -49,6 +49,8 @@ ModuleFrame 在 iframe 元素上保存原请求上下文，HTML 原样加载，�
 
 每次进入模块读取 JSON/CSS 和设置一次。二级多选返回复用内存缓存，修改立即写入；成功提示、失败回滚由公共组件处理。Caches 按需查看/清空，重置只删除指定模块子树。
 
+模块数据操作位于标题栏右侧三点菜单，页面不再平铺维护按钮。`ActionMenu` 为独立页和宿主常驻顶栏共用组件；宿主将 `frame.state.actions` 传给 `menu.update(actions, busy)`，选择时调用 `frame.perform(id)`。缓存查看进入可返回的缓存子页，清空和重置仍要求确认。菜单组件处理外部点击、Escape、方向键与 Tab，宿主不访问 iframe 内部 DOM。
+
 ## 构建与验证
 
 `npm run build` 生成无业务配置的 dist/api.js 和公共前端；Release 工作流上传 api.js、index.html、app.mjs、navigation.mjs。`build(boxjs, css?)` 仅用于生成模块前端文件，不再输出配置副本或模块绑定脚本。

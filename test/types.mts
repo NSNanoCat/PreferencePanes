@@ -1,7 +1,12 @@
 import type { BoxJSInput, ModuleDefinition, SettingsField } from "@nsnanocat/preference-panes";
 import { build } from "@nsnanocat/preference-panes";
 import { mount } from "@nsnanocat/preference-panes/browser";
-import { ModuleFrame, ModuleStatus, Navigation } from "@nsnanocat/preference-panes/navigation";
+import { ActionMenu, ModuleFrame, ModuleStatus, Navigation } from "@nsnanocat/preference-panes/navigation";
+
+const menu = new ActionMenu(id => frame.perform(id));
+menu.update([{ id: "viewCaches", label: "查看缓存" }]);
+menu.close();
+menu.destroy();
 
 const status = new ModuleStatus(document.createElement("span"));
 await status.check("/configs/Module");

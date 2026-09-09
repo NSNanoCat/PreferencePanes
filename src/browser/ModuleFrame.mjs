@@ -11,7 +11,7 @@ export class ModuleFrame extends EventTarget {
     #abort = () => this.destroy();
     #state;
     #change = event => {
-        this.#state = event.detail;
+        this.#state = { ...event.detail, actions: event.detail.actions ?? [] };
         this.dispatchEvent(new Event("change"));
     };
 
@@ -30,7 +30,7 @@ export class ModuleFrame extends EventTarget {
         this.element.title = `${inputs.module} 设置`;
         this.element.dataset.preferencePanes = JSON.stringify(inputs);
         this.element.addEventListener("preferencepanes:change", this.#change);
-        this.#state = { title: inputs.module, module: inputs.module, busy: false, canGoBack: true };
+        this.#state = { title: inputs.module, module: inputs.module, busy: false, canGoBack: true, actions: [] };
         options.signal?.addEventListener("abort", this.#abort, { once: true });
     }
 
@@ -68,6 +68,17 @@ export class ModuleFrame extends EventTarget {
      */
     back() {
         if (!this.#state.busy && this.#state.canGoBack) this.element.contentWindow.history.back();
+    }
+
+    /**
+     * 向模块发送菜单操作，不让宿主访问内部 DOM 或存储客户端。
+     * Dispatch a menu action without host access to internal DOM or the storage client.
+     * @param {string} id 当前可用操作 / Available action identifier.
+     * @returns {void} 无返回值 / No return value.
+     */
+    perform(id) {
+        if (this.#state.busy || !this.#state.actions.some(action => action.id === id)) throw new Error("Action is not available");
+        this.element.dispatchEvent(new CustomEvent("preferencepanes:action", { detail: id }));
     }
 
     /**

@@ -1,3 +1,4 @@
+import { ActionMenu } from "./ActionMenu.mjs";
 import { createPreferencesClient } from "./client.mjs";
 import { errorView, icon, element as node, resourceURL } from "./components.mjs";
 import { Navigation } from "./Navigation.mjs";
@@ -20,6 +21,15 @@ export function mountPanel(root, catalog) {
     back.setAttribute("aria-label", "返回");
     back.type = "button";
     const heading = node("h1", "pp-title", title);
+    const handlers = new Map();
+    const menuItems = [
+        { id: "viewCaches", label: "查看缓存" },
+        { id: "clearCaches", label: "清空缓存", destructive: true },
+        { id: "reset", label: "重置模块", destructive: true },
+    ];
+    const menu = new ActionMenu(id => handlers.get(id)());
+    const trailing = node("span", "pp-nav-spacer");
+    trailing.append(menu.element);
     const brand = node("div", "pp-brand");
     const logo = node("span", "pp-brand-icon");
     logo.setAttribute("aria-hidden", "true");
@@ -30,20 +40,26 @@ export function mountPanel(root, catalog) {
     const toast = node("div", "pp-toast");
     toast.setAttribute("role", "status");
     toast.hidden = true;
-    header.append(back, brand, node("span", "pp-nav-spacer"));
+    header.append(back, brand, trailing);
     shell.append(header, viewport, toast);
     root.append(shell);
     // 嵌入模式向宿主发布导航状态，宿主不读取或修改模块内部 DOM。
     // Embedded mode publishes navigation state without host reads or mutations of the module DOM.
     const publishNavigation = () => {
+        const actions = handlers.size ? menuItems : [];
+        menu.update(actions, saving);
         const frame = window.frameElement;
         if (!frame?.dataset.preferencePanes) return;
         frame.dispatchEvent(
             new frame.ownerDocument.defaultView.CustomEvent("preferencepanes:change", {
-                detail: { title: heading.textContent, module: catalog.module.module, busy: saving, canGoBack: !back.disabled },
+                detail: { title: heading.textContent, module: catalog.module.module, busy: saving, canGoBack: !back.disabled, actions },
             }),
         );
     };
+    const onAction = event => {
+        if (!saving && handlers.has(event.detail)) handlers.get(event.detail)();
+    };
+    window.frameElement?.addEventListener("preferencepanes:action", onAction);
     let timer,
         navigation,
         generation = 0,
@@ -353,17 +369,13 @@ export function mountPanel(root, catalog) {
             if (eventName === "input") inputContainer.addEventListener("compositionend", event => event.target.dispatchEvent(new window.Event("input", { bubbles: true })));
             groups.get(group).append(row);
         }
-        const maintenance = node("section", "pp-maintenance");
-        maintenance.append(node("h2", "pp-title", "模块数据"));
-        const actions = node("div", "pp-actions");
-        const cacheView = node("button", "", "查看 Caches");
-        const cacheClear = node("button", "", "清空 Caches");
-        const reset = node("button", "pp-danger", "重置模块");
+        const cachePage = node("section", "pp-cache-page");
         const output = node("pre", "pp-cache");
-        output.hidden = true;
+        output.textContent = "暂无缓存";
         output.setAttribute("aria-label", "Caches 内容");
-        for (const button of [cacheView, cacheClear, reset]) button.type = "button";
-        cacheView.onclick = () => {
+        cachePage.append(output);
+        editors.set("$caches", { node: cachePage, title: "缓存" });
+        handlers.set("viewCaches", () => {
             if (saving) return;
             let value;
             return perform(
@@ -377,12 +389,11 @@ export function mountPanel(root, catalog) {
                 },
                 () => {
                     output.textContent = value === undefined ? "暂无缓存" : JSON.stringify(value, null, 2);
-                    output.hidden = false;
-                    cacheView.textContent = "刷新 Caches";
+                    navigation.open("$caches");
                 },
             );
-        };
-        cacheClear.onclick = () => {
+        });
+        handlers.set("clearCaches", () => {
             if (saving) return;
             if (!window.confirm(`清空 ${active} 的全部 Caches？`)) return;
             return perform(
@@ -391,15 +402,12 @@ export function mountPanel(root, catalog) {
                     output.textContent = "暂无缓存";
                 },
             );
-        };
-        reset.onclick = () => {
+        });
+        handlers.set("reset", () => {
             if (saving) return;
             if (!window.confirm(`重置 ${active}？这将删除该模块的 Settings、Caches 和其它持久化数据。`)) return;
             return perform(() => client.reset(active), controls);
-        };
-        actions.append(cacheView, cacheClear, reset);
-        maintenance.append(actions, output);
-        view.append(maintenance);
+        });
         navigation?.destroy();
         navigation = new Navigation(viewport, view, key => editors.get(key)?.node);
         navigation.addEventListener("change", updateNavigation);
@@ -425,6 +433,8 @@ export function mountPanel(root, catalog) {
          */
         destroy() {
             destroyed = true;
+            menu.destroy();
+            window.frameElement?.removeEventListener("preferencepanes:action", onAction);
             navigation?.destroy();
             generation++;
             if (active && !saving) client.leave(active);

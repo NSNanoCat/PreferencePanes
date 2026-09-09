@@ -53,6 +53,8 @@ test("ModuleFrame cancels late HTML and releases navigation state subscriptions"
     const controller = new AbortController();
     const frame = new ModuleFrame("/settings/Example", { signal: controller.signal });
     frame.element.dispatchEvent(new CustomEvent("preferencepanes:change", { detail: { title: "选项", module: "Example", busy: true, canGoBack: false } }));
+    assert.deepEqual(frame.state.actions, []);
+    assert.throws(() => frame.perform("reset"), /not available/);
     frame.back();
     assert.equal(back, 0);
     const loading = frame.load();
@@ -62,4 +64,19 @@ test("ModuleFrame cancels late HTML and releases navigation state subscriptions"
     assert.equal(frame.element.srcdoc, undefined);
     frame.element.dispatchEvent(new CustomEvent("preferencepanes:change", { detail: { title: "stale" } }));
     assert.equal(frame.state.title, "选项");
+});
+
+test("ModuleFrame forwards only advertised idle actions", t => {
+    globalThis.document = { baseURI: "https://example.org/", createElement: () => Object.assign(new EventTarget(), { dataset: {} }) };
+    t.after(() => {
+        delete globalThis.document;
+    });
+    const frame = new ModuleFrame("/settings/Example");
+    const calls = [];
+    frame.element.addEventListener("preferencepanes:action", event => calls.push(event.detail));
+    frame.element.dispatchEvent(new CustomEvent("preferencepanes:change", { detail: { title: "Example", busy: false, actions: [{ id: "viewCaches", label: "查看缓存" }] } }));
+    frame.perform("viewCaches");
+    assert.throws(() => frame.perform("reset"), /not available/);
+    assert.deepEqual(calls, ["viewCaches"]);
+    frame.destroy();
 });

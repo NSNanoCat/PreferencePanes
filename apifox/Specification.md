@@ -63,6 +63,8 @@ ModuleFrame 在 iframe 元素上保留请求上下文，HTML 原样加载，不�
 
 每次进入或刷新模块读 JSON/CSS 并读取设置一次；二级多选返回复用内存缓存。修改立即生效；Caches 按需读取，删除和重置后不额外 GET。主页仅 HEAD 对应配置，不读取存储。
 
+查看缓存、清空缓存、重置模块收敛到标题栏右侧 ActionMenu。ModuleFrame 的导航状态包括 actions 描述，宿主只调用 perform(id)；模块接收操作事件并使用现有 get/delete 接口执行。写入或维护操作进行时菜单和返回按钮禁用。缓存展示为导航子页，返回不重读设置；清空与重置保留确认步骤。
+
 ## 发布
 
 api.js 及公共 HTML/JS 由 PreferencePanes 的 Release 工作流发布。业务模块引用 https://github.com/NSNanoCat/PreferencePanes/releases/latest/download/api.js，自动更新遵循代理工具的缓存周期。业务仓库不生成 settings.bundle.js；网站不发布 API 或模块渲染产物。必须先发布该通用 API，再上线引用它的新模块模板。
