@@ -30,6 +30,7 @@ export default [
 		],
 	},
 	{ input: "src/proxy/handler.mjs", output: { file: "dist/preference-panes.proxy.js", format: "iife", name: "PreferencePanes" } },
+	{ input: "src/proxy/config.mjs", output: { file: "dist/preference-panes.config.js", format: "iife", name: "PreferencePanes" } },
 ].map(config => ({
 	...config,
 	plugins: [nodeResolve({ browser: true }), ...(config.plugins ?? [])],

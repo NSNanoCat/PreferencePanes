@@ -12,8 +12,8 @@ export class SettingsHandler {
 	#origin;
 	/** @type {string} 安装配置中的存储根 / Storage root from installation config. */
 	#storageKey;
-	/** @type {string} 安装配置中的模块 / Module from installation config. */
-	#module;
+	/** @type {Set<string>} 独立模块允许访问的业务模块 / Business modules allowed by the standalone installation. */
+	#modules;
 	/** @type {string} 页面标记头 / Page marker header. */
 	#requestHeader;
 
@@ -27,11 +27,13 @@ export class SettingsHandler {
 		const target = new URL(origin);
 		if (target.protocol !== "https:" || target.pathname !== "/" || target.search || target.hash || target.username || target.password) throw new TypeError("origin must be an HTTPS origin");
 		if (typeof storageKey !== "string" || !storageKey || storageKey.startsWith("@")) throw new TypeError("storageKey must be a literal root key");
-		validatePathParts([module]);
+		const modules = Array.isArray(module) ? module : [module];
+		if (!modules.length) throw new TypeError("At least one module is required");
+		validatePathParts(modules);
 		if (!/^[a-z][a-z0-9-]*$/i.test(requestHeader)) throw new TypeError("Invalid requestHeader");
 		this.#origin = target.origin;
 		this.#storageKey = storageKey;
-		this.#module = module;
+		this.#modules = new Set(modules);
 		this.#requestHeader = requestHeader;
 	}
 
@@ -52,7 +54,7 @@ export class SettingsHandler {
 		} catch (error) {
 			return reply(400, { error: error.message });
 		}
-		if (parts[0] !== this.#module) return reply(404, { error: "Module is not handled" });
+		if (!this.#modules.has(parts[0])) return reply(404, { error: "Module is not handled" });
 		const requestHeaders = Object.fromEntries(Object.entries(request.headers ?? {}).map(([key, value]) => [key.toLowerCase(), value]));
 		if (requestHeaders[this.#requestHeader.toLowerCase()] !== "1" || (requestHeaders.origin && requestHeaders.origin !== this.#origin)) return reply(403, { error: "Forbidden settings client" });
 		let value;

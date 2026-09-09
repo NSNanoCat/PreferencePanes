@@ -5,6 +5,7 @@ import type { Notification, PreferencesPanel } from "@nsnanocat/preference-panes
 const definition = normalizeBoxJs([], "Module");
 void definition.storageKey;
 const handler = new SettingsHandler({ origin: "https://example.org", storageKey: "Root", module: "Module" });
+new SettingsHandler({ origin: "https://example.org", storageKey: "Root", module: ["Module", "Other"] });
 const response = await handler.handle({ url: "https://example.org/api/Module/Settings/", method: "GET" });
 const code: number | undefined = response?.status;
 void code;
