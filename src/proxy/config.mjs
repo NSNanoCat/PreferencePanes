@@ -8,12 +8,12 @@ import { done } from "@nsnanocat/util/lib/done.mjs";
  * @returns {void} 将响应交给宿主 / Deliver the response to the host.
  */
 export function mockConfiguration(config) {
-	const method = globalThis.$request.method;
-	const allowed = method === "GET" || method === "HEAD";
-	const response = {
-		status: allowed ? 200 : 405,
-		headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", Allow: "GET, HEAD" },
-		body: method === "HEAD" ? "" : JSON.stringify(allowed ? config : { error: "Method not allowed" }),
-	};
-	done($app === "Quantumult X" ? response : { response });
+    const method = globalThis.$request.method;
+    const allowed = method === "GET" || method === "HEAD";
+    const response = {
+        status: allowed ? 200 : 405,
+        headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", Allow: "GET, HEAD" },
+        body: method === "HEAD" ? "" : JSON.stringify(allowed ? config : { error: "Method not allowed" }),
+    };
+    done($app === "Quantumult X" ? response : { response });
 }

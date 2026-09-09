@@ -1,69 +1,69 @@
 {
-	"name": "@nsnanocat/preference-panes",
-	"version": "0.6.0",
-	"description": "Shared settings API runtime for JavaScript proxy modules",
-	"author": "VirgilClyne <Virgil@nanocat.me>",
-	"homepage": "https://NSNanoCat.github.io/preference-panes",
-	"keywords": [
-		"loon",
-		"quantumult",
-		"surge",
-		"shadowrocket",
-		"stash",
-		"egern",
-		"settings"
-	],
-	"license": "Apache-2.0",
-	"bugs": "https://github.com/NSNanoCat/PreferencePanes/issues",
-	"type": "module",
-	"main": "src/index.mjs",
-	"exports": {
-		".": {
-			"types": "./src/index.d.ts",
-			"import": "./src/index.mjs"
-		},
-		"./browser": {
-			"types": "./src/browser/index.d.ts",
-			"import": "./src/browser/index.mjs"
-		},
-		"./browser/panel.css": "./src/browser/panel.css",
-		"./dist/preference-panes.mjs": "./dist/preference-panes.mjs",
-		"./dist/preference-panes.request.js": "./dist/preference-panes.request.js",
-		"./dist/preference-panes.proxy.js": "./dist/preference-panes.proxy.js",
-		"./dist/preference-panes.config.js": "./dist/preference-panes.config.js",
-		"./dist/settings/*": "./dist/settings/*"
-	},
-	"types": "src/index.d.ts",
-	"scripts": {
-		"test": "node --test test/*.test.mjs",
-		"check": "npm run lint && npm run typecheck && npm test",
-		"lint": "biome check .",
-		"format": "biome check --write .",
-		"typecheck": "tsc --noEmit",
-		"build": "rollup -c",
-		"prepack": "npm run build",
-		"apifox:generate": "node apifox/generate.mjs",
-		"apifox:check": "node apifox/generate.mjs --check"
-	},
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/NSNanoCat/PreferencePanes.git"
-	},
-	"files": [
-		"src",
-		"dist"
-	],
-	"dependencies": {
-		"@nsnanocat/url": "^1.2.6",
-		"@nsnanocat/util": "^2.7.4"
-	},
-	"devDependencies": {
-		"@biomejs/biome": "2.4.6",
-		"@rollup/plugin-node-resolve": "^16.0.3",
-		"rollup": "^4.63.1",
-		"typescript": "^5.9.3"
-	},
-	"publishConfig": {
-		"access": "public"
-	}
+    "name": "@nsnanocat/preference-panes",
+    "version": "0.6.0",
+    "description": "Shared settings API runtime for JavaScript proxy modules",
+    "author": "VirgilClyne <Virgil@nanocat.me>",
+    "homepage": "https://NSNanoCat.github.io/preference-panes",
+    "keywords": [
+        "loon",
+        "quantumult",
+        "surge",
+        "shadowrocket",
+        "stash",
+        "egern",
+        "settings"
+    ],
+    "license": "Apache-2.0",
+    "bugs": "https://github.com/NSNanoCat/PreferencePanes/issues",
+    "type": "module",
+    "main": "src/index.mjs",
+    "exports": {
+        ".": {
+            "types": "./src/index.d.ts",
+            "import": "./src/index.mjs"
+        },
+        "./browser": {
+            "types": "./src/browser/index.d.ts",
+            "import": "./src/browser/index.mjs"
+        },
+        "./browser/panel.css": "./src/browser/panel.css",
+        "./dist/preference-panes.mjs": "./dist/preference-panes.mjs",
+        "./dist/preference-panes.request.js": "./dist/preference-panes.request.js",
+        "./dist/preference-panes.proxy.js": "./dist/preference-panes.proxy.js",
+        "./dist/preference-panes.config.js": "./dist/preference-panes.config.js",
+        "./dist/settings/*": "./dist/settings/*"
+    },
+    "types": "src/index.d.ts",
+    "scripts": {
+        "test": "node --test test/*.test.mjs",
+        "check": "npm run lint && npm run typecheck && npm test",
+        "lint": "biome check .",
+        "format": "biome check --write .",
+        "typecheck": "tsc --noEmit",
+        "build": "rollup -c",
+        "prepack": "npm run build",
+        "apifox:generate": "node apifox/generate.mjs",
+        "apifox:check": "node apifox/generate.mjs --check"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/NSNanoCat/PreferencePanes.git"
+    },
+    "files": [
+        "src",
+        "dist"
+    ],
+    "dependencies": {
+        "@nsnanocat/url": "^1.2.6",
+        "@nsnanocat/util": "^2.7.4"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "2.1.4",
+        "@rollup/plugin-node-resolve": "^16.0.3",
+        "rollup": "^4.63.1",
+        "typescript": "^5.9.3"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
 }

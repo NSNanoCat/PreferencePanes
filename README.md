@@ -17,7 +17,7 @@
 | .github/ | CI、双平台发布工作流 |
 | dist/ | 构建产物，不提交 Git |
 
-Biome 与 NSNanoCat Util/FlatBufferRoot 对齐：tab、LF、320 列，保留统一 lint 规则。类型声明位于 src/index.d.ts 和 src/browser/index.d.ts，JSDoc 使用中英双语。
+Biome 使用全局通用配置：四空格、LF、320 列，CLI 版本与配置 schema 的 2.1.4 对齐。Apifox JSON 也参与检查，生成器使用同一 Biome 格式化输出。类型声明位于 src/index.d.ts 和 src/browser/index.d.ts，JSDoc 使用中英双语。
 
 ## 代理接口
 
