@@ -106,6 +106,6 @@ npm run preview
 
 ## 维护
 
-遵循 AGENTS.md 与通用 Biome 配置。运行 `npm run check` 和 `npm run apifox:check` 验证代码、类型、行为与文档。0.7.1 采用单模块双输入接口，并将页面与主页导航收敛到共用组件；运行时无额外 npm 依赖。
+遵循 AGENTS.md 与通用 Biome 配置。运行 `npm run check` 和 `npm run apifox:check` 验证代码、类型、行为与文档。0.7.2 通过 ModuleFrame 保留 iframe 请求上下文，并与常驻顶栏同步导航状态；JSON/CSS 输入及存储接口保持不变，运行时无额外 npm 依赖。
 
 [接口规范](apifox/Specification.md) · [Apifox JSON](apifox/preference-panes.apifox.json)

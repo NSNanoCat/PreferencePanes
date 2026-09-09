@@ -1,4 +1,4 @@
-# PreferencePanes 0.7.1 模块设置页规范
+# PreferencePanes 0.7.2 模块设置页规范
 
 ## 职责边界
 
