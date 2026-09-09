@@ -5,10 +5,10 @@ import { rollup } from "rollup";
 import builds from "../rollup.config.mjs";
 
 test("config-only Mock returns JSON without storage, arguments or network", async () => {
-    const bundle = await rollup(builds[4]);
-    const { output } = await bundle.generate(builds[4].output);
+    const bundle = await rollup(builds[3]);
+    const { output } = await bundle.generate(builds[3].output);
     await bundle.close();
-    const code = `${output[0].code}\nPreferencePanes.mockConfiguration([{id:"@Root.Module.Settings.flag",type:"boolean",val:true}]);`;
+    const code = `${output[0].code}\nPreferencePanes.mock([{id:"@Root.Module.Settings.flag",type:"boolean",val:true}]);`;
     assert.doesNotMatch(code, /SettingsHandler|persistentStore|Storage\.getItem|httpClient\.get/);
     for (const quantumult of [false, true]) {
         for (const method of ["HEAD", "GET", "POST"]) {

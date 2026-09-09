@@ -1,56 +1,23 @@
 import { URL } from "@nsnanocat/url";
 import { Lodash as _ } from "@nsnanocat/util/polyfill/Lodash.mjs";
 import { Storage } from "@nsnanocat/util/polyfill/Storage";
-import { parseSettingsPathname, validatePathParts } from "./lib/settings-path.mjs";
+import { response } from "./lib/response.mjs";
+import { parseSettingsPathname } from "./lib/settings-path.mjs";
 
 /**
- * 按插件声明的根和模块桥接持久化存储，不下载或解析 BoxJS。
- * Bridge persistence within the installed root and module without downloading or parsing BoxJS.
+ * 根据 BoxJS 目录桥接持久化存储，不下载配置或解析控件。
+ * Bridge persistence using the BoxJS catalog without downloading configuration or interpreting controls.
  */
-export class SettingsHandler {
-    /**
-     * 接管来源
-     * Handled origin.
-     * @type {string}
-     */
-    #origin;
-    /**
-     * 安装配置中的存储根
-     * Storage root from installation config.
-     * @type {string}
-     */
-    #storageKey;
-    /**
-     * 独立模块允许访问的业务模块
-     * Business modules allowed by the standalone installation.
-     * @type {Set<string>}
-     */
-    #modules;
-    /**
-     * 页面标记头
-     * Page marker header.
-     * @type {string}
-     */
-    #requestHeader;
+export class Store {
+    #catalog;
 
     /**
-     * 固定来源、存储根和模块，构造时不访问网络或存储。
-     * Fix the origin, storage root and module without network or storage access at construction.
-     * @param {import("./index.js").SettingsHandlerOptions} options 插件安装配置 / Plugin installation config.
-     * @throws {TypeError} 安装配置无效 / Invalid installation config.
+     * 复用包内已解析的目录，构造时不访问网络或存储。
+     * Reuse the parsed internal catalog without network or persistence access during construction.
+     * @param {import("./BoxJS.mjs").BoxJS} catalog BoxJS 路径目录 / BoxJS path catalog.
      */
-    constructor({ origin, storageKey, module, requestHeader = "X-Settings-Client" }) {
-        const target = new URL(origin);
-        if (target.protocol !== "https:" || target.pathname !== "/" || target.search || target.hash || target.username || target.password) throw new TypeError("origin must be an HTTPS origin");
-        if (typeof storageKey !== "string" || !storageKey || storageKey.startsWith("@")) throw new TypeError("storageKey must be a literal root key");
-        const modules = Array.isArray(module) ? module : [module];
-        if (!modules.length) throw new TypeError("At least one module is required");
-        validatePathParts(modules);
-        if (!/^[a-z][a-z0-9-]*$/i.test(requestHeader)) throw new TypeError("Invalid requestHeader");
-        this.#origin = target.origin;
-        this.#storageKey = storageKey;
-        this.#modules = new Set(modules);
-        this.#requestHeader = requestHeader;
+    constructor(catalog) {
+        this.#catalog = catalog;
     }
 
     /**
@@ -61,18 +28,18 @@ export class SettingsHandler {
      */
     async handle(request) {
         const url = new URL(request.url);
-        if (url.origin !== this.#origin || !url.pathname.startsWith("/api/")) return;
-        const headers = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
-        const reply = (status, data) => ({ status, headers, body: request.method === "HEAD" ? "" : JSON.stringify(data) });
+        if (!url.pathname.startsWith("/api/")) return;
+        const reply = (status, data) => response(request, status, data);
         let parts;
         try {
             parts = parseSettingsPathname(url.pathname);
         } catch (error) {
             return reply(400, { error: error.message });
         }
-        if (!this.#modules.has(parts[0])) return reply(404, { error: "Module is not handled" });
+        const binding = this.#catalog.modules.get(parts[0]);
+        if (!binding) return reply(404, { error: "Module is not declared in BoxJS" });
         const requestHeaders = Object.fromEntries(Object.entries(request.headers ?? {}).map(([key, value]) => [key.toLowerCase(), value]));
-        if (requestHeaders[this.#requestHeader.toLowerCase()] !== "1" || (requestHeaders.origin && requestHeaders.origin !== this.#origin)) return reply(403, { error: "Forbidden settings client" });
+        if (requestHeaders["x-settings-client"] !== "1" || (requestHeaders.origin && requestHeaders.origin !== url.origin)) return reply(403, { error: "Forbidden settings client" });
         let value;
         switch (request.method) {
             case "HEAD":
@@ -91,10 +58,10 @@ export class SettingsHandler {
                 }
                 break;
             default:
-                return { ...reply(405, { error: "Method not allowed" }), headers: { ...headers, Allow: "HEAD, GET, POST, DELETE" } };
+                return { ...reply(405, { error: "Method not allowed" }), headers: { ...reply(405).headers, Allow: "HEAD, GET, POST, DELETE" } };
         }
         try {
-            const root = Storage.getItem(this.#storageKey, {});
+            const root = Storage.getItem(binding.storageKey, {});
             if (!isRecord(root)) throw new TypeError("stored root must be an object");
             const parent = storageParent(root, parts, request.method === "POST");
             const key = parts.at(-1);
@@ -110,7 +77,7 @@ export class SettingsHandler {
                     if (parent) _.unset(parent, [key]);
                     break;
             }
-            if (!Storage.setItem(this.#storageKey, root)) throw new Error("Storage write failed");
+            if (!Storage.setItem(binding.storageKey, root)) throw new Error("Storage write failed");
             return reply(200, request.method === "POST" ? { saved: true } : { deleted: true });
         } catch (error) {
             return reply(500, { error: error.message });

@@ -23,8 +23,10 @@ globalThis.$httpClient = {
         throw new Error("Storage API must not fetch configuration");
     },
 };
-const { SettingsHandler, parseSettingsPath } = await import("../src/index.mjs");
-const options = { origin: "https://example.org", storageKey: "Root", module: "Module" };
+const { Store } = await import("../src/Store.mjs");
+const { BoxJS } = await import("../src/BoxJS.mjs");
+const { parseSettingsPath } = await import("../src/lib/settings-path.mjs");
+const catalog = new BoxJS([{ id: "@Root.Module.Settings.key" }]);
 const req = (method, path = "Module/Settings/key", body = undefined) => ({
     url: `https://example.org/api/${path}`,
     method,
@@ -40,7 +42,7 @@ beforeEach(() => {
 test("GET returns the full addressed value including Caches and undeclared keys", async () => {
     const data = { Module: { Settings: { key: "value", hidden: 7 }, Caches: { list: [1, 2] } }, Other: { secret: true } };
     store.set("Root", JSON.stringify(data));
-    const handler = new SettingsHandler(options);
+    const handler = new Store(catalog);
     assert.deepEqual(JSON.parse((await handler.handle(req("GET", "Module/"))).body), data.Module);
     assert.equal(reads, 1);
     assert.deepEqual(JSON.parse((await handler.handle(req("GET", "Module/Caches"))).body), data.Module.Caches);
@@ -52,7 +54,7 @@ test("GET returns the full addressed value including Caches and undeclared keys"
 });
 
 test("POST replaces any JSON value without BoxJS field or enum validation", async () => {
-    const handler = new SettingsHandler(options);
+    const handler = new Store(catalog);
     store.set("Root", JSON.stringify({ Other: { sentinel: 7 } }));
     for (const value of ["not-an-enum", false, 0, "", null, [], [1, 1], { nested: { enabled: true }, list: [null, 2] }]) {
         assert.equal((await handler.handle(req("POST", "Module/New/key", value))).status, 200);
@@ -63,7 +65,7 @@ test("POST replaces any JSON value without BoxJS field or enum validation", asyn
 });
 
 test("DELETE clears Caches or resets the module without touching sibling modules", async () => {
-    const handler = new SettingsHandler(options);
+    const handler = new Store(catalog);
     store.set("Root", JSON.stringify({ Module: { Settings: { key: 1 }, Caches: { large: [1, 2] }, hidden: 3 }, Other: { sentinel: 7 } }));
     assert.equal((await handler.handle(req("DELETE", "Module/Caches"))).status, 200);
     assert.deepEqual(JSON.parse(store.get("Root")), { Module: { Settings: { key: 1 }, hidden: 3 }, Other: { sentinel: 7 } });
@@ -76,7 +78,7 @@ test("DELETE clears Caches or resets the module without touching sibling modules
 });
 
 test("HEAD checks routing without reading storage or requiring an existing value", async () => {
-    const handler = new SettingsHandler(options);
+    const handler = new Store(catalog);
     for (const path of ["Module/", "Module/Caches", "Module/missing"]) {
         const response = await handler.handle(req("HEAD", path));
         assert.equal(response.status, 200);
@@ -88,7 +90,7 @@ test("HEAD checks routing without reading storage or requiring an existing value
 });
 
 test("legacy serialized parents and array elements retain values during path writes", async () => {
-    const handler = new SettingsHandler(options);
+    const handler = new Store(catalog);
     store.set("Root", JSON.stringify({ Module: { Settings: JSON.stringify({ nested: { old: 1 } }), Caches: { items: [{ value: 1 }] } } }));
     assert.equal((await handler.handle(req("POST", "Module/Settings/nested/new", false))).status, 200);
     assert.deepEqual(JSON.parse(store.get("Root")).Module.Settings, { nested: { old: 1, new: false } });
@@ -100,7 +102,7 @@ test("legacy serialized parents and array elements retain values during path wri
 });
 
 test("transport validation and storage failures do not report success", async () => {
-    const handler = new SettingsHandler(options);
+    const handler = new Store(catalog);
     assert.equal((await handler.handle({ ...req("GET"), headers: {} })).status, 403);
     assert.equal((await handler.handle({ ...req("POST"), headers: { "X-Settings-Client": "1", "Content-Type": "text/plain" }, body: "1" })).status, 415);
     assert.equal((await handler.handle({ ...req("POST"), body: "{" })).status, 400);
@@ -114,14 +116,13 @@ test("transport validation and storage failures do not report success", async ()
     assert.equal(store.size, 0);
 });
 
-test("installed root and module are required and never taken from browser headers", async () => {
-    for (const storageKey of [undefined, "", "@Root.Other"]) assert.throws(() => new SettingsHandler({ ...options, storageKey }));
-    assert.throws(() => new SettingsHandler({ ...options, module: "Other/path" }));
-    assert.throws(() => new SettingsHandler({ ...options, origin: "http://example.org" }));
-    const handler = new SettingsHandler(options);
+test("storage roots come only from BoxJS, not headers or deployment origin", async () => {
+    const handler = new Store(catalog);
     await handler.handle({ ...req("POST", undefined, 9), headers: { ...req("POST").headers, storageKey: "OtherRoot" } });
     assert.equal(store.has("OtherRoot"), false);
     assert.equal(JSON.parse(store.get("Root")).Module.Settings.key, 9);
+    assert.equal((await handler.handle({ ...req("GET"), headers: { ...req("GET").headers, Origin: "https://other.org" } })).status, 403);
+    assert.equal((await handler.handle({ ...req("GET"), url: "https://another-host.org/api/Module/Settings/key" })).status, 200);
 });
 
 test("paths preserve decoding and reject unsafe segments", () => {
@@ -130,13 +131,12 @@ test("paths preserve decoding and reject unsafe segments", () => {
 });
 
 test("one standalone installation routes allowed modules and preserves their storage boundaries", async () => {
-    const handler = new SettingsHandler({ ...options, module: ["Module", "Other"] });
-    assert.throws(() => new SettingsHandler({ ...options, module: [] }));
-    assert.throws(() => new SettingsHandler({ ...options, module: ["Module", "__proto__"] }));
+    const handler = new Store(new BoxJS([{ id: "@Root.Module.Settings.key" }, { id: "@Second.Other.Settings.key" }]));
     assert.equal((await handler.handle(req("POST", "Module/Settings/key", 1))).status, 200);
     assert.equal((await handler.handle(req("POST", "Other/Settings/key", 2))).status, 200);
     assert.equal(JSON.parse((await handler.handle(req("GET", "Other/Settings/key"))).body), 2);
     assert.equal((await handler.handle(req("POST", "Unknown/Settings/key", 3))).status, 404);
     assert.equal((await handler.handle(req("DELETE", "Module/"))).status, 200);
-    assert.deepEqual(JSON.parse(store.get("Root")), { Other: { Settings: { key: 2 } } });
+    assert.deepEqual(JSON.parse(store.get("Root")), {});
+    assert.deepEqual(JSON.parse(store.get("Second")), { Other: { Settings: { key: 2 } } });
 });
