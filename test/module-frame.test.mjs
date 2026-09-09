@@ -1,6 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { requestConfirmation } from "../src/browser/components.mjs";
 import { ModuleFrame } from "../src/browser/ModuleFrame.mjs";
+
+test("host confirmation is asynchronous and detaches with its module frame", async t => {
+    globalThis.document = { baseURI: "https://example.org/", createElement: () => Object.assign(new EventTarget(), { dataset: {}, ownerDocument: { defaultView: { CustomEvent } } }) };
+    t.after(() => {
+        delete globalThis.document;
+    });
+    const frame = new ModuleFrame("/settings/Example");
+    frame.addEventListener("confirm", event => {
+        event.preventDefault();
+        event.detail.resolve(false);
+    });
+    const host = { frameElement: frame.element, confirm: () => assert.fail("Host owns the dialog") };
+    assert.equal(await requestConfirmation(host, "Reset?"), false);
+    frame.destroy();
+    host.confirm = () => true;
+    assert.equal(await requestConfirmation(host, "Standalone?"), true);
+});
 
 test("ModuleFrame preserves response HTML and passes dynamic URL/header inputs outside the document", async t => {
     globalThis.document = { baseURI: "https://example.org/settings/", createElement: () => Object.assign(new EventTarget(), { dataset: {} }) };

@@ -61,3 +61,21 @@ export function errorView(error, retry) {
     view.append(element("p", "", `加载失败：${error.message}`), button);
     return view;
 }
+
+/**
+ * 请求宿主确认；独立网页使用浏览器对话框。
+ * Request confirmation from the host, using the browser dialog for standalone pages.
+ * @param {Window} host 模块窗口 / Module window.
+ * @param {string} message 确认内容 / Confirmation message.
+ * @returns {Promise<boolean>} 用户是否确认 / Whether the user confirmed.
+ */
+export function requestConfirmation(host, message) {
+    return new Promise((resolve, reject) => {
+        const frame = host.frameElement;
+        if (frame) {
+            const event = new frame.ownerDocument.defaultView.CustomEvent("preferencepanes:confirm", { cancelable: true, detail: { message, resolve, reject } });
+            if (!frame.dispatchEvent(event)) return;
+        }
+        resolve(host.confirm(message));
+    });
+}

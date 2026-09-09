@@ -1,6 +1,6 @@
 import { ActionMenu } from "./ActionMenu.mjs";
 import { createPreferencesClient } from "./client.mjs";
-import { errorView, icon, element as node, resourceURL } from "./components.mjs";
+import { errorView, icon, element as node, requestConfirmation, resourceURL } from "./components.mjs";
 import { Navigation } from "./Navigation.mjs";
 
 /**
@@ -27,7 +27,7 @@ export function mountPanel(root, catalog) {
         { id: "clearCaches", label: "清空缓存", destructive: true },
         { id: "reset", label: "重置模块", destructive: true },
     ];
-    const menu = new ActionMenu(id => handlers.get(id)());
+    const menu = new ActionMenu(id => runAction(id));
     const trailing = node("span", "pp-nav-spacer");
     trailing.append(menu.element);
     const brand = node("div", "pp-brand");
@@ -57,7 +57,7 @@ export function mountPanel(root, catalog) {
         );
     };
     const onAction = event => {
-        if (!saving && handlers.has(event.detail)) handlers.get(event.detail)();
+        if (!saving && handlers.has(event.detail)) runAction(event.detail);
     };
     window.frameElement?.addEventListener("preferencepanes:action", onAction);
     let timer,
@@ -99,6 +99,19 @@ export function mountPanel(root, catalog) {
         }, 2400);
     };
     const client = createPreferencesClient({ catalog, notify });
+    /**
+     * 两种菜单入口共用异步错误处理，包含宿主确认框错误。
+     * Share async error handling between both menus, including host-dialog errors.
+     * @param {string} id 操作标识 / Action identifier.
+     * @returns {Promise<void>} 操作已处理 / Action handled.
+     */
+    async function runAction(id) {
+        try {
+            await handlers.get(id)();
+        } catch (error) {
+            notify({ kind: "error", message: error.message });
+        }
+    }
     /**
      * 打开模块并忽略已过期的异步结果。
      * Open a module and ignore stale asynchronous results.
@@ -401,9 +414,9 @@ export function mountPanel(root, catalog) {
                 },
             );
         });
-        handlers.set("clearCaches", () => {
+        handlers.set("clearCaches", async () => {
             if (saving) return;
-            if (!window.confirm(`清空 ${active} 的全部 Caches？`)) return;
+            if (!(await requestConfirmation(window, `清空 ${active} 的全部 Caches？`)) || destroyed || saving) return;
             return perform(
                 () => client.clearCaches(active),
                 () => {
@@ -411,9 +424,9 @@ export function mountPanel(root, catalog) {
                 },
             );
         });
-        handlers.set("reset", () => {
+        handlers.set("reset", async () => {
             if (saving) return;
-            if (!window.confirm(`重置 ${active}？这将删除该模块的 Settings、Caches 和其它持久化数据。`)) return;
+            if (!(await requestConfirmation(window, `重置 ${active}？这将删除该模块的 Settings、Caches 和其它持久化数据。`)) || destroyed || saving) return;
             return perform(() => client.reset(active), controls);
         });
         navigation?.destroy();
