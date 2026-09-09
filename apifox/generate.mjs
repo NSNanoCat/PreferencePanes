@@ -81,8 +81,8 @@ const declarations = [
         id: "pp-page-get",
         method: "get",
         path: "/settings/{module}",
-        name: "打开通用设置页",
-        group: "通用设置页面",
+        name: "打开具体模块设置页",
+        group: "模块设置页面",
         mock: true,
         page: true,
         schema: {},
@@ -98,7 +98,7 @@ const declarations = [
         mock: true,
         schema: {},
         example: undefined,
-        description: "主菜单并发探测。模块的原生 BoxJS Mock 返回 200 才启用入口，不读取持久化设置。该路径没有线上静态文件。",
+        description: "由调用方自定义主页探测 JSON 是否可访问。返回 200 才启用该模块入口，不读取持久化设置；PreferencePanes 不生成或管理此主页。",
     },
     {
         id: "pp-config-get",
@@ -121,7 +121,7 @@ const declarations = [
             },
             { id: "@BiliBili.Enhanced.Settings.enabled", name: "启用", type: "boolean", val: true },
         ],
-        description: "每次进入或刷新模块页先取一次配置，实时生成控件。从 ID 提取 storageKey，不使用浏览器传来的存储根键。",
+        description: "具体模块页面启动器导入一次 BoxJS 后交给渲染器。直接调用 mount 时使用传入 JSON，不再次请求配置或生成模块目录。",
     },
     {
         id: "pp-subtree-get",
@@ -140,7 +140,7 @@ const declarations = [
         name: "探测模块读写路由",
         group: "持久化读写",
         schema: {},
-        description: "确认安装配置接管此模块路由，不访问网络或存储，不表示数据已存在；主菜单仍通过 HEAD /configs/{module} 探测配置 Mock。",
+        description: "诊断该模块的存储路由，不读写数据。项目自定义主页独立探测 JSON 可达性，不用此 API 判定设置页面可用。",
     },
     {
         id: "511372916",
@@ -299,7 +299,7 @@ const document = {
     $schema: { app: "apifox", type: "project", version: "1.2.0" },
     info: {
         name: "Preference Panes",
-        description: "独立多模块存储桥接与页面、仅以 BoxJS JSON Mock 探测设置入口（0.6.0）",
+        description: "仅渲染导入 JSON 对应的具体模块设置页；项目定制入口独立托管",
         mockRule: { rules: [], enableSystemRule: true },
     },
     projectSetting: {

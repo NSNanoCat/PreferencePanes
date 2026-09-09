@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { BoxJS } from "../src/BoxJS.mjs";
 
-test("BoxJS alone determines menus and independent storage roots", () => {
+test("BoxJS indexes module identities and their storage roots", () => {
     const input = {
         name: "Example",
         apps: [

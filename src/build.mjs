@@ -13,8 +13,8 @@ export async function build(boxjs, css = "") {
     const catalog = new BoxJS(boxjs);
     const module = catalog.module.module;
     const [html, app, proxy, mock] = await Promise.all([
-        readFile(new URL("../dist/settings/index.html", import.meta.url), "utf8"),
-        readFile(new URL("../dist/settings/app.mjs", import.meta.url), "utf8"),
+        readFile(new URL("../dist/module/index.html", import.meta.url), "utf8"),
+        readFile(new URL("../dist/module/app.mjs", import.meta.url), "utf8"),
         readFile(new URL("../dist/preference-panes.proxy.js", import.meta.url), "utf8"),
         readFile(new URL("../dist/preference-panes.config.js", import.meta.url), "utf8"),
     ]);

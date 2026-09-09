@@ -24,7 +24,7 @@ function resources() {
                     const bundle = await rollup({ input: "src/browser/app.mjs", plugins: [nodeResolve({ browser: true }), resources()] });
                     try {
                         const { output } = await bundle.generate({ format: "es" });
-                        const html = (await readFile(new URL("./src/browser/site.html", import.meta.url), "utf8")).replaceAll("__VERSION__", pkg.version);
+                        const html = (await readFile(new URL("./src/browser/module.html", import.meta.url), "utf8")).replaceAll("__VERSION__", pkg.version);
                         return `export default ${JSON.stringify({ page: { type: "text/html", body: html }, "/settings/assets/app.mjs": { type: "text/javascript", body: output[0].code } })};`;
                     } finally {
                         await bundle.close();
@@ -47,12 +47,12 @@ export default [
     { input: "src/proxy/handler.mjs", output: { file: "dist/preference-panes.proxy.js", format: "iife", name: "PreferencePanes" } },
     {
         input: "src/browser/app.mjs",
-        output: { file: "dist/settings/app.mjs", format: "es" },
+        output: { file: "dist/module/app.mjs", format: "es" },
         plugins: [
             {
                 name: "page-shell",
                 async generateBundle() {
-                    const html = await readFile(new URL("./src/browser/site.html", import.meta.url), "utf8");
+                    const html = await readFile(new URL("./src/browser/module.html", import.meta.url), "utf8");
                     this.emitFile({ type: "asset", fileName: "index.html", source: html.replaceAll("__VERSION__", pkg.version) });
                 },
             },
