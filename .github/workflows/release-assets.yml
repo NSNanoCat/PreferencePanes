@@ -21,4 +21,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes
-          gh release upload "$GITHUB_REF_NAME" dist/api.js dist/module/index.html dist/module/app.mjs dist/module/navigation.mjs --clobber
+          zip -q -X -j dist/official-styles.zip src/browser/vendor/*.css src/browser/vendor/provenance.json
+          gh release upload "$GITHUB_REF_NAME" dist/api.js dist/module/index.html dist/module/app.mjs dist/module/navigation.mjs dist/official-styles.zip --clobber

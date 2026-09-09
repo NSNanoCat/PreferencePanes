@@ -54,11 +54,24 @@ export class ModuleFrame extends EventTarget {
  * Host confirmation event detail.
  */
 export interface ConfirmationRequest {
-    /** 确认内容 / Confirmation message. */
+    /**
+     * 确认内容。
+     * Confirmation message.
+     */
     message: string;
-    /** 返回选择 / Return the user's choice. */
+    /**
+     * 返回选择。
+     * Return the user's choice.
+     * @param confirmed 是否确认 / Whether confirmed.
+     * @returns 无返回值 / No return value.
+     */
     resolve(confirmed: boolean): void;
-    /** 返回失败 / Return a failure. */
+    /**
+     * 返回失败。
+     * Return a failure.
+     * @param error 错误 / Error.
+     * @returns 无返回值 / No return value.
+     */
     reject(error: Error): void;
 }
 
