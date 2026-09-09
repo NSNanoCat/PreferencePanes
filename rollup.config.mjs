@@ -13,17 +13,14 @@ function resources() {
     return {
         name: "preference-resources",
         resolveId(id) {
-            if (id === "#styles" || id === "#assets") return id;
+            if (id === "#styles" || id === "#style-urls" || id === "#assets") return id;
         },
         async load(id) {
             switch (id) {
-                case "#styles": {
-                    const layout = await readFile(new URL("./src/browser/panel.css", import.meta.url), "utf8");
-                    const imports = Object.keys(officialStyles)
-                        .map(url => `@import url("${url}") layer(preference-panes);`)
-                        .join("\n");
-                    return `export default ${JSON.stringify(`${imports}\n@layer preference-panes {\n${layout}\n}`)};`;
-                }
+                case "#styles":
+                    return `export default ${JSON.stringify(await readFile(new URL("./src/browser/panel.css", import.meta.url), "utf8"))};`;
+                case "#style-urls":
+                    return `export default ${JSON.stringify(Object.keys(officialStyles))};`;
                 case "#assets": {
                     const bundle = await rollup({ input: "src/browser/app.mjs", plugins: [nodeResolve({ browser: true }), resources()] });
                     try {

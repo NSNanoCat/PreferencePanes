@@ -18,6 +18,7 @@ test("production artifacts contain only official URLs, never fixture CSS or loca
     for (const file of ["api.js", "module/app.mjs", "preference-panes.mjs"]) {
         const source = await readFile(new URL(`../dist/${file}`, import.meta.url), "utf8");
         for (const url of urls) assert.ok(source.includes(url), `${file}: ${url}`);
+        assert.doesNotMatch(source, /@import|@layer/);
         assert.doesNotMatch(source, /@bilibili\/b-style|--Ga0:|v-toggle--small\{width|__official__|official-styles\.zip|settings\/official\//);
     }
 });
