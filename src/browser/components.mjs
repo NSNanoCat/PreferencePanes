@@ -10,28 +10,30 @@
 export function element(tag, className, text) {
     const node = document.createElement(tag);
     node.className = className;
-    // 官方 AppSettings 1.1.2 的作用域标记与原版 CSS 一起固定版本。
-    // Pin official AppSettings 1.1.2 scope attributes together with its unmodified CSS.
-    if (/\bform-row(?:\b|__)/.test(className)) node.setAttribute("data-v-b69aa1ea", "");
-    if (/\bform-group(?:\b|__)/.test(className)) node.setAttribute("data-v-e590be47", "");
     if (text !== undefined) node.textContent = text;
     return node;
 }
 
 /**
- * 搜索、选择和文本控件共用官方 VField 的 DOM 结构。
- * Share the official VField DOM structure across search, select and text controls.
- * @param {HTMLElement} control 已创建的原生控件 / Existing native control.
- * @param {boolean} [multiline] 是否为多行输入 / Whether the control is multiline.
- * @returns {HTMLDivElement} 字段容器 / Field container.
+ * 用官方 b-style 组合行布局，不绑定某个 App 内置页面的编译作用域。
+ * Compose rows with official b-style utilities without private app-page compilation scopes.
+ * @template {"div" | "label"} T
+ * @param {T} tag 行元素 / Row element.
+ * @returns {HTMLElementTagNameMap[T]} 设置行 / Settings row.
  */
-export function fieldControl(control, multiline = false) {
-    const field = element("div", `v-field pp-editor${multiline ? " v-field--textarea" : ""}`);
-    const body = element("div", "v-field__body");
-    control.classList.add("v-field__control");
-    body.append(control);
-    field.append(body);
-    return field;
+export function settingRow(tag) {
+    return element(tag, "pp-row flex_between pd_md bb_1 bc_line_regular bg_bg1");
+}
+
+/**
+ * 搜索、选择和文本控件共用官方输入配色与间距，交互由标准 HTML 控件负责。
+ * Share official colors and spacing while native HTML controls own input interaction.
+ * @param {HTMLElement} control 已创建的原生控件 / Existing native control.
+ * @returns {HTMLElement} 输入控件 / Input control.
+ */
+export function fieldControl(control) {
+    control.classList.add("pp-editor", "bg_bg3", "text1", "pd_sm", "bd_radius_md");
+    return control;
 }
 
 /**

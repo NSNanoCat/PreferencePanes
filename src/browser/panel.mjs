@@ -1,6 +1,6 @@
 import { ActionMenu } from "./ActionMenu.mjs";
 import { createPreferencesClient } from "./client.mjs";
-import { errorView, fieldControl, icon, element as node, requestConfirmation, resourceURL } from "./components.mjs";
+import { errorView, fieldControl, icon, element as node, requestConfirmation, resourceURL, settingRow } from "./components.mjs";
 import { Navigation } from "./Navigation.mjs";
 
 /**
@@ -231,16 +231,17 @@ export function mountPanel(root, catalog) {
             const match = /^\[([^\]]+)\]\s*(.*)$/.exec(field.name);
             const group = match?.[1] ?? "通用";
             if (!groups.has(group)) {
-                const section = node("section", "form-group form-group--has-title");
-                const rows = node("div", "form-group__row");
-                section.append(node("h2", "form-group__title", group), rows);
+                const section = node("section", "pp-group mt_md");
+                const rows = node("div", "pp-rows");
+                section.append(node("h2", "text3 fs_4 fw_400 mb_sm", group), rows);
                 groups.set(group, rows);
                 view.append(section);
             }
-            const row = node("div", "form-row pp-field");
-            const label = node("div", "form-row__text");
-            label.append(node("span", "form-row__title", match?.[2] ?? field.name));
-            if (field.description) label.append(node("span", "form-row__subtitle", field.description));
+            const row = settingRow("div");
+            row.classList.add("pp-field");
+            const label = node("div", "pp-label flex_col items_start mr_md");
+            label.append(node("span", "text1 fs_4", match?.[2] ?? field.name));
+            if (field.description) label.append(node("span", "text3 fs_5 mt_2", field.description));
             row.append(label);
             const value = values[field.key];
             /**
@@ -276,11 +277,11 @@ export function mountPanel(root, catalog) {
                 case field.type === "array" && Boolean(field.options): {
                     const page = node("section", "pp-choice-page");
                     if (field.description) page.append(node("p", "pp-description", field.description));
-                    const choices = node("div", "form-group__row");
+                    const choices = node("div", "pp-rows");
                     page.append(choices);
                     inputContainer = choices;
                     editors.set(field.key, { node: page, title: match?.[2] ?? field.name });
-                    const summary = node("span", "form-row__value pp-summary");
+                    const summary = node("span", "pp-summary");
                     const link = node("button", "pp-choice-link");
                     link.type = "button";
                     link.setAttribute("aria-label", field.name);
@@ -301,7 +302,9 @@ export function mountPanel(root, catalog) {
                         if (!link.contains(event.target)) link.click();
                     });
                     const inputs = field.options.map(option => {
-                        const label = node("label", "form-row pp-choice", option.label);
+                        const label = settingRow("label");
+                        label.classList.add("pp-choice");
+                        label.textContent = option.label;
                         const input = node("input", "");
                         input.type = "checkbox";
                         input.setAttribute("aria-label", option.label);
@@ -316,20 +319,15 @@ export function mountPanel(root, catalog) {
                     break;
                 }
                 case field.type === "boolean": {
-                    const toggle = node("button", "v-toggle v-toggle--small form-row__toggle");
-                    toggle.type = "button";
+                    const toggle = node("input", "pp-switch");
+                    toggle.type = "checkbox";
+                    toggle.setAttribute("switch", "");
                     toggle.setAttribute("role", "switch");
                     toggle.setAttribute("aria-label", field.name);
-                    toggle.append(node("span", "v-toggle__circle"));
                     write = value => {
-                        toggle.setAttribute("aria-checked", String(value === true));
-                        toggle.classList.toggle("v-toggle--closed", value !== true);
+                        toggle.checked = value === true;
                     };
-                    read = () => toggle.getAttribute("aria-checked") === "true";
-                    toggle.onclick = () => {
-                        write(!read());
-                        toggle.dispatchEvent(new window.Event("change", { bubbles: true }));
-                    };
+                    read = () => toggle.checked;
                     row.append(toggle);
                     break;
                 }
@@ -373,7 +371,7 @@ export function mountPanel(root, catalog) {
                                 return input.value;
                         }
                     };
-                    row.append(fieldControl(input, multiline));
+                    row.append(fieldControl(input));
                     break;
                 }
             }
