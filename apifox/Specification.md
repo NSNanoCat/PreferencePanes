@@ -1,4 +1,4 @@
-# PreferencePanes 0.7.0 模块设置页规范
+# PreferencePanes 0.7.1 模块设置页规范
 
 ## 职责边界
 
@@ -48,11 +48,37 @@ module 来自 BoxJS 字段 ID。path 用 / 分层，每段独立编码，不把�
 
 模块资源位于 /settings/assets/{module}.html、{module}.boxjs.json、{module}.css、{module}.request.js、{module}.config.js。app.mjs 为公共启动 JS。CSS 可以为空。不存在全局菜单 boxjs.json 或全局 custom.css 输入文件。
 
+## URL 与 Header 资源输入
+
+GET /settings/{module} 支持 json/css 查询参数，以及 X-PreferencePanes-JSON / X-PreferencePanes-CSS 请求头。参数值为 JSON 与 CSS 的资源地址，不是正文；没有新增第三种配置输入。请求头名称不区分大小写，分别优先于对应查询参数。缺省 JSON 为 /configs/{module}，缺省 CSS 为 /settings/assets/{module}.css；CSS 显式传空字符串时不下载样式文件，只用内置默认样式。相对地址以模块页请求 URL 解析，支持 HTTP(S)，跨域资源需允许 CORS；请求不携带 Cookie。显式指定资源失败时显示错误，不回退到其它资源。
+
+~~~http
+GET /settings/Enhanced?json=%2Fconfigs%2FEnhanced&css=%2Fsettings%2Fassets%2FEnhanced.css
+~~~
+
+~~~http
+GET /settings/Enhanced
+X-PreferencePanes-JSON: /configs/Enhanced
+X-PreferencePanes-CSS: /settings/assets/Enhanced.css
+~~~
+
+代理仅将 Header/URL 输入与当前页面请求地址编码到 HTML 的 meta 中，不下载 JSON/CSS，不读取存储，不接受 Header 改写存储根。浏览器解码输入、下载资源并检查 BoxJS 模块是否与页面模块一致。静态托管 HTML 支持查询参数；Header 入口必须由独立代理脚本响应，不能使用忽略 Header 的静态 HTML Mock。
+
+普通网页点击链接无法携带 Header。调用方先创建进入模块的 history 记录，用 fetch 携带 Header 请求模块 HTML，将正文赋给同源 iframe.srcdoc。srcdoc 与宿主隔离 CSS；模块内部只修改自身 URL 的 fragment，不依赖 srcdoc 的 pathname 或宿主 base URL。二级页后退复用模块缓存，再后退由宿主销毁 iframe、展示定制主页并重新探测 JSON。主页刷新或重新进入模块时重新请求 HTML、资源和设置，不在浏览器持久化存储缓存它们。iframe 是样式与文档隔离，不是同源脚本的安全沙箱。
+
 ## 入口可用性与导入测试
 
 项目主页自行 HEAD /configs/{module}，HTTP 200 才启用入口。API 可达不能替代 JSON 可达。这个探测逻辑不在 PreferencePanes 模块渲染器中。
 
 模块页面启动器 GET 对应 JSON 和模块 CSS，再调用 mount；JSON 缺失或模块与 URL 不符时不生成表单。调用方直接传给 mount 的 JSON 已经完成导入，渲染器不会再次访问配置或探测其它模块。
+
+## 共用导航行为
+
+`@nsnanocat/preference-panes/navigation` 导出 Navigation；构建产物提供 /settings/assets/navigation.mjs。模块二级页和定制主页使用同一个组件，各自在自己的文档内创建实例。组件接收 DOM 容器、根页节点、子页工厂；这些是视图宿主，不是新增模块配置。组件不接受模块清单、存储映射或品牌样式。
+
+open(key) 使用当前文档 URL 的 fragment 加入历史，back() 沿浏览器联合历史返回。current/canGoBack 与 change 事件供调用方更新标题、返回按钮或在主页重新探测。直接打开子页时补一次根页历史，刷新不重复堆叠。根页保留在原位，子页统一 280ms 从右滑入、向右滑出，动画结束才移除；减少动态效果时立即切换。子页工厂拿到 AbortSignal，退出或切换后取消异步加载，旧动画不能移除新视图。destroy() 释放加载、动画、监听器与节点。
+
+模块表单工厂返回已缓存的编辑器 DOM，不重读设置。外部定制主页工厂创建新 iframe，模块重新进入时读取一次。CSS 与节点布局仍由各自页面维护，导航组件不生成定制首页。
 
 `npm run preview` 打开开发测试台。选择模块 JSON、可选 CSS，点击“生成”后在 iframe 查看模块页。初始不装入示例，不生成项目首页，CSS 不影响导入表单。测试 API 使用独立内存，不读写用户代理数据。
 
