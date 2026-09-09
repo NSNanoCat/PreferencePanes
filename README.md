@@ -2,7 +2,7 @@
 
 PreferencePanes 负责具体模块的设置页、共享导航和本地持久化 API。模块页面只接受 BoxJS JSON 与可选 CSS；业务模块自己发布版本对应的 JSON，项目网站维护定制主页、入口探测和主题。
 
-## 通用 API（开发版 form 契约）
+## 通用 API（0.8.0 form 契约）
 
 业务模块安装同一个 `https://github.com/NSNanoCat/PreferencePanes/releases/latest/download/api.js`，不再生成绑定业务配置的读写脚本，也不需要额外安装独立设置插件。该文件由本仓库 Release 工作流发布，自动更新遵循代理工具的缓存周期。
 
