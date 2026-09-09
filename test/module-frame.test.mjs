@@ -1,6 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { requestConfirmation } from "../src/browser/components.mjs";
+
+test("native notice interception suppresses the module fallback and releases its listener", t => {
+    globalThis.document = { baseURI: "https://example.org/", createElement: () => Object.assign(new EventTarget(), { dataset: {} }) };
+    t.after(() => {
+        delete globalThis.document;
+    });
+    const frame = new ModuleFrame("/settings/Example");
+    let notice;
+    frame.addEventListener("notice", event => {
+        notice = event.detail;
+        event.preventDefault();
+    });
+    const detail = { kind: "success", message: "修改成功" };
+    assert.equal(frame.element.dispatchEvent(new CustomEvent("preferencepanes:notice", { cancelable: true, detail })), false);
+    assert.deepEqual(notice, detail);
+    frame.destroy();
+    assert.equal(frame.element.dispatchEvent(new CustomEvent("preferencepanes:notice", { cancelable: true, detail })), true);
+});
+
 import { ModuleFrame } from "../src/browser/ModuleFrame.mjs";
 
 test("host confirmation is asynchronous and detaches with its module frame", async t => {

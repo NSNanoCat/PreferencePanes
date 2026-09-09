@@ -1,4 +1,4 @@
-# PreferencePanes 0.9.1 form API 规范
+# PreferencePanes 0.9.2 form API 规范
 
 ## 职责
 

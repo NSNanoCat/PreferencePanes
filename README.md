@@ -12,6 +12,8 @@ PreferencePanes 负责具体模块的设置页、共享导航和本地持久化 
 
 宿主可监听 ModuleFrame 的 `confirm` 事件，调用 `preventDefault()` 接管确认框，再以 `event.detail.resolve(boolean)` 或 `reject(error)` 完成。未接管的独立网页使用浏览器对话框；模块离开后到达的确认结果不会继续写入。
 
+宿主也可监听 `notice` 事件，通过 `preventDefault()` 接管 `{kind, message}` 提示；被接管时模块不创建网页 Toast、不启用提示计时器。独立使用的通用面板仍提供默认通知。
+
 设置页顶部使用官方 VField 外观搜索当前字段的名称、说明、路径和选项标签。搜索只隐藏现有行，不重新生成控件、不追加网络读取；文本框、多行输入和下拉框也共用相同字段结构。
 
 业务模块安装同一个 `https://github.com/NSNanoCat/PreferencePanes/releases/latest/download/api.js`，不再生成绑定业务配置的读写脚本，也不需要额外安装独立设置插件。该文件由本仓库 Release 工作流发布，自动更新遵循代理工具的缓存周期。
