@@ -49,22 +49,6 @@ export function resourceURL(value) {
 }
 
 /**
- * 展示标准 BoxJS 图标；icons 保持透明/彩色语义，不解释为亮暗版本。
- * Display standard BoxJS icons, preserving transparent/color rather than light/dark semantics.
- * @param {import("../index.js").BoxJSMetadata} metadata 展示信息 / Presentation metadata.
- * @param {string} className 样式 / CSS class.
- * @returns {HTMLImageElement | null} 图标或无图标 / Icon or no icon.
- */
-export function icon(metadata, className) {
-    const source = metadata.icon || metadata.icons?.[1] || metadata.icons?.[0];
-    if (!source) return null;
-    const image = element("img", className);
-    image.src = resourceURL(source);
-    image.alt = "";
-    return image;
-}
-
-/**
  * 共享加载失败视图，不创建配置表单或数据读取。
  * Share a load-error view without creating controls or reading settings.
  * @param {Error} error 失败原因 / Failure reason.

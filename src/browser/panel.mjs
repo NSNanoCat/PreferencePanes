@@ -1,6 +1,6 @@
 import { ActionMenu } from "./ActionMenu.mjs";
 import { createPreferencesClient } from "./client.mjs";
-import { errorView, fieldControl, icon, element as node, requestConfirmation, resourceURL, settingRow } from "./components.mjs";
+import { errorView, fieldControl, element as node, requestConfirmation, resourceURL, settingRow } from "./components.mjs";
 import { Navigation } from "./Navigation.mjs";
 
 /**
@@ -30,17 +30,10 @@ export function mountPanel(root, catalog) {
     const menu = new ActionMenu(id => runAction(id));
     const trailing = node("span", "pp-nav-spacer");
     trailing.append(menu.element);
-    const logo = node("span", "pp-module-logo");
-    logo.setAttribute("aria-hidden", "true");
-    const image = icon(catalog.module.metadata, "");
-    if (image) logo.append(image);
-    const toolbar = node("div", "pp-toolbar");
-    toolbar.setAttribute("role", "search");
-    toolbar.hidden = true;
     const viewport = node("div", "pp-viewport");
     let toast;
     header.append(back, heading, trailing);
-    shell.append(header, toolbar, viewport);
+    shell.append(header, viewport);
     root.append(shell);
     // 嵌入模式向宿主发布导航状态，宿主不读取或修改模块内部 DOM。
     // Embedded mode publishes navigation state without host reads or mutations of the module DOM.
@@ -131,7 +124,6 @@ export function mountPanel(root, catalog) {
     async function open(module) {
         const version = ++generation;
         active = module;
-        toolbar.hidden = true;
         back.disabled = window.history.length <= 1;
         heading.textContent = module;
         publishNavigation();
@@ -154,14 +146,6 @@ export function mountPanel(root, catalog) {
         const { definition, values } = client.snapshot(active);
         heading.textContent = definition.metadata?.name || active;
         const view = node("section", "pp-fields");
-        const search = node("input", "");
-        search.type = "search";
-        search.placeholder = "搜索设置项";
-        search.setAttribute("aria-label", "搜索设置");
-        const searchField = fieldControl(search);
-        searchField.classList.add("pp-search");
-        toolbar.replaceChildren(logo, searchField);
-        const searchRows = [];
         /**
          * 挂载后执行的多行高度更新
          * Textarea sizing callbacks run after mounting.
@@ -180,7 +164,6 @@ export function mountPanel(root, catalog) {
          */
         const updateNavigation = () => {
             const editor = editors.get(navigation.current);
-            toolbar.hidden = Boolean(navigation.current);
             heading.textContent = editor?.title ?? definition.metadata?.name ?? active;
             back.disabled = saving || !navigation.canGoBack;
             publishNavigation();
@@ -405,18 +388,7 @@ export function mountPanel(root, catalog) {
             });
             if (eventName === "input") inputContainer.addEventListener("compositionend", event => event.target.dispatchEvent(new window.Event("input", { bubbles: true })));
             groups.get(group).append(row);
-            searchRows.push({ row, text: [field.name, field.key, field.description, ...(field.options ?? []).map(option => option.label)].join(" ").toLocaleLowerCase() });
         }
-        const empty = node("p", "pp-description", "没有匹配的设置项");
-        empty.hidden = true;
-        empty.setAttribute("role", "status");
-        view.append(empty);
-        search.oninput = () => {
-            const words = search.value.trim().toLocaleLowerCase().split(/\s+/);
-            for (const { row, text } of searchRows) row.hidden = !words.every(word => text.includes(word));
-            for (const rows of groups.values()) rows.parentElement.hidden = [...rows.children].every(row => row.hidden);
-            empty.hidden = searchRows.some(({ row }) => !row.hidden);
-        };
         const cachePage = node("section", "pp-cache-page");
         const output = node("pre", "pp-cache");
         output.textContent = "暂无缓存";
