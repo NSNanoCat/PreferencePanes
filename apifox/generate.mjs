@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
  */
 const moduleId = 8522462;
 const specification = await readFile(new URL("Specification.md", import.meta.url), "utf8");
+const integration = await readFile(new URL("HostIntegration.md", import.meta.url), "utf8");
 const parameter = (name, description, required = false) => ({ id: `${name}#0`, name, description, type: "string", schema: { type: "string" }, required, enable: false, example: "" });
 const declarations = [
     { id: "pp-page-get", method: "get", path: "/settings/{module}", name: "打开模块设置页面", group: "模块设置页面", page: true },
@@ -127,9 +128,29 @@ for (const key of [
     "projectAssociations",
 ])
     document[key] = [];
+document.docCollection = [
+    {
+        name: document.apiCollection[0].name,
+        moduleId,
+        children: [],
+        items: [
+            {
+                id: "pp-host-integration",
+                name: integration.split("\n")[0].slice(2),
+                sidebarTitle: "",
+                content: integration,
+                folderId: 0,
+                type: "",
+                tags: [],
+                visibility: "SHARED",
+                moduleId,
+            },
+        ],
+    },
+];
 const output = new URL("preference-panes.apifox.json", import.meta.url);
 const json = execFileSync(process.execPath, [fileURLToPath(import.meta.resolve("@biomejs/biome/bin/biome")), "format", "--stdin-file-path", fileURLToPath(output)], { input: JSON.stringify(document), encoding: "utf8" });
 if (process.argv.includes("--check")) {
     if ((await readFile(output, "utf8")) !== json) throw new Error("Apifox JSON is stale");
 } else await writeFile(output, json);
-console.log(JSON.stringify({ operations: apis.length, paths: new Set(apis.map(api => api.path)).size, formOperations: apis.filter(api => api.requestBody.type === "application/x-www-form-urlencoded").length }));
+console.log(JSON.stringify({ documents: document.docCollection[0].items.length, operations: apis.length, paths: new Set(apis.map(api => api.path)).size, formOperations: apis.filter(api => api.requestBody.type === "application/x-www-form-urlencoded").length }));

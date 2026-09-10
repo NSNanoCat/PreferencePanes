@@ -15,22 +15,24 @@
     color: var(--pp-text);
     background: var(--pp-background);
     position: relative;
-    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
 }
 .pp-panel * {
     box-sizing: border-box;
     letter-spacing: 0;
 }
 .pp-header {
+    flex: none;
     height: calc(52px + env(safe-area-inset-top));
     padding: env(safe-area-inset-top) 12px 0;
     display: flex;
     align-items: center;
     background: var(--pp-surface);
     border-bottom: 1px solid var(--pp-border);
-    position: sticky;
-    top: 0;
-    z-index: 1;
+    position: relative;
+    z-index: 2;
 }
 .pp-title {
     flex: 1;
@@ -81,22 +83,25 @@
     opacity: 0.5;
     cursor: wait;
 }
+/* 固定工具区与滚动视口共用弹性布局，不按工具栏高度拼接页面偏移。
+ * Fixed tools and the scrolling viewport share a flex layout without toolbar-height offsets. */
+.pp-toolbar {
+    flex: none;
+    padding: 12px max(16px, calc((100% - 688px) / 2));
+    background: var(--pp-surface);
+    border-bottom: 1px solid var(--pp-border);
+}
 .pp-viewport {
     position: relative;
-    height: calc(100vh - 52px - env(safe-area-inset-top));
+    flex: 1;
+    min-height: 0;
     overflow: hidden;
 }
 :root[data-preference-panes-embedded] .pp-header {
     display: none;
 }
-:root[data-preference-panes-embedded] .pp-viewport {
-    height: 100vh;
-}
 @supports (height: 100dvh) {
-    .pp-viewport {
-        height: calc(100dvh - 52px - env(safe-area-inset-top));
-    }
-    :root[data-preference-panes-embedded] .pp-viewport {
+    .pp-panel {
         height: 100dvh;
     }
 }
@@ -147,7 +152,7 @@
 }
 .pp-search {
     width: 100%;
-    margin-bottom: 12px;
+    margin: 0;
 }
 .pp-panel .pp-multiline {
     display: block;

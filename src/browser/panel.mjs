@@ -34,10 +34,13 @@ export function mountPanel(root, catalog) {
     logo.setAttribute("aria-hidden", "true");
     const image = icon(catalog.module.metadata, "");
     if (image) logo.append(image);
+    const toolbar = node("div", "pp-toolbar");
+    toolbar.setAttribute("role", "search");
+    toolbar.hidden = true;
     const viewport = node("div", "pp-viewport");
     let toast;
     header.append(back, heading, trailing);
-    shell.append(header, viewport);
+    shell.append(header, toolbar, viewport);
     root.append(shell);
     // 嵌入模式向宿主发布导航状态，宿主不读取或修改模块内部 DOM。
     // Embedded mode publishes navigation state without host reads or mutations of the module DOM.
@@ -128,6 +131,7 @@ export function mountPanel(root, catalog) {
     async function open(module) {
         const version = ++generation;
         active = module;
+        toolbar.hidden = true;
         back.disabled = window.history.length <= 1;
         heading.textContent = module;
         publishNavigation();
@@ -157,7 +161,7 @@ export function mountPanel(root, catalog) {
         search.setAttribute("aria-label", "搜索设置");
         const searchField = fieldControl(search);
         searchField.classList.add("pp-search");
-        view.append(searchField);
+        toolbar.replaceChildren(searchField);
         const searchRows = [];
         /**
          * 挂载后执行的多行高度更新
@@ -177,6 +181,7 @@ export function mountPanel(root, catalog) {
          */
         const updateNavigation = () => {
             const editor = editors.get(navigation.current);
+            toolbar.hidden = Boolean(navigation.current);
             heading.textContent = editor?.title ?? definition.metadata?.name ?? active;
             back.disabled = saving || !navigation.canGoBack;
             publishNavigation();
