@@ -16,9 +16,9 @@ jobs:
         with: { node-version: "24" }
       - run: npm ci --registry=https://registry.npmjs.org/ --@nsnanocat:registry=https://registry.npmjs.org/
       - run: npm run check && npm run apifox:check
-      - name: Publish common API and frontend
+      - name: Publish common API
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes
-          gh release upload "$GITHUB_REF_NAME" dist/api.js dist/module/index.html dist/module/app.mjs dist/module/navigation.mjs --clobber
+          gh release upload "$GITHUB_REF_NAME" dist/api.js --clobber

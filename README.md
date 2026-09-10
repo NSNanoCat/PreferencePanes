@@ -1,6 +1,6 @@
 # @nsnanocat/preference-panes
 
-PreferencePanes 负责具体模块的设置页、共享导航和本地持久化 API。模块页面只接受 BoxJS JSON 与可选 CSS；业务模块自己发布版本对应的 JSON，项目网站维护定制主页、入口探测和主题。
+PreferencePanes 负责具体模块的设置页、声明式主页控制器、共享导航和本地持久化 API。模块页面只接受 BoxJS JSON 与可选 CSS；业务模块自己发布版本对应的 JSON，项目网站只维护定制 HTML、可选 CSS 与图标素材。
 
 ## 通用 API（0.8.0 form 契约）
 
@@ -32,7 +32,7 @@ await fetch("/api/set", {
 
 ## 页面与输入
 
-主页状态行使用 `@nsnanocat/preference-panes/navigation` 的 `ModuleStatus`。组件只 HEAD 配置地址，失败显示“未安装”，成功读取 X-PreferencePanes-Version 显示业务模块版本；旧配置未提供版本头时显示“版本未知”。状态行始终占据第二行，不读取持久化设置。
+主页加载 `/settings/assets/host.mjs`，通过入口元素的 `data-module`、`data-page`、`data-json` 和可选 `data-css` 自动建立状态、模块页面和原生导航。ModuleStatus 只 HEAD 配置地址，失败显示“未安装”，成功读取 X-PreferencePanes-Version 显示业务模块版本；状态行始终占据第二行，不读取持久化设置。
 
 ```js
 import { mount } from "@nsnanocat/preference-panes/browser";
@@ -65,7 +65,7 @@ ModuleFrame 在 iframe 元素上保存原请求上下文，HTML 原样加载，�
 
 ## 构建与验证
 
-`npm run build` 生成无业务配置的 dist/api.js 和公共前端；Release 工作流上传 api.js、index.html、app.mjs、navigation.mjs。`build(boxjs, css?)` 仅用于生成模块前端文件，不再输出配置副本或模块绑定脚本。
+`npm run build` 生成无业务配置的 dist/api.js 和公共前端；Release 工作流只上传包含页面与运行资源的 api.js。`build(boxjs, css?)` 仅用于生成模块前端文件，不再输出配置副本或模块绑定脚本。
 
 `npm run preview` 提供文件导入测试台，上传 JSON/CSS 后在隔离 iframe 预览；测试存储只在内存中。`npm run check` 检查代码、类型、行为；`npm run apifox:generate` 和 `npm run apifox:check` 维护原生接口文档。
 
