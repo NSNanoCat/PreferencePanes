@@ -18,7 +18,11 @@
     position: relative;
     display: flex;
     flex-direction: column;
+    width: 100%;
+    max-width: 100vw;
+    min-width: 0;
     height: 100vh;
+    overflow: hidden;
 }
 
 :root[data-theme="dark"] .pp-panel {
@@ -97,6 +101,7 @@
  * Fixed tools and the scrolling viewport share a flex layout without toolbar-height offsets. */
 .pp-toolbar {
     flex: none;
+    min-width: 0;
     padding: 12px max(16px, calc((100% - 688px) / 2));
     background: var(--pp-surface);
     border-bottom: 1px solid var(--pp-border);
@@ -104,6 +109,7 @@
 .pp-viewport {
     position: relative;
     flex: 1;
+    min-width: 0;
     min-height: 0;
     overflow: hidden;
 }
@@ -120,7 +126,9 @@
 .pp-cache-page {
     position: absolute;
     inset: 0;
-    overflow: auto;
+    min-width: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
     padding: 12px max(16px, calc((100% - 688px) / 2)) calc(28px + env(safe-area-inset-bottom) + var(--pp-keyboard-height, 0px));
     scroll-padding-bottom: var(--pp-keyboard-height, 0px);
     background: var(--pp-background);
@@ -205,6 +213,7 @@
     font-weight: 400;
 }
 .pp-row {
+    min-width: 0;
     min-height: 48px;
     padding: 16px;
     display: flex;
