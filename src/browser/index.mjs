@@ -12,7 +12,7 @@ import { mountPanel } from "./panel.mjs";
  */
 export function mount(boxjs, css = "") {
     if (typeof css !== "string") throw new TypeError("CSS must be a string");
-    const catalog = new BoxJS(boxjs);
+    const catalog = boxjs instanceof BoxJS ? boxjs : new BoxJS(boxjs);
     const metadata = catalog.module.metadata;
     const image = metadata.icon || metadata.icons?.[1] || metadata.icons?.[0];
     if (image) resourceURL(image);

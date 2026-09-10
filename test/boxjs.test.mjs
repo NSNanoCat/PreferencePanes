@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { BoxJS } from "../src/BoxJS.mjs";
 import { normalizeBoxJs } from "../src/lib/boxjs.mjs";
 import { config } from "./fixtures/module.mjs";
 
@@ -8,6 +9,7 @@ test("BoxJS array, app and subscription normalize IDs without project constants"
     assert.equal(a.storageKey, "Example");
     assert.deepEqual(a.settingsPath, ["Module", "Settings"]);
     assert.deepEqual(normalizeBoxJs({ settings: config }, "Module"), a);
+    assert.deepEqual(normalizeBoxJs(new BoxJS(config), "Module"), a);
     assert.deepEqual(normalizeBoxJs({ apps: [{ settings: config }, { settings: [{ ...config[0], id: "@Other.Second.Settings.on" }] }] }, "Module"), a);
     assert.equal(a.fields[4].defaultValue, 1);
     assert.throws(() => normalizeBoxJs([{ ...config[0], type: "unsupported" }], "Module"), /Unsupported/);

@@ -128,7 +128,7 @@ export function createPreferencesClient({ catalog, fetch: request = globalThis.f
             const state = { controller: new AbortController(), definition: null, values: {}, saving: false };
             sessions.set(module, state);
             try {
-                const definition = normalizeBoxJs(catalog.select(module), module);
+                const definition = normalizeBoxJs(catalog, module);
                 const response = await send(`@${definition.storageKey}.${definition.settingsPath.join(".")}`, "get", undefined, state.controller.signal);
                 let subtree = response.status === 404 ? {} : await response.json();
                 if (typeof subtree === "string") subtree = JSON.parse(subtree);
