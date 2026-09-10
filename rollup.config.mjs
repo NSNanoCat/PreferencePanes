@@ -22,13 +22,18 @@ function resources() {
                 case "#style-urls":
                     return `export default ${JSON.stringify(Object.keys(officialStyles))};`;
                 case "#assets": {
-                    const bundle = await rollup({ input: "src/browser/app.mjs", plugins: [nodeResolve({ browser: true }), resources()] });
+                    const bundles = await Promise.all(
+                        [
+                            ["app", "src/browser/app.mjs"],
+                            ["navigation", "src/browser/Navigation.mjs"],
+                        ].map(async ([name, input]) => [name, await rollup({ input, plugins: [nodeResolve({ browser: true }), resources()] })]),
+                    );
                     try {
-                        const app = await bundle.generate({ format: "es" });
+                        const output = Object.fromEntries(await Promise.all(bundles.map(async ([name, bundle]) => [name, (await bundle.generate({ format: "es" })).output[0].code])));
                         const html = (await readFile(new URL("./src/browser/module.html", import.meta.url), "utf8")).replaceAll("__VERSION__", pkg.version);
-                        return `export default ${JSON.stringify({ page: { type: "text/html", body: html }, "/settings/assets/app.mjs": { type: "text/javascript", body: app.output[0].code } })};`;
+                        return `export default ${JSON.stringify({ page: { type: "text/html", body: html }, "/settings/assets/app.mjs": { type: "text/javascript", body: output.app }, "/settings/assets/navigation.mjs": { type: "text/javascript", body: output.navigation } })};`;
                     } finally {
-                        await bundle.close();
+                        await Promise.all(bundles.map(([, bundle]) => bundle.close()));
                     }
                 }
                 default:

@@ -10,6 +10,7 @@
 | --- | --- | --- |
 | GET | /settings/{module} | 通用模块页，JSON/CSS 动态导入 |
 | GET | /settings/assets/app.mjs | 具体模块页的通用渲染器 |
+| GET | /settings/assets/navigation.mjs | ModuleStatus、ModuleFrame 和 Navigation 网页组件 |
 | HEAD、GET | /configs/{module} | 业务模块提供的版本化 JSON Mock |
 | POST | /api/get | 读取完整存储键或子树 |
 | POST | /api/set | 替换完整存储键处的值 |

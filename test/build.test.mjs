@@ -66,9 +66,11 @@ for (const quantumult of [false, true])
         }
         assert.equal(reads, 0);
         assert.match((await run("/settings/Module")).body, /<!doctype html>/i);
-        const app = await run("/settings/assets/app.mjs");
-        assert.equal(status(app), 200);
-        assert.match(app.body, /PreferencePanes|preference-panes/);
+        for (const asset of ["app.mjs", "navigation.mjs"]) {
+            const result = await run(`/settings/assets/${asset}`);
+            assert.equal(status(result), 200);
+            assert.match(result.body, /PreferencePanes|preference-panes/);
+        }
         const host = await run("/settings/assets/host.mjs");
         if (quantumult) assert.deepEqual(JSON.parse(JSON.stringify(host)), {});
         else assert.equal(host, undefined);

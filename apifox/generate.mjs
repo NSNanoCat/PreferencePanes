@@ -14,6 +14,7 @@ const parameter = (name, description, required = false) => ({ id: `${name}#0`, n
 const declarations = [
     { id: "pp-page-get", method: "get", path: "/settings/{module}", name: "打开模块设置页面", group: "模块设置页面", page: true },
     { id: "pp-app-get", method: "get", path: "/settings/assets/app.mjs", name: "加载模块设置渲染器", group: "通用页面资源", asset: true },
+    { id: "pp-navigation-get", method: "get", path: "/settings/assets/navigation.mjs", name: "加载通用页面导航组件", group: "通用页面资源", asset: true },
     { id: "pp-config-head", method: "head", path: "/configs/{module}", name: "探测业务模块配置 Mock", group: "模块配置" },
     { id: "pp-config-get", method: "get", path: "/configs/{module}", name: "取得版本对应的 BoxJS", group: "模块配置" },
     { id: "pp-store-get", method: "post", path: "/api/get", name: "读取完整存储键", group: "本地 form 存储 API" },
