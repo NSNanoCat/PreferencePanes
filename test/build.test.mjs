@@ -14,6 +14,8 @@ test("public browser is module-only and contains no project menu or installer", 
     assert.deepEqual(Object.keys(await import("../src/index.mjs")), ["build"]);
     assert.deepEqual(Object.keys(await import("../dist/preference-panes.mjs")), ["mount"]);
     assert.deepEqual(Object.keys(await import("@nsnanocat/preference-panes/navigation")), ["ActionMenu", "ModuleFrame", "ModuleStatus", "Navigation"]);
+    const { ActionMenu } = await import("@nsnanocat/preference-panes/navigation");
+    assert.equal(typeof ActionMenu.prototype.open, "function");
     const browser = await readFile(new URL("../dist/preference-panes.mjs", import.meta.url), "utf8");
     assert.doesNotMatch(browser, /node:fs|node-fetch|\$persistentStore|@nsnanocat\/util/);
     assert.doesNotMatch(browser, /pp-home|self-panel|pp-install|安装模块|data-module/);
@@ -41,7 +43,7 @@ for (const quantumult of [false, true])
         const store = new Map();
         let reads = 0;
         const api = await readFile(new URL("../dist/api.js", import.meta.url), "utf8");
-        const run = (path, method = "GET", body) =>
+        const run = (path, method = "GET", body = undefined) =>
             new Promise(resolve => {
                 const read = key => {
                     reads++;

@@ -5,6 +5,7 @@ import { ActionMenu, ModuleFrame, ModuleStatus, Navigation } from "@nsnanocat/pr
 
 const menu = new ActionMenu(id => frame.perform(id));
 menu.update([{ id: "viewCaches", label: "查看缓存" }]);
+menu.open();
 menu.close();
 menu.destroy();
 

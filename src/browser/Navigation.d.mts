@@ -141,6 +141,12 @@ export class ActionMenu {
      */
     update(items: MenuAction[], disabled?: boolean): void;
     /**
+     * 打开当前操作菜单。
+     * Open the current action sheet.
+     * @returns 无返回值 / No return value.
+     */
+    open(): void;
+    /**
      * 关闭菜单。
      * Close the menu.
      * @returns 无返回值 / No return value.

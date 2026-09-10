@@ -1,15 +1,16 @@
 /**
- * 标题栏共用三点菜单；Shadow DOM 隔离项目样式，保留继承的主题色。
- * Shared title-bar overflow menu; Shadow DOM isolates layout while inheriting theme colors.
+ * 共用三点按钮和底部操作菜单；弹层挂载到文档根部，不受标题栏显示状态影响。
+ * Shared overflow trigger and bottom action sheet; the layer is mounted at document level and remains independent of header visibility.
  */
 export class ActionMenu {
     #button;
-    #popup;
-    #backdrop;
+    #layer;
+    #items;
     #select;
     #document;
+    #disabled = true;
     #key = event => {
-        if (event.key === "Escape" && !this.#popup.hidden) {
+        if (event.key === "Escape" && !this.#layer.hidden) {
             event.preventDefault();
             this.close();
             this.#button.focus();
@@ -25,44 +26,55 @@ export class ActionMenu {
         this.#document = document;
         this.#select = select;
         this.element = document.createElement("span");
-        const root = this.element.attachShadow({ mode: "open" });
-        root.innerHTML = `<style>
-          :host{display:inline-flex;position:relative;width:44px;height:44px;color:inherit}
-          :host([hidden]),[hidden]{display:none!important}
-          button{font:inherit;cursor:pointer;border:0;color:inherit;background:none}
+        const triggerRoot = this.element.attachShadow({ mode: "open" });
+        triggerRoot.innerHTML = `<style>
+          :host{display:inline-flex;width:44px;height:44px;color:inherit}
+          :host([hidden]){display:none!important}
+          button{width:44px;height:44px;padding:10px;font:inherit;cursor:pointer;border:0;color:inherit;background:none}
           button:disabled{opacity:.4;cursor:default}
           button:focus-visible{outline:2px solid currentColor;outline-offset:-3px}
-          #trigger{width:44px;height:44px;padding:10px;position:relative;z-index:3}
           svg{display:block;width:24px;height:24px;fill:currentColor}
-          #backdrop{position:fixed;inset:0;z-index:1}
-          #items{position:absolute;right:0;top:46px;z-index:2;min-width:160px;padding:6px;background:var(--pp-surface,Canvas);color:var(--pp-text,CanvasText);border:1px solid var(--pp-border,#8884);border-radius:12px;box-shadow:0 8px 28px #0003}
-          #items button{display:block;text-align:left;white-space:nowrap;width:100%;padding:11px 14px;border-radius:8px;font:14px/1.4 system-ui,sans-serif}
-          #items button:hover{background:#8882}
-          #items button[data-danger]{color:#e45656}
-        </style><button id="trigger" type="button" aria-label="更多操作" aria-haspopup="menu" aria-expanded="false" aria-controls="items"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="20" cy="12" r="2"/></svg></button><button id="backdrop" type="button" tabindex="-1" aria-label="关闭菜单" hidden></button><div id="items" role="menu" hidden></div>`;
-        this.#button = root.querySelector("#trigger");
-        this.#popup = root.querySelector("#items");
-        this.#backdrop = root.querySelector("#backdrop");
-        this.#button.onclick = () => {
-            const open = this.#popup.hidden;
-            this.#popup.hidden = this.#backdrop.hidden = !open;
-            this.#button.setAttribute("aria-expanded", String(open));
-            if (open) this.#popup.firstElementChild.focus();
+        </style><button type="button" aria-label="更多操作" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="20" cy="12" r="2"/></svg></button>`;
+        this.#button = triggerRoot.querySelector("button");
+        this.#layer = document.createElement("span");
+        const layerRoot = this.#layer.attachShadow({ mode: "open" });
+        layerRoot.innerHTML = `<style>
+          :host{position:fixed;inset:0;z-index:2147483647;color:var(--pp-text,CanvasText);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+          :host([hidden]){display:none!important}
+          button{font:inherit;cursor:pointer;border:0;color:inherit;background:none}
+          button:focus-visible{outline:2px solid var(--pp-accent,Highlight);outline-offset:-3px}
+          #backdrop{position:absolute;inset:0;width:100%;height:100%;padding:0;background:#0008;animation:pp-fade-in .18s ease-out}
+          #sheet{position:absolute;z-index:1;left:0;right:0;bottom:0;width:min(100%,540px);max-height:calc(100% - 24px);margin:auto;padding:8px 8px calc(8px + env(safe-area-inset-bottom));animation:pp-sheet-in .22s cubic-bezier(.2,.8,.2,1)}
+          #items,#cancel{overflow:hidden;background:var(--pp-surface,Canvas);border:1px solid var(--pp-border,#8884);border-radius:14px;box-shadow:0 8px 28px #0004}
+          #items{max-height:calc(100vh - 116px - env(safe-area-inset-bottom));overflow-y:auto;-webkit-overflow-scrolling:touch}
+          #items button,#cancel{display:block;width:100%;min-height:54px;padding:14px 18px;text-align:center}
+          #items button+button{border-top:1px solid var(--pp-border,#8884)}
+          #items button[data-danger]{color:var(--pp-danger,#e45656)}
+          #cancel{margin-top:8px;color:var(--pp-accent,Highlight);font-weight:600}
+          @keyframes pp-fade-in{from{opacity:0}}
+          @keyframes pp-sheet-in{from{transform:translateY(100%)}}
+          @media (prefers-reduced-motion:reduce){#backdrop,#sheet{animation:none}}
+        </style><button id="backdrop" type="button" tabindex="-1" aria-label="关闭菜单"></button><section id="sheet" role="dialog" aria-modal="true" aria-label="更多操作"><div id="items" role="menu"></div><button id="cancel" type="button">取消</button></section>`;
+        this.#items = layerRoot.querySelector("#items");
+        this.#button.onclick = () => (this.#layer.hidden ? this.open() : this.close());
+        layerRoot.querySelector("#backdrop").onclick = () => {
+            this.close();
+            this.#button.focus();
         };
-        this.#backdrop.onclick = () => this.close();
-        this.#popup.onkeydown = event => {
-            if (event.key === "Tab") {
-                this.close();
-                return;
-            }
-            const items = [...this.#popup.children];
-            const index = items.indexOf(root.activeElement);
+        layerRoot.querySelector("#cancel").onclick = () => {
+            this.close();
+            this.#button.focus();
+        };
+        this.#items.onkeydown = event => {
+            const items = [...this.#items.children];
+            const index = items.indexOf(layerRoot.activeElement);
             const offsets = { ArrowDown: 1, ArrowUp: -1 };
             if (event.key in offsets) {
                 event.preventDefault();
                 items[(index + offsets[event.key] + items.length) % items.length].focus();
             }
         };
+        document.body.append(this.#layer);
         document.addEventListener("keydown", this.#key);
         this.update([]);
     }
@@ -76,8 +88,9 @@ export class ActionMenu {
      */
     update(items, disabled = false) {
         this.close();
-        this.#button.disabled = disabled || items.length === 0;
-        this.#popup.replaceChildren(
+        this.#disabled = disabled || items.length === 0;
+        this.#button.disabled = this.#disabled;
+        this.#items.replaceChildren(
             ...items.map(item => {
                 const button = this.#document.createElement("button");
                 button.type = "button";
@@ -94,12 +107,29 @@ export class ActionMenu {
     }
 
     /**
+     * 打开当前操作菜单。
+     * Open the current action sheet.
+     * @returns {void} 无返回值 / No return value.
+     */
+    open() {
+        if (this.#disabled) return;
+        const style = getComputedStyle(this.element);
+        for (const property of ["--pp-text", "--pp-surface", "--pp-border", "--pp-accent", "--pp-danger"]) {
+            const value = style.getPropertyValue(property);
+            if (value) this.#layer.style.setProperty(property, value);
+        }
+        this.#layer.hidden = false;
+        this.#button.setAttribute("aria-expanded", "true");
+        this.#items.firstElementChild.focus();
+    }
+
+    /**
      * 关闭菜单。
      * Close the menu.
      * @returns {void} 无返回值 / No return value.
      */
     close() {
-        this.#popup.hidden = this.#backdrop.hidden = true;
+        this.#layer.hidden = true;
         this.#button.setAttribute("aria-expanded", "false");
     }
 
@@ -110,6 +140,7 @@ export class ActionMenu {
      */
     destroy() {
         this.#document.removeEventListener("keydown", this.#key);
+        this.#layer.remove();
         this.element.remove();
     }
 }
