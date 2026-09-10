@@ -4,17 +4,15 @@ PreferencePanes 负责具体模块的设置页、共享网页组件和本地持�
 
 ## 通用 API（0.8.0 form 契约）
 
-嵌入的模块页跟随宿主根元素的 `data-theme`（light/dark）和 `--pp-keyboard-height`（CSS 长度），退出时释放观察器。独立页面使用网页自身/系统主题；通用包不再解析 Bilibili 的 User-Agent。
+嵌入的模块页跟随宿主根元素的 `data-theme`（light/dark）和 `--pp-keyboard-height`（CSS 长度），退出时释放观察器。独立页面使用网页自身或系统主题；通用包不识别任何客户端 User-Agent。
 
-正式表单通过独立 stylesheet 链接引用 `src/browser/official-styles.json` 中的官方 b-style 与主题 CDN，不内嵌、镜像或 Mock 官方 CSS。基础分页布局单独打包，不依赖远程样式加载。设置行由公开 b-style 工具类组成，不使用 Hilo 内置页面的编译作用域。开关采用标准 checkbox 的 switch 属性及 switch 语义，由浏览器呈现原生控件（[Safari/iOS 17.4 起显示开关](https://webkit.org/blog/15054/an-html-switch-control/)，其他浏览器保留可操作的复选框）；单选使用 select，多选保留二级页面。BoxJS 动态生成及修改即保存保持不变。
-
-本地验证可运行 `npm run preview -- --override-official`，显式把官方 URL override 到 `test/fixtures/official-styles/`。副本和 SHA-256 只用于测试，不进入 npm 或 Release；不带此参数的预览与生产一样使用官方地址。
+默认样式完全由包内 `pp-*` 类和 CSS 变量提供，不请求任何项目或客户端资源。调用方可通过 CSS 输入覆盖变量、组件，或在该 CSS 中自行引用所属客户端的官方样式。开关采用标准 checkbox 的 switch 属性及 switch 语义，由浏览器呈现原生控件（[Safari/iOS 17.4 起显示开关](https://webkit.org/blog/15054/an-html-switch-control/)，其他浏览器保留可操作的复选框）；单选使用 select，多选保留二级页面。BoxJS 动态生成及修改即保存保持不变。
 
 宿主可监听 ModuleFrame 的 `confirm` 事件，调用 `preventDefault()` 接管确认框，再以 `event.detail.resolve(boolean)` 或 `reject(error)` 完成。未接管的独立网页使用浏览器对话框；模块离开后到达的确认结果不会继续写入。
 
 宿主也可监听 `notice` 事件，通过 `preventDefault()` 接管 `{kind, message}` 提示；被接管时模块不创建网页 Toast、不启用提示计时器。独立使用的通用面板仍提供默认通知。
 
-搜索使用标准 search 控件，固定在导航栏下方的工具区，表单内容独立滚动。二级选择和缓存页隐藏搜索工具区，返回后恢复原查询。搜索范围为当前字段的名称、说明、路径和选项标签。搜索只隐藏现有行，不重新生成控件、不追加网络读取；文本框、多行输入和下拉框共用官方配色、间距和原生输入结构。
+搜索使用标准 search 控件，固定在导航栏下方的工具区，表单内容独立滚动。二级选择和缓存页隐藏搜索工具区，返回后恢复原查询。搜索范围为当前字段的名称、说明、路径和选项标签。搜索只隐藏现有行，不重新生成控件、不追加网络读取；文本框、多行输入和下拉框共用通用变量、间距和原生输入结构。
 
 业务模块安装同一个 `https://github.com/NSNanoCat/PreferencePanes/releases/latest/download/api.js`，不再生成绑定业务配置的读写脚本，也不需要额外安装独立设置插件。该文件由本仓库 Release 工作流发布，自动更新遵循代理工具的缓存周期。
 
