@@ -63,7 +63,7 @@ ModuleFrame 在 iframe 元素上保存原请求上下文，HTML 原样加载，�
 
 ## 构建与验证
 
-`npm run build` 生成无业务配置的 dist/api.js 和公共前端；Release 工作流只上传包含页面与运行资源的 api.js。`build(boxjs, css?)` 仅用于生成模块前端文件，不再输出配置副本或模块绑定脚本。
+`npm run build` 生成无业务配置的 dist/api.js 和公共前端；Release 工作流只上传包含页面与运行资源的 api.js。`build(boxjs, css?)` 仅输出 `settings/{module}/index.html`、公共 `settings/assets/app.mjs` 和可选模块 CSS，不复制配置、导航组件或重复 HTML。
 
 `npm run preview` 提供文件导入测试台，上传 JSON/CSS 后在隔离 iframe 预览；测试存储只在内存中。`npm run check` 检查代码、类型、行为；`npm run apifox:generate` 和 `npm run apifox:check` 维护原生接口文档。
 

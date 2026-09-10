@@ -29,7 +29,8 @@ test("each build creates only one module and never overwrites a project landing 
     assert.equal(otherFiles["settings/assets/Other.css"], "");
     assert.equal(files["settings/Other/index.html"], undefined);
     assert.equal(files["settings/assets/app.mjs"], otherFiles["settings/assets/app.mjs"]);
-    assert.equal(files["settings/assets/navigation.mjs"], otherFiles["settings/assets/navigation.mjs"]);
+    assert.equal(files["settings/assets/Module.html"], undefined);
+    assert.equal(files["settings/assets/navigation.mjs"], undefined);
     await assert.rejects(build({ apps: [document, other] }), /exactly one module/);
     await assert.rejects(build([]), /exactly one module/);
     await assert.rejects(build(document, { stylesheets: [] }));
