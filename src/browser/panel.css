@@ -57,13 +57,13 @@
     min-width: 0;
     overflow-wrap: anywhere;
 }
-/* 模块图标在正文内；嵌入宿主可使用纯文字原生标题栏。
- * Keep module icons in content so embedded hosts can use text-only native titles. */
+/* 模块图标位于固定搜索工具栏左侧；嵌入宿主仍可使用纯文字原生标题栏。
+ * Keep the module icon beside the fixed search field while embedded hosts use text-only native titles. */
 .pp-module-logo {
     display: none;
-    width: 64px;
-    height: 64px;
-    margin: 8px auto 20px;
+    width: 36px;
+    height: 36px;
+    flex: none;
 }
 .pp-module-logo:not(:empty) {
     display: block;
@@ -103,6 +103,9 @@
     flex: none;
     min-width: 0;
     padding: 12px max(16px, calc((100% - 688px) / 2));
+    display: flex;
+    align-items: center;
+    gap: 12px;
     background: var(--pp-surface);
     border-bottom: 1px solid var(--pp-border);
 }
@@ -173,7 +176,9 @@
     border-radius: 6px;
 }
 .pp-search {
+    flex: 1;
     width: 100%;
+    min-width: 0;
     margin: 0;
 }
 .pp-panel .pp-multiline {
