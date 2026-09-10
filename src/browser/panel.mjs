@@ -236,17 +236,17 @@ export function mountPanel(root, catalog) {
             const match = /^\[([^\]]+)\]\s*(.*)$/.exec(field.name);
             const group = match?.[1] ?? "通用";
             if (!groups.has(group)) {
-                const section = node("section", "pp-group mt_md");
+                const section = node("section", "pp-group");
                 const rows = node("div", "pp-rows");
-                section.append(node("h2", "text3 fs_4 fw_400 mb_sm", group), rows);
+                section.append(node("h2", "pp-group-title", group), rows);
                 groups.set(group, rows);
                 view.append(section);
             }
             const row = settingRow("div");
             row.classList.add("pp-field");
-            const label = node("div", "pp-label flex_col items_start mr_md");
-            label.append(node("span", "text1 fs_4", match?.[2] ?? field.name));
-            if (field.description) label.append(node("span", "text3 fs_5 mt_2", field.description));
+            const label = node("div", "pp-label");
+            label.append(node("span", "pp-field-name", match?.[2] ?? field.name));
+            if (field.description) label.append(node("span", "pp-field-description", field.description));
             row.append(label);
             const value = values[field.key];
             /**

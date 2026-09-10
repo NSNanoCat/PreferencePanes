@@ -1,12 +1,11 @@
-import styleURLs from "#style-urls";
 import defaults from "#styles";
 import { BoxJS } from "../BoxJS.mjs";
 import { element, resourceURL } from "./components.mjs";
 import { mountPanel } from "./panel.mjs";
 
 /**
- * 挂载模块设置页；内置资源只引用官方地址，CSS 输入仅用于该页。
- * Mount the module page with official resource URLs and optional page-specific CSS.
+ * 挂载模块设置页；默认样式由包提供，可选 CSS 仅作用于当前模块。
+ * Mount a module page with package defaults and optional module-scoped CSS.
  * @param {import("../index.js").BoxJSInput} boxjs 单个模块的 BoxJS JSON / BoxJS JSON for one module.
  * @param {string} [css] 可选 CSS 正文 / Optional CSS text.
  * @returns {import("./index.js").MountedPreferences} 模块生命周期句柄 / Module lifecycle handle.
@@ -24,22 +23,13 @@ export function mount(boxjs, css = "") {
         root.id = "preferences";
         document.body.append(root);
     }
-    // 远程视觉资源与基础布局分开加载，网络状态不控制分页定位。
-    // Load remote visual resources separately so network state cannot control page positioning.
-    const links = styleURLs.map(url => {
-        const link = element("link", "");
-        link.rel = "stylesheet";
-        link.href = url;
-        return link;
-    });
     const base = element("style", ""),
         custom = element("style", "");
     base.textContent = defaults;
     custom.textContent = css;
-    document.head.append(...links, base, custom);
+    document.head.append(base, custom);
     const previousTitle = document.title;
     const previousTheme = document.documentElement.dataset.theme;
-    const previousDark = document.documentElement.classList.contains("bili_dark");
     const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
     const previousKeyboard = document.documentElement.style.getPropertyValue("--pp-keyboard-height");
     const host = window.frameElement?.ownerDocument.documentElement;
@@ -51,7 +41,6 @@ export function mount(boxjs, css = "") {
     const syncAppearance = () => {
         const theme = host?.dataset.theme ?? previousTheme ?? (systemTheme.matches ? "dark" : "light");
         document.documentElement.dataset.theme = theme;
-        document.documentElement.classList.toggle("bili_dark", theme === "dark");
         if (host) document.documentElement.style.setProperty("--pp-keyboard-height", host.style.getPropertyValue("--pp-keyboard-height"));
     };
     let observer;
@@ -72,9 +61,7 @@ export function mount(boxjs, css = "") {
         destroy() {
             observer?.disconnect();
             systemTheme.removeEventListener("change", syncAppearance);
-            document.documentElement.classList.toggle("bili_dark", previousDark);
             panel?.destroy();
-            for (const link of links) link.remove();
             base.remove();
             custom.remove();
             if (existing) root.replaceChildren();

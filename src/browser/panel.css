@@ -1,12 +1,13 @@
-/* 官方 b-style 负责行布局与配色；本文件只定义面板容器和控件约束。
- * Official b-style owns row layout and colors; this file defines panel containers and control constraints. */
+/* 通用默认样式只使用 pp 命名空间；项目可通过 CSS 输入覆盖变量和组件。
+ * Generic defaults use only the pp namespace; projects may override variables and components through CSS input. */
 .pp-panel {
-    --pp-text: var(--text1);
-    --pp-background: var(--bg2);
-    --pp-surface: var(--bg1);
-    --pp-border: var(--line_regular);
-    --pp-muted: var(--text3);
-    --pp-accent: var(--brand_pink);
+    --pp-text: #18191c;
+    --pp-background: #f6f7f8;
+    --pp-surface: #fff;
+    --pp-field: #f1f2f3;
+    --pp-border: #e3e5e7;
+    --pp-muted: #797f87;
+    --pp-accent: #1677ff;
     font:
         15px / 1.5 -apple-system,
         BlinkMacSystemFont,
@@ -18,6 +19,15 @@
     display: flex;
     flex-direction: column;
     height: 100vh;
+}
+
+:root[data-theme="dark"] .pp-panel {
+    --pp-text: #f1f2f3;
+    --pp-background: #0d0e0f;
+    --pp-surface: #18191c;
+    --pp-field: #2f3238;
+    --pp-border: #2f3238;
+    --pp-muted: #9499a0;
 }
 .pp-panel * {
     box-sizing: border-box;
@@ -147,8 +157,12 @@
     width: 45%;
     min-width: 0;
     min-height: 36px;
+    padding: 8px 10px;
     font: inherit;
+    color: var(--pp-text);
+    background: var(--pp-field);
     border: 0;
+    border-radius: 6px;
 }
 .pp-search {
     width: 100%;
@@ -167,9 +181,37 @@
 .pp-label {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    margin-right: 16px;
+}
+.pp-field-name {
+    color: var(--pp-text);
+    font-size: 15px;
+}
+.pp-field-description {
+    margin-top: 2px;
+    color: var(--pp-muted);
+    font-size: 12px;
+}
+.pp-group {
+    margin-top: 16px;
+}
+.pp-group-title {
+    margin: 0 0 8px;
+    color: var(--pp-muted);
+    font-size: 15px;
+    font-weight: 400;
 }
 .pp-row {
     min-height: 48px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--pp-surface);
+    border-bottom: 1px solid var(--pp-border);
 }
 .pp-rows > :last-child {
     border-bottom: 0 !important;

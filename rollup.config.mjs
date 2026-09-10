@@ -2,7 +2,6 @@ import { readFile } from "node:fs/promises";
 import { nodeResolve } from "@rollup/plugin-node-resolve";
 import { rollup } from "rollup";
 import pkg from "./package.json" with { type: "json" };
-import officialStyles from "./src/browser/official-styles.json" with { type: "json" };
 
 /**
  * 页面资源由包自身编译，代理和静态站点使用同一套产物。
@@ -13,14 +12,12 @@ function resources() {
     return {
         name: "preference-resources",
         resolveId(id) {
-            if (id === "#styles" || id === "#style-urls" || id === "#assets") return id;
+            if (id === "#styles" || id === "#assets") return id;
         },
         async load(id) {
             switch (id) {
                 case "#styles":
                     return `export default ${JSON.stringify(await readFile(new URL("./src/browser/panel.css", import.meta.url), "utf8"))};`;
-                case "#style-urls":
-                    return `export default ${JSON.stringify(Object.keys(officialStyles))};`;
                 case "#assets": {
                     const bundles = await Promise.all(
                         [
