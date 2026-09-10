@@ -40,7 +40,13 @@ await frame.load();
 ## 导航与原生 WebView
 
 - `frame.state` 提供 `title`、`module`、`busy`、`canGoBack` 和 `actions`。宿主从状态生成导航，不读取或改写 iframe 内部 DOM。
-- 菜单先展示 actions 的 label，选定后调用 `frame.perform(id)`。异步菜单返回时应确认模块没有变化，避免对后来打开的模块执行旧操作。
+- `ActionMenu` 提供可复用的底部操作菜单。宿主把 `frame.state.actions` 传给 `menu.update(actions, busy)`；网页按钮可直接使用组件自带触发器，只有原生三点按钮而没有原生菜单的 WebView 宿主在按钮回调中调用 `menu.open()`。选定后调用 `frame.perform(id)`。状态变化会关闭旧菜单，避免对后来打开的模块执行旧操作。
+
+```js
+const menu = new ActionMenu(id => frame.perform(id));
+frame.addEventListener("change", () => menu.update(frame.state.actions, frame.state.busy));
+nativeMoreButton.onclick = () => menu.open();
+```
 - `confirm` 事件可由宿主 `preventDefault()` 后通过 `detail.resolve(boolean)`/`reject(error)` 完成；未接管时使用标准浏览器确认。
 - `notice` 事件包含 `{kind, message}`。宿主接管时负责短暂提示；模块不再创建重复 Toast，也不追加读取。
 - 保存成功只更新当前页面快照；每次重新进入模块再读取，二级页面返回继续复用现有快照。
