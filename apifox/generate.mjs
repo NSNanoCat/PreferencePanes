@@ -13,6 +13,8 @@ const integration = await readFile(new URL("HostIntegration.md", import.meta.url
 const parameter = (name, description, required = false) => ({ id: `${name}#0`, name, description, type: "string", schema: { type: "string" }, required, enable: false, example: "" });
 const declarations = [
     { id: "pp-page-get", method: "get", path: "/settings/{module}", name: "打开模块设置页面", group: "模块设置页面", page: true },
+    { id: "pp-host-get", method: "get", path: "/settings/assets/host.mjs", name: "加载声明式主页控制器", group: "通用页面资源", asset: true },
+    { id: "pp-app-get", method: "get", path: "/settings/assets/app.mjs", name: "加载模块设置渲染器", group: "通用页面资源", asset: true },
     { id: "pp-config-head", method: "head", path: "/configs/{module}", name: "探测业务模块配置 Mock", group: "模块配置" },
     { id: "pp-config-get", method: "get", path: "/configs/{module}", name: "取得版本对应的 BoxJS", group: "模块配置" },
     { id: "pp-store-get", method: "post", path: "/api/get", name: "读取完整存储键", group: "本地 form 存储 API" },
@@ -33,10 +35,10 @@ const apis = declarations.map(entry => {
         status: "testing",
         tags: [entry.group],
         operationId: `preference_panes_${entry.id}`,
-        description: `## ${entry.name}\n\n${form ? "POST form 的字段名是完整 @root.path，读取和删除的字段值留空。使用 {{storageKey}} 变量填写字段名；不要把示例设为固定业务路径。API 不鉴权、不下载 BoxJS、不校验字段枚举。" : "module 是由 BoxJS 字段 ID 推导的路径参数，不预填业务模块名。配置由业务仓库版本对应的 Mock 提供；页面由 PreferencePanes 提供。"}\n\n${specification}`,
+        description: `## ${entry.name}\n\n${form ? "POST form 的字段名是完整 @root.path，读取和删除的字段值留空。使用 {{storageKey}} 变量填写字段名；不要把示例设为固定业务路径。API 不鉴权、不下载 BoxJS、不校验字段枚举。" : entry.asset ? "该资源由同一个 PreferencePanes api.js 返回。项目网站只在 HTML 中引用路径，不托管或复制运行脚本。" : "module 是由 BoxJS 字段 ID 推导的路径参数，不预填业务模块名。配置由业务仓库版本对应的 Mock 提供；页面由 PreferencePanes 提供。"}\n\n${specification}`,
         sourceUrl: "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/Specification.md",
         parameters: {
-            path: form ? [] : [parameter("module", "BoxJS 的模块段，动态填入", true)],
+            path: entry.path.includes("{module}") ? [parameter("module", "BoxJS 的模块段，动态填入", true)] : [],
             query: entry.page ? [parameter("json", "JSON 资源地址，默认 /configs/{module}"), parameter("css", "可选 CSS 地址，省略使用内置默认样式")] : [],
             header: entry.page ? [parameter("X-PreferencePanes-JSON", "JSON 地址，优先于 json 查询参数"), parameter("X-PreferencePanes-CSS", "CSS 地址，优先于 css 查询参数")] : [],
             cookie: [],
@@ -53,7 +55,7 @@ const apis = declarations.map(entry => {
             code,
             name: code === 200 ? "成功" : "失败",
             headers: entry.path.startsWith("/configs/") ? [parameter("X-PreferencePanes-Version", "与配置和业务脚本同次构建的版本", true)] : [],
-            contentType: entry.method === "head" ? "noContent" : entry.page ? "html" : "json",
+            contentType: entry.method === "head" ? "noContent" : entry.page ? "html" : entry.asset ? "text" : "json",
             jsonSchema: code === 200 ? {} : { type: "object", properties: { error: { type: "string" } } },
             description: code === 200 ? "get 返回原始 JSON 值；set/delete 返回成功标记" : "格式、路径、方法或存储错误；没有 401/403 鉴权响应",
         })),

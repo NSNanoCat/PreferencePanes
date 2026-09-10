@@ -66,6 +66,11 @@ for (const quantumult of [false, true])
         }
         assert.equal(reads, 0);
         assert.match((await run("/settings/Module")).body, /<!doctype html>/i);
+        for (const asset of ["app.mjs", "host.mjs"]) {
+            const result = await run(`/settings/assets/${asset}`);
+            assert.equal(status(result), 200);
+            assert.match(result.body, /PreferencePanes|preference-panes/);
+        }
         assert.equal(status(await run("/api/set", "POST", "@Root.Module.Settings.unlisted=%7B%22raw%22%3Atrue%7D")), 200);
         assert.equal(status(await run("/api/set", "POST", "@Another.Other.flag=false")), 200);
         assert.equal(status(await run("/api/delete", "POST", "@Root.Module=")), 200);

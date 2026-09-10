@@ -1,14 +1,16 @@
-# PreferencePanes 0.9.5 form API 规范
+# PreferencePanes form API 规范
 
 ## 职责
 
-业务仓库按版本发布 BoxJS JSON 与必要的配置 Mock 响应，模块安装配置 Mock 和 PreferencePanes latest Release 的 api.js。PreferencePanes 负责设置页生成、展示、导航、页面容器和 util 存储桥接；api.js 不包含业务配置或存储根映射。项目网站仅维护定制主页、入口 HEAD 探测、导航静态组件与 CSS/图标，不托管模块页面和读写脚本，也不需要独立设置插件。
+业务仓库按版本发布 BoxJS JSON 与必要的配置 Mock 响应，模块安装配置 Mock 和 PreferencePanes latest Release 的 api.js。PreferencePanes 负责设置页生成、展示、主页入口探测、页面导航、Bilibili common 容器交互和 util 存储桥接；api.js 不包含业务配置或存储根映射。项目网站只发布声明模块入口的定制 HTML、可选 CSS 与图标素材，不托管运行逻辑、模块页面或读写脚本，也不要求普通浏览器能够独立运行该主页。
 
 ## 接口
 
 | HTTP 方法 | 路径 | 用途 |
 | --- | --- | --- |
 | GET | /settings/{module} | 通用模块页，JSON/CSS 动态导入 |
+| GET | /settings/assets/host.mjs | 声明式主页的通用宿主控制器 |
+| GET | /settings/assets/app.mjs | 具体模块页的通用渲染器 |
 | HEAD、GET | /configs/{module} | 业务模块提供的版本化 JSON Mock |
 | POST | /api/get | 读取完整存储键或子树 |
 | POST | /api/set | 替换完整存储键处的值 |
@@ -59,7 +61,9 @@ get 成功返回原始 JSON 值，缺失返回 404。set 返回 {"saved":true}�
 
 JSON/CSS 资源 URL 可通过 json/css 查询参数，或 X-PreferencePanes-JSON / X-PreferencePanes-CSS Header 传入；Header 分别优先。缺省 JSON 为 /configs/{module}，缺省 CSS 为空，使用内置样式。资源只接受 HTTP(S) 或相对地址。浏览器读取 JSON 后根据完整字段 ID 推导存储根与路径，生成 form 请求。
 
-ModuleFrame 在 iframe 元素上保留请求上下文，HTML 原样加载，不根据 about:srcdoc 猜模块，也不补丁式改写返回 HTML。Navigation 统一管理历史、左右切换、滚动保留与退出取消；嵌入布局由框架处理，模块通过事件向常驻顶栏报告状态。
+主页 HTML 使用 `data-module`、`data-page`、`data-json` 和可选 `data-css` 声明入口。`host.mjs` 读取这些声明，以 ModuleStatus 并发 HEAD 配置地址，并以 ModuleFrame 和 Navigation 统一管理 iframe、历史、左右切换、滚动保留与退出取消；主页不再提供自己的探测或导航脚本。
+
+正式 Bilibili 页面由 HTML 直接引用官方 JSBridge SDK。`host.mjs` 要求 common WebView，按官方页面相同方式从 User-Agent 的 `themeId/2` 建立初始深色主题，再通过 `ui.observeThemeChange` 接收更新；导航、菜单与提示使用官方 `ui.setTitle`、`ui.setNavigationButton`、`ui.observeNavigationClick`、`liveUI.selectPanel`、`liveUI.toast` 和 `ability.alert`。它不提供普通浏览器降级实现。
 
 默认样式通过独立 stylesheet 链接引用官方 b-style 和主题 CDN，基础分页布局不依赖远程资源。设置行采用公开工具类，输入控件采用标准 HTML；不依赖 Hilo 容器内置文件或其私有编译作用域。
 
@@ -71,4 +75,4 @@ ModuleFrame 在 iframe 元素上保留请求上下文，HTML 原样加载，不�
 
 ## 发布
 
-api.js 及公共 HTML/JS 由 PreferencePanes 的 Release 工作流发布。业务模块引用 https://github.com/NSNanoCat/PreferencePanes/releases/latest/download/api.js，自动更新遵循代理工具的缓存周期。业务仓库不生成 settings.bundle.js；网站不发布 API 或模块渲染产物。必须先发布该通用 API，再上线引用它的新模块模板。
+Release 只发布包含页面和运行资源的 api.js。业务模块引用 https://github.com/NSNanoCat/PreferencePanes/releases/latest/download/api.js，自动更新遵循代理工具的缓存周期。业务仓库不生成 settings.bundle.js；网站不发布 API、宿主脚本或模块渲染产物。必须先发布该通用 API，再上线引用它的新模块模板。
