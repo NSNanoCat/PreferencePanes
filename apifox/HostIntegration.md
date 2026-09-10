@@ -1,22 +1,26 @@
-# 宿主集成：声明式主页、原生界面与固定搜索
+# 调用方集成：模块容器、页面导航与固定搜索
 
-具体模块设置页只接收 BoxJS JSON 和可选 CSS。项目主页只声明入口和素材，PreferencePanes 的通用宿主控制器负责探测、导航及原生交互；HTML 直接引用 Bilibili 官方 SDK 和官方页面 CSS。
+具体模块设置页只接收 BoxJS JSON 和可选 CSS。PreferencePanes 不提供项目主页，也不绑定任何客户端 SDK；项目可以使用公共网页组件建立自己的入口、探测和导航。
 
-## 声明式主页
+## 项目主页
 
-主页加载 `/settings/assets/host.mjs`，入口按钮至少提供 `data-module`、`data-page`、`data-json`，需要个性化模块页时再提供 `data-css`。状态节点使用 `data-module-status`。HTML 不编写 HEAD、版本解析、iframe 或 Bridge 调用。
+ModuleStatus 只向配置地址发送 HEAD，失败显示“未安装”，成功读取 `X-PreferencePanes-Version` 显示业务版本。主页的 HTML、状态节点、按钮行为与视觉样式均由项目自己定义。
 
 ```html
-<button data-module="Enhanced" data-page="/settings/Enhanced" data-json="/configs/Enhanced" data-css="https://example.org/theme.css" disabled>
+<button id="module" disabled>
   <img src="/settings/assets/Enhanced.png" alt="">
   <span>Enhanced</span>
-  <span data-module-status>检测中</span>
+  <span id="status">检测中</span>
 </button>
-<script src="https://s1.hdslb.com/bfs/seed/jinkela/short/jsb/js-bridge.min.js"></script>
-<script type="module" src="/settings/assets/host.mjs"></script>
+<script type="module">
+  import { ModuleStatus } from "@nsnanocat/preference-panes/navigation";
+  const status = new ModuleStatus(document.querySelector("#status"));
+  status.addEventListener("change", () => module.disabled = status.state.status !== "installed");
+  status.check("/configs/Enhanced");
+</script>
 ```
 
-项目 HTML 负责选择官方 SDK 和业务页面 CSS 的地址；`host.mjs` 不镜像官方资源，也不为公网浏览器提供降级页面。
+该组件不读取设置、不下载 BoxJS，也不推断项目模块清单。
 
 ## 模块页面
 
@@ -33,7 +37,7 @@ container.append(frame.element);
 await frame.load();
 ```
 
-## 导航与原生交互
+## 导航与原生 WebView
 
 - `frame.state` 提供 `title`、`module`、`busy`、`canGoBack` 和 `actions`。宿主从状态生成导航，不读取或改写 iframe 内部 DOM。
 - 菜单先展示 actions 的 label，选定后调用 `frame.perform(id)`。异步菜单返回时应确认模块没有变化，避免对后来打开的模块执行旧操作。
@@ -41,19 +45,10 @@ await frame.load();
 - `notice` 事件包含 `{kind, message}`。宿主接管时负责短暂提示；模块不再创建重复 Toast，也不追加读取。
 - 保存成功只更新当前页面快照；每次重新进入模块再读取，二级页面返回继续复用现有快照。
 
+客户端 Bridge 属于项目页面的运行环境。项目 HTML 引入客户端的官方 SDK 后，由项目自己的页面脚本直接调用 SDK；不要把某个客户端的 Bridge、User-Agent、主题值或原生菜单协议加入 PreferencePanes。ModuleFrame 的标准事件是双方唯一的网页边界。
+
 ## 固定搜索
 
 搜索输入位于导航下方的固定工具区，工具区和滚动视口使用弹性布局。滚动表单不会改变输入框的位置；二级多选和缓存页隐藏搜索，返回时恢复原查询。搜索仅过滤当前已生成的字段，不发额外存储请求。
 
-## Bilibili common 容器示例
-
-通用宿主控制器直接使用这些接口。用户已导出 SDK 3.3.5、`container.common: true`。iOS 宿主入口为 `bilibili://web/general?url=<编码后的页面 URL>`。
-
-- 主题：按官方 H5 的实现从 User-Agent `themeId/2` 建立初始深色主题，再订阅 `ui.observeThemeChange` 的 V2 channel；处理 `data.theme`，忽略没有主题数据的注册回执。
-- 提示：`liveUI.toast`，数据 `{type:"short", msg:message}`。当前 common 清单没有旧 `biliapp.showToast`。
-- 菜单：`ui.setNavigationButton` 创建 MORE 按钮；收到该按钮 ID 后调用 `liveUI.selectPanel`。选项为 `{text:label, value:id}`，返回的 `data.text` 实际是选项 value。
-- 原生导航模型没有搜索输入槽位，所以固定搜索仍是模块工具区，不伪造另一套标题栏。
-
-完整原生协议与研究位于 Apifox 的 Bilibili 项目（8774015）：文档「Bilibili Common WebView 调研」（9430864）和「Bilibili Common WebView JSBridge 接口」（9430865）；对应源文件在 Biliverse/API 的 reports 与 docs/reference 中。
-
-当前验证覆盖请求和回调时序、过期操作保护、浏览器中的固定搜索与真实官方 CSS。原生主题事件、底部面板和短提示的最终视觉结果仍需用户真机复测。
+当前验证覆盖模块请求、事件时序、过期操作保护、固定搜索与真实官方 CSS。客户端原生界面由各项目在对应 App 中验证。

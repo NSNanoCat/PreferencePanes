@@ -1,6 +1,6 @@
 # @nsnanocat/preference-panes
 
-PreferencePanes 负责具体模块的设置页、声明式主页控制器、共享导航和本地持久化 API。模块页面只接受 BoxJS JSON 与可选 CSS；业务模块自己发布版本对应的 JSON，项目网站只维护定制 HTML、可选 CSS 与图标素材。
+PreferencePanes 负责具体模块的设置页、共享网页组件和本地持久化 API。模块页面只接受 BoxJS JSON 与可选 CSS；业务模块自己发布版本对应的 JSON。项目主页及其客户端 SDK 调用属于调用方，不进入本包。
 
 ## 通用 API（0.8.0 form 契约）
 
@@ -32,8 +32,6 @@ await fetch("/api/set", {
 
 ## 页面与输入
 
-主页加载 `/settings/assets/host.mjs`，通过入口元素的 `data-module`、`data-page`、`data-json` 和可选 `data-css` 自动建立状态、模块页面和原生导航。ModuleStatus 只 HEAD 配置地址，失败显示“未安装”，成功读取 X-PreferencePanes-Version 显示业务模块版本；状态行始终占据第二行，不读取持久化设置。
-
 ```js
 import { mount } from "@nsnanocat/preference-panes/browser";
 const page = mount(boxjs, ".pp-panel { --pp-accent: #16866a; }");
@@ -58,6 +56,8 @@ frame.destroy();
 ```
 
 ModuleFrame 在 iframe 元素上保存原请求上下文，HTML 原样加载，不从 about:srcdoc 猜模块、不注入临时 CSS。框架自身管理嵌入模式，通过事件发布标题、忙碌状态和返回能力。Navigation 统一管理 fragment 历史、滑动、滚动保留、加载取消及动画结束后释放；项目提供根页、子页工厂和布局。
+
+项目主页可按需使用导出的 ModuleStatus、ModuleFrame 和 Navigation，也可以自行实现入口。PreferencePanes 不提供主页运行脚本，不识别具体 App，不加载或调用任何客户端 Bridge SDK。调用方若运行在原生 WebView，应在自己的 HTML/页面脚本中直接接入该客户端的官方 SDK，再把 ModuleFrame 事件映射到原生界面。
 
 每次进入模块读取 JSON/CSS 和设置一次。二级多选返回复用内存缓存，修改立即写入；成功提示、失败回滚由公共组件处理。Caches 按需查看/清空，重置只删除指定模块子树。
 
