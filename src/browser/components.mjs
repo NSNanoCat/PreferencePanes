@@ -15,24 +15,24 @@ export function element(tag, className, text) {
 }
 
 /**
- * 用官方 b-style 组合行布局，不绑定某个 App 内置页面的编译作用域。
- * Compose rows with official b-style utilities without private app-page compilation scopes.
+ * 创建通用设置行；外部 CSS 可通过 pp 类名覆盖视觉样式。
+ * Create a generic settings row whose appearance can be overridden through pp classes.
  * @template {"div" | "label"} T
  * @param {T} tag 行元素 / Row element.
  * @returns {HTMLElementTagNameMap[T]} 设置行 / Settings row.
  */
 export function settingRow(tag) {
-    return element(tag, "pp-row flex_between pd_md bb_1 bc_line_regular bg_bg1");
+    return element(tag, "pp-row");
 }
 
 /**
- * 搜索、选择和文本控件共用官方输入配色与间距，交互由标准 HTML 控件负责。
- * Share official colors and spacing while native HTML controls own input interaction.
+ * 为标准 HTML 输入控件添加通用面板类名。
+ * Add the generic panel class to a standard HTML input control.
  * @param {HTMLElement} control 已创建的原生控件 / Existing native control.
  * @returns {HTMLElement} 输入控件 / Input control.
  */
 export function fieldControl(control) {
-    control.classList.add("pp-editor", "bg_bg3", "text1", "pd_sm", "bd_radius_md");
+    control.classList.add("pp-editor");
     return control;
 }
 

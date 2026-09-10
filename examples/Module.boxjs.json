@@ -2,7 +2,7 @@
     "id": "example.module",
     "name": "Example Module",
     "author": "Example",
-    "icon": "https://biliverse.github.io/settings/assets/Enhanced_light.png",
+    "icon": "https://example.com/module.png",
     "settings": [
         { "id": "@Example.Module.Settings.enabled", "name": "启用功能", "type": "boolean", "val": true },
         {
