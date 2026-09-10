@@ -22,13 +22,13 @@ function resources() {
                 case "#style-urls":
                     return `export default ${JSON.stringify(Object.keys(officialStyles))};`;
                 case "#assets": {
-                    const bundles = await Promise.all(["app", "host"].map(name => rollup({ input: `src/browser/${name}.mjs`, plugins: [nodeResolve({ browser: true }), resources()] })));
+                    const bundle = await rollup({ input: "src/browser/app.mjs", plugins: [nodeResolve({ browser: true }), resources()] });
                     try {
-                        const [app, host] = await Promise.all(bundles.map(bundle => bundle.generate({ format: "es" })));
+                        const app = await bundle.generate({ format: "es" });
                         const html = (await readFile(new URL("./src/browser/module.html", import.meta.url), "utf8")).replaceAll("__VERSION__", pkg.version);
-                        return `export default ${JSON.stringify({ page: { type: "text/html", body: html }, "/settings/assets/app.mjs": { type: "text/javascript", body: app.output[0].code }, "/settings/assets/host.mjs": { type: "text/javascript", body: host.output[0].code } })};`;
+                        return `export default ${JSON.stringify({ page: { type: "text/html", body: html }, "/settings/assets/app.mjs": { type: "text/javascript", body: app.output[0].code } })};`;
                     } finally {
-                        await Promise.all(bundles.map(bundle => bundle.close()));
+                        await bundle.close();
                     }
                 }
                 default:
@@ -46,7 +46,6 @@ function resources() {
 export default [
     { input: "src/browser/index.mjs", output: { file: "dist/preference-panes.mjs", format: "es" } },
     { input: "src/browser/Navigation.mjs", output: { file: "dist/module/navigation.mjs", format: "es" } },
-    { input: "src/browser/host.mjs", output: { file: "dist/module/host.mjs", format: "es" } },
     { input: "src/proxy/handler.mjs", output: { file: "dist/api.js", format: "iife" } },
     {
         input: "src/browser/app.mjs",
