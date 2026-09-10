@@ -49,18 +49,25 @@ export function resourceURL(value) {
 }
 
 /**
- * 共享加载失败视图，不创建配置表单或数据读取。
- * Share a load-error view without creating controls or reading settings.
- * @param {Error} error 失败原因 / Failure reason.
- * @param {() => unknown} retry 重试动作 / Retry action.
- * @returns {HTMLElement} 错误视图 / Error view.
+ * 创建覆盖可用内容区的通用读取状态，失败时可附加重试动作。
+ * Create a shared status view that fills the available content area and may include retry.
+ * @param {string} message 状态文本 / Status message.
+ * @param {(() => unknown) | undefined} [retry] 重试动作 / Retry action.
+ * @returns {HTMLElement} 居中状态视图 / Centered status view.
  */
-export function errorView(error, retry) {
-    const view = element("section", "pp-error");
-    const button = element("button", "", "重新读取");
-    button.type = "button";
-    button.onclick = retry;
-    view.append(element("p", "", `加载失败：${error.message}`), button);
+export function statusView(message, retry) {
+    const view = element("section", "pp-status");
+    view.setAttribute("role", "status");
+    view.setAttribute("aria-live", "polite");
+    const spinner = element("span", "pp-status-spinner");
+    spinner.setAttribute("aria-hidden", "true");
+    view.append(spinner, element("p", "pp-status-message", message));
+    if (retry) {
+        const button = element("button", "pp-status-action", "重新读取");
+        button.type = "button";
+        button.onclick = retry;
+        view.append(button);
+    }
     return view;
 }
 

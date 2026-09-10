@@ -1,8 +1,10 @@
 import { BoxJS } from "../BoxJS.mjs";
 import { pageInputs } from "../lib/page-inputs.mjs";
-import { errorView } from "./components.mjs";
+import { statusView } from "./components.mjs";
 import { mount } from "./index.mjs";
+import { installDefaultStyles } from "./styles.mjs";
 
+installDefaultStyles(document);
 let view;
 /**
  * 从 URL 或代理传递的 Header 导入 JSON/CSS，支持独立文档与 srcdoc。
@@ -13,6 +15,7 @@ async function start() {
     try {
         view?.destroy();
         view = undefined;
+        document.querySelector("#preferences").replaceChildren(statusView("读取设置…"));
         const context = document.querySelector('meta[name="preference-panes-inputs"]');
         const embedded = window.frameElement?.dataset.preferencePanes;
         let inputs;
@@ -39,7 +42,7 @@ async function start() {
         if (catalog.module.module !== inputs.module) throw new Error("Imported JSON does not match the module URL");
         view = mount(catalog, style ? await style.text() : "");
     } catch (error) {
-        document.querySelector("#preferences").replaceChildren(errorView(error, start));
+        document.querySelector("#preferences").replaceChildren(statusView(`加载失败：${error.message}`, start));
     }
 }
 start();

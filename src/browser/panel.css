@@ -230,11 +230,53 @@
     color: inherit;
     text-decoration: underline;
 }
-.pp-error button {
+.pp-status {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 12px;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    padding: 24px;
+    color: var(--pp-muted, GrayText);
+    text-align: center;
+    background: var(--pp-background, Canvas);
+}
+.pp-viewport > .pp-status {
+    position: absolute;
+}
+.pp-status-spinner {
+    box-sizing: border-box;
+    width: 28px;
+    height: 28px;
+    border: 3px solid color-mix(in srgb, currentColor 25%, transparent);
+    border-top-color: var(--pp-accent, AccentColor);
+    border-radius: 50%;
+    animation: pp-status-spin 0.8s linear infinite;
+}
+.pp-status-message {
+    max-width: 100%;
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+.pp-status-action {
+    min-width: 96px;
     min-height: 44px;
-    padding: 8px 12px;
+    padding: 8px 16px;
+    border: 0;
     border-radius: 6px;
-    background: var(--pp-surface);
+    color: var(--pp-text, ButtonText);
+    font: inherit;
+    cursor: pointer;
+    background: var(--pp-surface, ButtonFace);
+}
+@keyframes pp-status-spin {
+    to {
+        transform: rotate(1turn);
+    }
 }
 .pp-cache {
     white-space: pre-wrap;

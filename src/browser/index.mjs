@@ -1,7 +1,7 @@
-import defaults from "#styles";
 import { BoxJS } from "../BoxJS.mjs";
 import { element, resourceURL } from "./components.mjs";
 import { mountPanel } from "./panel.mjs";
+import { installDefaultStyles } from "./styles.mjs";
 
 /**
  * 挂载模块设置页；默认样式由包提供，可选 CSS 仅作用于当前模块。
@@ -23,11 +23,10 @@ export function mount(boxjs, css = "") {
         root.id = "preferences";
         document.body.append(root);
     }
-    const base = element("style", ""),
-        custom = element("style", "");
-    base.textContent = defaults;
+    const { element: base, owned: ownsBase } = installDefaultStyles(document);
+    const custom = element("style", "");
     custom.textContent = css;
-    document.head.append(base, custom);
+    document.head.append(custom);
     const previousTitle = document.title;
     const previousTheme = document.documentElement.dataset.theme;
     const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
@@ -62,7 +61,7 @@ export function mount(boxjs, css = "") {
             observer?.disconnect();
             systemTheme.removeEventListener("change", syncAppearance);
             panel?.destroy();
-            base.remove();
+            if (ownsBase) base.remove();
             custom.remove();
             if (existing) root.replaceChildren();
             else root.remove();
