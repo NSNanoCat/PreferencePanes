@@ -1,6 +1,6 @@
 import { ActionMenu } from "./ActionMenu.mjs";
 import { createPreferencesClient } from "./client.mjs";
-import { errorView, fieldControl, element as node, requestConfirmation, resourceURL, settingRow } from "./components.mjs";
+import { fieldControl, element as node, requestConfirmation, resourceURL, settingRow, statusView } from "./components.mjs";
 import { Navigation } from "./Navigation.mjs";
 
 /**
@@ -127,13 +127,13 @@ export function mountPanel(root, catalog) {
         back.disabled = window.history.length <= 1;
         heading.textContent = module;
         publishNavigation();
-        viewport.replaceChildren(node("p", "pp-loading", "读取设置…"));
+        viewport.replaceChildren(statusView("读取设置…"));
         try {
             await client.open(module);
             if (version === generation) controls();
         } catch (error) {
             if (version !== generation) return;
-            viewport.replaceChildren(errorView(error, () => open(module)));
+            viewport.replaceChildren(statusView(`加载失败：${error.message}`, () => open(module)));
             publishNavigation();
         }
     }
