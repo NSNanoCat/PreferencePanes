@@ -35,9 +35,9 @@ async function start() {
         });
         const [data, style] = await Promise.all(resources.map(url => (url ? fetch(url, { cache: "no-store", credentials: "omit" }) : null)));
         if (data.status !== 200 || (style && style.status !== 200)) throw new Error(`HTTP ${data.status !== 200 ? data.status : style.status}`);
-        const boxjs = await data.json();
-        if (new BoxJS(boxjs).module.module !== inputs.module) throw new Error("Imported JSON does not match the module URL");
-        view = mount(boxjs, style ? await style.text() : "");
+        const catalog = new BoxJS(await data.json());
+        if (catalog.module.module !== inputs.module) throw new Error("Imported JSON does not match the module URL");
+        view = mount(catalog, style ? await style.text() : "");
     } catch (error) {
         document.querySelector("#preferences").replaceChildren(errorView(error, start));
     }

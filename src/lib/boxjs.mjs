@@ -4,14 +4,15 @@ import { validatePathParts } from "./settings-path.mjs";
 /**
  * 将 BoxJS 数组、app 或订阅转换为模块字段，保留原文件为唯一字段来源。
  * Normalize a BoxJS array, app or subscription using the source JSON as the field authority.
- * @param {unknown} config BoxJS JSON / BoxJS document.
+ * @param {unknown | BoxJS} config BoxJS JSON 或已解析目录 / BoxJS document or parsed catalog.
  * @param {string} module API 第一段模块名 / First API path segment.
  * @returns {import("../index.js").ModuleDefinition} 存储根和字段 / Storage root and fields.
  * @throws {TypeError} 配置结构、字段路径、默认值或展示属性无效 / Invalid configuration, field path, default or presentation attribute.
  */
 export function normalizeBoxJs(config, module) {
     validatePathParts([module]);
-    const target = new BoxJS(config).modules.get(module);
+    const catalog = config instanceof BoxJS ? config : new BoxJS(config);
+    const target = catalog.modules.get(module);
     if (!target) throw new TypeError(`No BoxJS settings for module: ${module}`);
     const { entries, storageKey, metadata } = target;
     const fields = [];

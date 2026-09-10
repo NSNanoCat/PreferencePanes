@@ -18,3 +18,10 @@ test("built renderer contains generic defaults without remote stylesheets", asyn
         assert.doesNotMatch(source, /<link[^>]+stylesheet|s1\.hdslb\.com/i, path);
     }
 });
+
+test("module renderer omits the search toolbar row", async () => {
+    for (const path of ["../src/browser/panel.mjs", "../src/browser/panel.css"]) {
+        const source = await readFile(new URL(path, import.meta.url), "utf8");
+        assert.doesNotMatch(source, /pp-toolbar|pp-search|pp-module-logo|搜索设置项/, path);
+    }
+});

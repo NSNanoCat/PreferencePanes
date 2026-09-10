@@ -57,23 +57,6 @@
     min-width: 0;
     overflow-wrap: anywhere;
 }
-/* 模块图标位于固定搜索工具栏左侧；嵌入宿主仍可使用纯文字原生标题栏。
- * Keep the module icon beside the fixed search field while embedded hosts use text-only native titles. */
-.pp-module-logo {
-    display: none;
-    width: 36px;
-    height: 36px;
-    flex: none;
-}
-.pp-module-logo:not(:empty) {
-    display: block;
-}
-.pp-module-logo img {
-    display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-}
 .pp-nav-spacer {
     width: 44px;
     flex: none;
@@ -96,18 +79,6 @@
 .pp-panel button:disabled {
     opacity: 0.5;
     cursor: wait;
-}
-/* 固定工具区与滚动视口共用弹性布局，不按工具栏高度拼接页面偏移。
- * Fixed tools and the scrolling viewport share a flex layout without toolbar-height offsets. */
-.pp-toolbar {
-    flex: none;
-    min-width: 0;
-    padding: 12px max(16px, calc((100% - 688px) / 2));
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    background: var(--pp-surface);
-    border-bottom: 1px solid var(--pp-border);
 }
 .pp-viewport {
     position: relative;
@@ -174,12 +145,6 @@
     background: var(--pp-field);
     border: 0;
     border-radius: 6px;
-}
-.pp-search {
-    flex: 1;
-    width: 100%;
-    min-width: 0;
-    margin: 0;
 }
 .pp-panel .pp-multiline {
     display: block;

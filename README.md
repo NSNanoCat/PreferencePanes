@@ -12,8 +12,6 @@ PreferencePanes 负责具体模块的设置页、共享网页组件和本地持�
 
 宿主也可监听 `notice` 事件，通过 `preventDefault()` 接管 `{kind, message}` 提示；被接管时模块不创建网页 Toast、不启用提示计时器。独立使用的通用面板仍提供默认通知。
 
-搜索使用标准 search 控件，固定在导航栏下方的工具区，表单内容独立滚动。二级选择和缓存页隐藏搜索工具区，返回后恢复原查询。搜索范围为当前字段的名称、说明、路径和选项标签。搜索只隐藏现有行，不重新生成控件、不追加网络读取；文本框、多行输入和下拉框共用通用变量、间距和原生输入结构。
-
 业务模块安装同一个 `https://github.com/NSNanoCat/PreferencePanes/releases/latest/download/api.js`，不再生成绑定业务配置的读写脚本，也不需要额外安装独立设置插件。该文件由本仓库 Release 工作流发布，自动更新遵循代理工具的缓存周期。
 
 API 为 POST /api/get、/api/set、/api/delete。form 字段名是完整 `@root.path`；读取和删除的值留空，写入值可以是普通文本或 JSON。API 不鉴权，不下载 JSON，也不校验控件和枚举。
@@ -59,11 +57,11 @@ ModuleFrame 在 iframe 元素上保存原请求上下文，HTML 原样加载，�
 
 每次进入模块读取 JSON/CSS 和设置一次。二级多选返回复用内存缓存，修改立即写入；成功提示、失败回滚由公共组件处理。Caches 按需查看/清空，重置只删除指定模块子树。
 
-模块图标显示在固定搜索栏左侧，标题栏只显示文字；嵌入模式隐藏模块自身标题栏，由宿主显示原生标题或自己的导航。模块数据操作位于标题栏右侧三点菜单，页面不再平铺维护按钮。`ActionMenu` 用于独立网页，也可用于网页宿主；原生宿主可直接把 `frame.state.actions` 映射为平台菜单，通过 `frame.perform(id)` 执行。使用网页菜单时，宿主将 `frame.state.actions` 传给 `menu.update(actions, busy)`，选择时调用 `frame.perform(id)`。缓存查看进入可返回的缓存子页，清空和重置仍要求确认。菜单组件处理外部点击、Escape、方向键与 Tab，宿主不访问 iframe 内部 DOM。
+标题栏只显示文字；嵌入模式隐藏模块自身标题栏，由宿主显示原生标题或自己的导航。模块数据操作位于标题栏右侧三点菜单，页面不再平铺维护按钮。`ActionMenu` 是共用的底部操作菜单：独立网页由其三点按钮打开；网页宿主或只有原生按钮、没有原生菜单的 WebView 宿主，将 `frame.state.actions` 传给 `menu.update(actions, busy)`，在宿主按钮点击时调用 `menu.open()`，选择后调用 `frame.perform(id)`。缓存查看进入可返回的缓存子页，清空和重置仍要求确认。菜单组件提供遮罩、取消按钮、外部点击、Escape 与方向键操作，弹层挂载在文档根部，不依赖模块标题栏是否显示；宿主不访问 iframe 内部 DOM。
 
 ## 构建与验证
 
-`npm run build` 生成无业务配置的 dist/api.js 和公共前端；Release 工作流只上传包含页面与运行资源的 api.js。`build(boxjs, css?)` 仅用于生成模块前端文件，不再输出配置副本或模块绑定脚本。
+`npm run build` 生成无业务配置的 dist/api.js 和公共前端；Release 工作流只上传包含页面与运行资源的 api.js。`build(boxjs, css?)` 仅输出 `settings/{module}/index.html`、公共 `settings/assets/app.mjs` 和可选模块 CSS，不复制配置、导航组件或重复 HTML。
 
 `npm run preview` 提供文件导入测试台，上传 JSON/CSS 后在隔离 iframe 预览；测试存储只在内存中。`npm run check` 检查代码、类型、行为；`npm run apifox:generate` 和 `npm run apifox:check` 维护原生接口文档。
 

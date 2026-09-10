@@ -12,12 +12,10 @@ export async function build(boxjs, css = "") {
     if (typeof css !== "string") throw new TypeError("CSS must be a string");
     const catalog = new BoxJS(boxjs);
     const module = catalog.module.module;
-    const [html, app, navigation] = await Promise.all([readFile(new URL("../dist/module/index.html", import.meta.url), "utf8"), readFile(new URL("../dist/module/app.mjs", import.meta.url), "utf8"), readFile(new URL("../dist/module/navigation.mjs", import.meta.url), "utf8")]);
+    const [html, app] = await Promise.all([readFile(new URL("../dist/module/index.html", import.meta.url), "utf8"), readFile(new URL("../dist/module/app.mjs", import.meta.url), "utf8")]);
     return {
         [`settings/${module}/index.html`]: html,
-        [`settings/assets/${module}.html`]: html,
         "settings/assets/app.mjs": app,
-        "settings/assets/navigation.mjs": navigation,
         [`settings/assets/${module}.css`]: css,
     };
 }
