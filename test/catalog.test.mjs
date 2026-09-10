@@ -19,7 +19,6 @@ test("BoxJS indexes module identities and their storage roots", () => {
         ],
     );
     assert.equal(catalog.metadata.name, "Example");
-    assert.deepEqual(catalog.select("Beta"), { name: "Example", apps: [input.apps[1]] });
     input.apps[0].settings[0].id = "@Other.Alpha.Settings.on";
     assert.equal(catalog.modules.get("Alpha").storageKey, "One");
 });

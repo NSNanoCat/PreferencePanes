@@ -12,8 +12,8 @@ export class BoxJS {
      */
     constructor(input) {
         if (!input || typeof input !== "object") throw new TypeError("Expected BoxJS JSON");
-        this.document = JSON.parse(JSON.stringify(input));
-        const apps = Array.isArray(this.document) ? [{ settings: this.document }] : (this.document.apps ?? [this.document]);
+        const document = JSON.parse(JSON.stringify(input));
+        const apps = Array.isArray(document) ? [{ settings: document }] : (document.apps ?? [document]);
         if (!Array.isArray(apps)) throw new TypeError("Expected BoxJS apps array");
         this.modules = new Map();
         for (const app of apps) {
@@ -21,7 +21,7 @@ export class BoxJS {
             for (const entry of app.settings) {
                 if (typeof entry.id !== "string") throw new TypeError("BoxJS settings require string IDs");
                 if (!entry.id.startsWith("@")) {
-                    if (Array.isArray(this.document)) throw new TypeError("BoxJS settings require @root.path IDs");
+                    if (Array.isArray(document)) throw new TypeError("BoxJS settings require @root.path IDs");
                     continue;
                 }
                 const [storageKey, ...parts] = entry.id.slice(1).split(".");
@@ -38,22 +38,8 @@ export class BoxJS {
                 target.owners.add(app);
             }
         }
-        this.metadata = metadata(Array.isArray(this.document) ? {} : this.document);
+        this.metadata = metadata(Array.isArray(document) ? {} : document);
         for (const target of this.modules.values()) target.metadata = target.owners.size === 1 ? metadata([...target.owners][0]) : {};
-    }
-
-    /**
-     * 提取一个模块的原生 BoxJS，保留所属 app 的元数据。
-     * Select a module's native BoxJS while retaining owning-app metadata.
-     * @param {string} module 模块标识 / Module identifier.
-     * @returns {unknown} 可直接用作配置 Mock 的 JSON / JSON suitable for a configuration Mock.
-     */
-    select(module) {
-        const target = this.modules.get(module);
-        if (!target) throw new TypeError(`No BoxJS settings for module: ${module}`);
-        if (Array.isArray(this.document)) return target.entries;
-        const apps = [...target.owners].map(app => ({ ...app, settings: app.settings.filter(entry => target.entries.includes(entry)) }));
-        return this.document.apps ? { ...this.document, apps } : apps[0];
     }
 
     /**
