@@ -154,14 +154,13 @@ export function mountPanel(root, catalog) {
         const { definition, values } = client.snapshot(active);
         heading.textContent = definition.metadata?.name || active;
         const view = node("section", "pp-fields");
-        view.append(logo);
         const search = node("input", "");
         search.type = "search";
         search.placeholder = "搜索设置项";
         search.setAttribute("aria-label", "搜索设置");
         const searchField = fieldControl(search);
         searchField.classList.add("pp-search");
-        toolbar.replaceChildren(searchField);
+        toolbar.replaceChildren(logo, searchField);
         const searchRows = [];
         /**
          * 挂载后执行的多行高度更新

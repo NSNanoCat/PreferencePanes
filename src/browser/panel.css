@@ -18,7 +18,11 @@
     position: relative;
     display: flex;
     flex-direction: column;
+    width: 100%;
+    max-width: 100vw;
+    min-width: 0;
     height: 100vh;
+    overflow: hidden;
 }
 
 :root[data-theme="dark"] .pp-panel {
@@ -53,13 +57,13 @@
     min-width: 0;
     overflow-wrap: anywhere;
 }
-/* 模块图标在正文内；嵌入宿主可使用纯文字原生标题栏。
- * Keep module icons in content so embedded hosts can use text-only native titles. */
+/* 模块图标位于固定搜索工具栏左侧；嵌入宿主仍可使用纯文字原生标题栏。
+ * Keep the module icon beside the fixed search field while embedded hosts use text-only native titles. */
 .pp-module-logo {
     display: none;
-    width: 64px;
-    height: 64px;
-    margin: 8px auto 20px;
+    width: 36px;
+    height: 36px;
+    flex: none;
 }
 .pp-module-logo:not(:empty) {
     display: block;
@@ -97,13 +101,18 @@
  * Fixed tools and the scrolling viewport share a flex layout without toolbar-height offsets. */
 .pp-toolbar {
     flex: none;
+    min-width: 0;
     padding: 12px max(16px, calc((100% - 688px) / 2));
+    display: flex;
+    align-items: center;
+    gap: 12px;
     background: var(--pp-surface);
     border-bottom: 1px solid var(--pp-border);
 }
 .pp-viewport {
     position: relative;
     flex: 1;
+    min-width: 0;
     min-height: 0;
     overflow: hidden;
 }
@@ -120,7 +129,9 @@
 .pp-cache-page {
     position: absolute;
     inset: 0;
-    overflow: auto;
+    min-width: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
     padding: 12px max(16px, calc((100% - 688px) / 2)) calc(28px + env(safe-area-inset-bottom) + var(--pp-keyboard-height, 0px));
     scroll-padding-bottom: var(--pp-keyboard-height, 0px);
     background: var(--pp-background);
@@ -165,7 +176,9 @@
     border-radius: 6px;
 }
 .pp-search {
+    flex: 1;
     width: 100%;
+    min-width: 0;
     margin: 0;
 }
 .pp-panel .pp-multiline {
@@ -205,6 +218,7 @@
     font-weight: 400;
 }
 .pp-row {
+    min-width: 0;
     min-height: 48px;
     padding: 16px;
     display: flex;
