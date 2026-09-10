@@ -19,6 +19,9 @@ test("public browser is module-only and contains no project menu or installer", 
     const browser = await readFile(new URL("../dist/preference-panes.mjs", import.meta.url), "utf8");
     assert.doesNotMatch(browser, /node:fs|node-fetch|\$persistentStore|@nsnanocat\/util/);
     assert.doesNotMatch(browser, /pp-home|self-panel|pp-install|安装模块|data-module/);
+    const navigation = await readFile(new URL("../dist/module/navigation.mjs", import.meta.url), "utf8");
+    assert.match(navigation, /\*,\*::before,\*::after\{box-sizing:border-box\}/);
+    assert.match(navigation, /#sheet\{[^}]*width:100%;max-width:540px/);
     for (const file of ["preference-panes.request.js", "settings/home.css"]) await assert.rejects(access(new URL(`../dist/${file}`, import.meta.url)), { code: "ENOENT" });
 });
 

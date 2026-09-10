@@ -41,10 +41,11 @@ export class ActionMenu {
         layerRoot.innerHTML = `<style>
           :host{position:fixed;inset:0;z-index:2147483647;color:var(--pp-text,CanvasText);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
           :host([hidden]){display:none!important}
+          *,*::before,*::after{box-sizing:border-box}
           button{font:inherit;cursor:pointer;border:0;color:inherit;background:none}
           button:focus-visible{outline:2px solid var(--pp-accent,Highlight);outline-offset:-3px}
           #backdrop{position:absolute;inset:0;width:100%;height:100%;padding:0;background:#0008;animation:pp-fade-in .18s ease-out}
-          #sheet{position:absolute;z-index:1;left:0;right:0;bottom:0;width:min(100%,540px);max-height:calc(100% - 24px);margin:auto;padding:8px 8px calc(8px + env(safe-area-inset-bottom));animation:pp-sheet-in .22s cubic-bezier(.2,.8,.2,1)}
+          #sheet{position:absolute;z-index:1;left:0;right:0;bottom:0;width:100%;max-width:540px;max-height:calc(100% - 24px);margin:auto;padding:8px 8px calc(8px + env(safe-area-inset-bottom));animation:pp-sheet-in .22s cubic-bezier(.2,.8,.2,1)}
           #items,#cancel{overflow:hidden;background:var(--pp-surface,Canvas);border:1px solid var(--pp-border,#8884);border-radius:14px;box-shadow:0 8px 28px #0004}
           #items{max-height:calc(100vh - 116px - env(safe-area-inset-bottom));overflow-y:auto;-webkit-overflow-scrolling:touch}
           #items button,#cancel{display:block;width:100%;min-height:54px;padding:14px 18px;text-align:center}
