@@ -97,6 +97,7 @@
 }
 .pp-fields,
 .pp-choice-page,
+.pp-settings-page,
 .pp-cache-page {
     position: absolute;
     inset: 0;

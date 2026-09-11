@@ -23,6 +23,7 @@ export function mountPanel(root, catalog) {
     const heading = node("h1", "pp-title", title);
     const handlers = new Map();
     const menuItems = [
+        { id: "viewSettings", label: "查看设置" },
         { id: "viewCaches", label: "查看缓存" },
         { id: "clearCaches", label: "清空缓存", destructive: true },
         { id: "reset", label: "重置模块", destructive: true },
@@ -389,6 +390,16 @@ export function mountPanel(root, catalog) {
             if (eventName === "input") inputContainer.addEventListener("compositionend", event => event.target.dispatchEvent(new window.Event("input", { bubbles: true })));
             groups.get(group).append(row);
         }
+        const settingsPage = node("section", "pp-settings-page");
+        const settingsOutput = node("pre", "pp-cache");
+        settingsOutput.setAttribute("aria-label", "Settings 内容");
+        settingsPage.append(settingsOutput);
+        editors.set("$settings", { node: settingsPage, title: "设置" });
+        handlers.set("viewSettings", () => {
+            if (saving) return;
+            settingsOutput.textContent = JSON.stringify(client.snapshot(active).values, null, 2);
+            navigation.open("$settings");
+        });
         const cachePage = node("section", "pp-cache-page");
         const output = node("pre", "pp-cache");
         output.textContent = "暂无缓存";

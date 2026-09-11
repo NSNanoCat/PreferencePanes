@@ -111,9 +111,21 @@ test("ModuleFrame forwards only advertised idle actions", t => {
     const frame = new ModuleFrame("/settings/Example");
     const calls = [];
     frame.element.addEventListener("preferencepanes:action", event => calls.push(event.detail));
-    frame.element.dispatchEvent(new CustomEvent("preferencepanes:change", { detail: { title: "Example", busy: false, actions: [{ id: "viewCaches", label: "查看缓存" }] } }));
+    frame.element.dispatchEvent(
+        new CustomEvent("preferencepanes:change", {
+            detail: {
+                title: "Example",
+                busy: false,
+                actions: [
+                    { id: "viewSettings", label: "查看设置" },
+                    { id: "viewCaches", label: "查看缓存" },
+                ],
+            },
+        }),
+    );
+    frame.perform("viewSettings");
     frame.perform("viewCaches");
     assert.throws(() => frame.perform("reset"), /not available/);
-    assert.deepEqual(calls, ["viewCaches"]);
+    assert.deepEqual(calls, ["viewSettings", "viewCaches"]);
     frame.destroy();
 });
