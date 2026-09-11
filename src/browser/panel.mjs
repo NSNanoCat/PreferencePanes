@@ -26,7 +26,7 @@ export function mountPanel(root, catalog) {
         { id: "viewSettings", label: "查看设置" },
         { id: "viewCaches", label: "查看缓存" },
         { id: "clearCaches", label: "清空缓存", destructive: true },
-        { id: "reset", label: "重置模块", destructive: true },
+        { id: "reset", label: "重置设置", destructive: true },
     ];
     const menu = new ActionMenu(id => runAction(id));
     const trailing = node("span", "pp-nav-spacer");
@@ -79,7 +79,7 @@ export function mountPanel(root, catalog) {
                 message = "Caches 已清空";
                 break;
             case event.operation === "reset":
-                message = "模块已重置";
+                message = "设置已重置";
                 break;
             default:
                 message = "修改成功";
@@ -436,7 +436,7 @@ export function mountPanel(root, catalog) {
         });
         handlers.set("reset", async () => {
             if (saving) return;
-            if (!(await requestConfirmation(window, `重置 ${active}？这将删除该模块的 Settings、Caches 和其它持久化数据。`)) || destroyed || saving) return;
+            if (!(await requestConfirmation(window, `重置 ${active} 的设置？这将删除该模块的 Settings、Caches 和其它持久化数据。`)) || destroyed || saving) return;
             return perform(() => client.reset(active), controls);
         });
         navigation?.destroy();
