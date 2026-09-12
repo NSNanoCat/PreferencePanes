@@ -120,6 +120,13 @@ export interface PreferencesClient {
      */
     remove(module: string, key: string): Promise<void>;
     /**
+     * 按需重新读取整个模块 Settings，不更新页面会话缓存。
+     * Reread all module Settings on demand without updating the page-session cache.
+     * @param module 已打开模块 / Open module.
+     * @returns 设置 JSON 值，缺失时为 undefined / Settings JSON value, or undefined when absent.
+     */
+    readSettings(module: string): Promise<unknown>;
+    /**
      * 按需读取整个模块 Caches，不刷新设置。
      * Read all module Caches on demand without refreshing settings.
      * @param module 已打开模块 / Open module.

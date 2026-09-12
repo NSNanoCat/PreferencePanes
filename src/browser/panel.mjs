@@ -23,9 +23,10 @@ export function mountPanel(root, catalog) {
     const heading = node("h1", "pp-title", title);
     const handlers = new Map();
     const menuItems = [
+        { id: "viewSettings", label: "查看设置" },
         { id: "viewCaches", label: "查看缓存" },
         { id: "clearCaches", label: "清空缓存", destructive: true },
-        { id: "reset", label: "重置模块", destructive: true },
+        { id: "reset", label: "重置设置", destructive: true },
     ];
     const menu = new ActionMenu(id => runAction(id));
     const trailing = node("span", "pp-nav-spacer");
@@ -78,7 +79,7 @@ export function mountPanel(root, catalog) {
                 message = "Caches 已清空";
                 break;
             case event.operation === "reset":
-                message = "模块已重置";
+                message = "设置已重置";
                 break;
             default:
                 message = "修改成功";
@@ -389,6 +390,29 @@ export function mountPanel(root, catalog) {
             if (eventName === "input") inputContainer.addEventListener("compositionend", event => event.target.dispatchEvent(new window.Event("input", { bubbles: true })));
             groups.get(group).append(row);
         }
+        const settingsPage = node("section", "pp-settings-page");
+        const settingsOutput = node("pre", "pp-cache");
+        settingsOutput.setAttribute("aria-label", "Settings 内容");
+        settingsPage.append(settingsOutput);
+        editors.set("$settings", { node: settingsPage, title: "设置" });
+        handlers.set("viewSettings", () => {
+            if (saving) return;
+            let value;
+            return perform(
+                async () => {
+                    try {
+                        value = await client.readSettings(active);
+                    } catch (error) {
+                        notify({ kind: "error", message: error.message });
+                        throw error;
+                    }
+                },
+                () => {
+                    settingsOutput.textContent = value === undefined ? "暂无设置" : JSON.stringify(value, null, 2);
+                    navigation.open("$settings");
+                },
+            );
+        });
         const cachePage = node("section", "pp-cache-page");
         const output = node("pre", "pp-cache");
         output.textContent = "暂无缓存";
@@ -425,7 +449,7 @@ export function mountPanel(root, catalog) {
         });
         handlers.set("reset", async () => {
             if (saving) return;
-            if (!(await requestConfirmation(window, `重置 ${active}？这将删除该模块的 Settings、Caches 和其它持久化数据。`)) || destroyed || saving) return;
+            if (!(await requestConfirmation(window, `重置 ${active} 的设置？这将删除该模块的 Settings、Caches 和其它持久化数据。`)) || destroyed || saving) return;
             return perform(() => client.reset(active), controls);
         });
         navigation?.destroy();
