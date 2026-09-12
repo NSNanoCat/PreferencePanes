@@ -1,4 +1,48 @@
 /**
+ * 模块 JSON Mock 的 HEAD 探测结果。
+ * Result returned by a module JSON Mock HEAD probe.
+ * @typedef {object} ModuleProbeResult
+ * @property {"installed" | "missing"} state 安装状态 / Installation state.
+ * @property {string | null} version 业务版本，缺失时为 null / Business version, or null when absent.
+ * @property {number | null} httpStatus HTTP 状态码，网络错误时为 null / HTTP status, or null for network errors.
+ */
+
+/**
+ * 模块探测请求选项。
+ * Options for a module probe request.
+ * @typedef {object} ModuleProbeOptions
+ * @property {typeof globalThis.fetch} [fetch] 可注入的 fetch / Injectable fetch.
+ * @property {AbortSignal} [signal] 外部取消信号 / External cancellation signal.
+ * @property {number} [timeout] 超时毫秒数，默认 3500 / Timeout in milliseconds, defaults to 3500.
+ */
+
+/**
+ * 通过模块 JSON Mock 的 HEAD 响应检测安装状态和业务版本。
+ * Detect module installation and business version from a module JSON Mock HEAD response.
+ * @param {string | URL} url 配置 Mock 地址 / Configuration Mock URL.
+ * @param {ModuleProbeOptions} [options] 请求选项 / Request options.
+ * @returns {Promise<ModuleProbeResult>} 探测结果 / Probe result.
+ * @throws {Error} 外部取消请求 / External cancellation.
+ */
+export async function probeModule(url, { fetch: request = globalThis.fetch, signal, timeout = 3500 } = {}) {
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    if (signal?.aborted) abort();
+    signal?.addEventListener("abort", abort, { once: true });
+    const timer = setTimeout(() => controller.abort(), timeout);
+    try {
+        const response = await request(url, { method: "HEAD", cache: "no-store", credentials: "omit", signal: controller.signal });
+        return response.status === 200 ? { state: "installed", version: response.headers.get("X-PreferencePanes-Version")?.trim() || null, httpStatus: 200 } : { state: "missing", version: null, httpStatus: response.status };
+    } catch (error) {
+        if (signal?.aborted) throw error;
+        return { state: "missing", version: null, httpStatus: null };
+    } finally {
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", abort);
+    }
+}
+
+/**
  * 模块入口的固定状态行，只通过 HEAD 探测安装状态和业务版本。
  * Fixed module status row, probing installation and business version with HEAD only.
  */
@@ -30,22 +74,28 @@ export class ModuleStatus extends EventTarget {
      * 每次进入重新探测，取消旧请求并忽略其迟到结果。
      * Reprobe on entry, cancelling old requests and ignoring late results.
      * @param {string | URL} url 配置 Mock 地址 / Configuration Mock URL.
-     * @returns {Promise<void>} 探测完成 / Probe completion.
+     * @param {ModuleProbeOptions} [options] 请求选项 / Request options.
+     * @returns {Promise<ModuleProbeResult>} 探测结果 / Probe result.
      */
-    async check(url) {
+    async check(url, options = {}) {
         this.#controller?.abort();
-        const controller = (this.#controller = new AbortController());
+        const controller = new AbortController();
+        this.#controller = controller;
+        const externalSignal = options.signal;
+        const abort = () => controller.abort();
+        if (externalSignal?.aborted) abort();
+        externalSignal?.addEventListener("abort", abort, { once: true });
         this.#render("checking");
-        const timer = setTimeout(() => controller.abort(), 3500);
         try {
-            const response = await fetch(url, { method: "HEAD", cache: "no-store", credentials: "omit", signal: controller.signal });
-            if (controller !== this.#controller) return;
-            const version = response.headers.get("X-PreferencePanes-Version")?.trim() || null;
-            this.#render(response.status === 200 ? "installed" : "missing", version);
-        } catch {
-            if (controller === this.#controller) this.#render("missing");
+            const result = await probeModule(url, { ...options, signal: controller.signal });
+            if (controller !== this.#controller) return result;
+            this.#render(result.state, result.version);
+            return result;
+        } catch (error) {
+            if (controller !== this.#controller) return { state: "missing", version: null, httpStatus: null };
+            throw error;
         } finally {
-            clearTimeout(timer);
+            externalSignal?.removeEventListener("abort", abort);
         }
     }
 
