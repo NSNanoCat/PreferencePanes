@@ -5,18 +5,14 @@ import type { ModuleModel } from "../index.js";
  * Lifecycle handle for a concrete module settings page.
  */
 export interface MountedPreferences {
-    /**
-     * 移除页面、样式、监听器和临时会话。
-     * Remove the page, styles, listeners and transient sessions.
-     * @returns 无返回值 / No return value.
-     */
+    /** 移除页面、样式和监听器 / Remove page, styles and listeners. */
     destroy(): void;
 }
 /**
- * 仅以代理 API 返回的模块模型和可选 CSS 挂载一个模块页，不生成项目主页。
- * Mount one module page using a proxy API model and optional CSS, without generating a project landing page.
- * @param model 代理 API 返回的模块模型 / Module model returned by the proxy API.
- * @param css 可选 CSS 正文；默认样式始终内置 / Optional CSS text; default styles are built in.
+ * 使用模块 API 返回的模型挂载设置页；CSS 仅覆盖当前模块。
+ * Mount a settings page from a module API model; CSS only overrides this module.
+ * @param model 模块 API 模型 / Module API model.
+ * @param css 可选 CSS 正文 / Optional CSS text.
  * @returns 生命周期句柄 / Lifecycle handle.
  */
 export function mount(model: ModuleModel, css?: string): MountedPreferences;

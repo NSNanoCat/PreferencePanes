@@ -14,7 +14,8 @@ export function normalizeBoxJs(config, module) {
     const catalog = config instanceof BoxJS ? config : new BoxJS(config);
     const target = catalog.modules.get(module);
     if (!target) throw new TypeError(`No BoxJS settings for module: ${module}`);
-    const { entries, storageKey, metadata } = target;
+    const { entries, storageKey } = target;
+    const metadata = normalizeMetadata(target.metadata);
     const fields = [];
     for (const entry of entries) {
         const parts = entry.id.slice(1).split(".").slice(1);
@@ -56,6 +57,23 @@ export function normalizeBoxJs(config, module) {
         settingsPath: common,
         ...(Object.keys(metadata).length ? { metadata } : {}),
     };
+}
+
+/**
+ * 校验供浏览器展示的标准 BoxJS 元数据。
+ * Validate standard BoxJS metadata used by the browser renderer.
+ * @param {Record<string, unknown>} source 原始展示元数据 / Raw presentation metadata.
+ * @returns {import("../index.js").BoxJSMetadata} 规范化展示元数据 / Normalized presentation metadata.
+ */
+function normalizeMetadata(source) {
+    const result = {};
+    for (const [key, value] of Object.entries(source)) {
+        const multiple = key === "icons" || key === "descs";
+        const values = multiple ? value : [value];
+        if (!Array.isArray(values) || values.some(item => typeof item !== "string")) throw new TypeError(`Invalid BoxJS app ${key}`);
+        result[key] = multiple ? [...values] : value;
+    }
+    return result;
 }
 
 /**

@@ -10,8 +10,8 @@ menu.close();
 menu.destroy();
 
 const status = new ModuleStatus(document.createElement("span"));
-await status.check("/configs/Module");
-const probe = await probeModule("/configs/Module");
+await status.check("/api/Module", { json: "/configs/Module" });
+const probe = await probeModule("/api/Module", { json: "/configs/Module" });
 void probe.status;
 status.destroy();
 
@@ -34,7 +34,7 @@ const files: Record<string, string> = await build(boxjs);
 await build(boxjs, "body { color: black; }");
 void files;
 const definition: ModuleDefinition = { module: "Module", storageKey: "Root", settingsPath: ["Module", "Settings"], fields: [] };
-const model: ModuleModel = { module: "Module", definition, values: {}, configURL: "/configs/Module" };
+const model: ModuleModel = { module: "Module", boxjs, values: {}, configURL: "/configs/Module" };
 mount(model).destroy();
 mount(model, "body { color: black; }").destroy();
 // @ts-expect-error 页面不接受安装对象或元素配置 / Pages do not accept installation or element configuration.

@@ -1,3 +1,4 @@
+import { validValue } from "../lib/boxjs.mjs";
 import { ActionMenu } from "./ActionMenu.mjs";
 import { createPreferencesClient } from "./client.mjs";
 import { fieldControl, element as node, requestConfirmation, resourceURL, settingRow, statusView } from "./components.mjs";
@@ -103,7 +104,7 @@ export function mountPanel(root, model) {
             toast.hidden = true;
         }, 2400);
     };
-    const client = createPreferencesClient({ configURL: () => model.configURL, notify });
+    const client = createPreferencesClient({ model, definition, notify });
     /**
      * 两种菜单入口共用异步错误处理，包含宿主确认框错误。
      * Share async error handling between both menus, including host-dialog errors.
@@ -131,7 +132,6 @@ export function mountPanel(root, model) {
         publishNavigation();
         viewport.replaceChildren(statusView("读取设置…"));
         try {
-            await client.open(module, model);
             if (version === generation) controls();
         } catch (error) {
             if (version !== generation) return;
@@ -145,7 +145,7 @@ export function mountPanel(root, model) {
      * @returns {void} 无返回值 / No return value.
      */
     function controls() {
-        const { definition, values } = client.snapshot(active);
+        const { definition, values } = client.snapshot();
         heading.textContent = definition.metadata?.name || active;
         const view = node("section", "pp-fields");
         /**
@@ -196,7 +196,7 @@ export function mountPanel(root, model) {
                 .finally(() => {
                     pendingWrites--;
                     saving = pendingWrites > 0;
-                    if (destroyed && !saving) client.leave(active);
+                    if (destroyed && !saving) client.leave();
                     back.disabled = saving || !navigation.canGoBack;
                     publishNavigation();
                 });
@@ -278,7 +278,7 @@ export function mountPanel(root, model) {
                     link.append(summary, node("span", "pp-chevron", "›"));
                     row.append(link);
                     const refresh = () => {
-                        const value = client.snapshot(active).values[field.key];
+                        const value = client.snapshot().values[field.key];
                         summary.textContent =
                             field.options
                                 .filter(option => Array.isArray(value) && value.includes(option.key))
@@ -379,10 +379,17 @@ export function mountPanel(root, model) {
                     return;
                 }
                 const restore = () => {
-                    if (version === inputVersion) write(client.snapshot(module).values[field.key]);
+                    if (version === inputVersion) write(client.snapshot().values[field.key]);
                 };
                 perform(
-                    () => client.set(module, field.key, value),
+                    () => {
+                        if (!validValue(field, value)) {
+                            const error = new TypeError("Invalid setting value");
+                            notify({ kind: "error", operation: "write", module, key: field.key, message: error.message });
+                            throw error;
+                        }
+                        return client.set(field.key, value);
+                    },
                     () => {
                         for (const refresh of summaries) refresh();
                     },
@@ -403,7 +410,7 @@ export function mountPanel(root, model) {
             return perform(
                 async () => {
                     try {
-                        value = await client.readSettings(active);
+                        value = await client.readSettings();
                     } catch (error) {
                         notify({ kind: "error", message: error.message });
                         throw error;
@@ -427,7 +434,7 @@ export function mountPanel(root, model) {
             return perform(
                 async () => {
                     try {
-                        value = await client.readCaches(active);
+                        value = await client.readCaches();
                     } catch (error) {
                         notify({ kind: "error", message: error.message });
                         throw error;
@@ -443,7 +450,7 @@ export function mountPanel(root, model) {
             if (saving) return;
             if (!(await requestConfirmation(window, `清空 ${active} 的全部 Caches？`)) || destroyed || saving) return;
             return perform(
-                () => client.clearCaches(active),
+                () => client.clearCaches(),
                 () => {
                     output.textContent = "暂无缓存";
                 },
@@ -452,7 +459,7 @@ export function mountPanel(root, model) {
         handlers.set("reset", async () => {
             if (saving) return;
             if (!(await requestConfirmation(window, `重置 ${active} 的设置？这将删除该模块的 Settings、Caches 和其它持久化数据。`)) || destroyed || saving) return;
-            return perform(() => client.reset(active), controls);
+            return perform(() => client.reset(), controls);
         });
         navigation?.destroy();
         navigation = new Navigation(viewport, view, key => editors.get(key)?.node);
@@ -483,7 +490,7 @@ export function mountPanel(root, model) {
             window.frameElement?.removeEventListener("preferencepanes:action", onAction);
             navigation?.destroy();
             generation++;
-            if (active && !saving) client.leave(active);
+            if (active && !saving) client.leave();
             clearTimeout(timer);
             shell.remove();
         },

@@ -1,8 +1,8 @@
 import { validatePathParts } from "./lib/settings-path.mjs";
 
 /**
- * BoxJS 的共同目录：模块、存储根和展示元数据都来自同一份 JSON。
- * Shared BoxJS catalog deriving modules, storage roots and metadata from one JSON document.
+ * BoxJS 的共同目录：只索引模块、存储根和原始展示元数据。
+ * Shared BoxJS catalog indexing modules, storage roots and raw presentation metadata only.
  */
 export class BoxJS {
     /**
@@ -38,8 +38,8 @@ export class BoxJS {
                 target.owners.add(app);
             }
         }
-        this.metadata = metadata(Array.isArray(document) ? {} : document);
-        for (const target of this.modules.values()) target.metadata = target.owners.size === 1 ? metadata([...target.owners][0]) : {};
+        this.metadata = presentation(Array.isArray(document) ? {} : document);
+        for (const target of this.modules.values()) target.metadata = target.owners.size === 1 ? presentation([...target.owners][0]) : {};
     }
 
     /**
@@ -54,19 +54,16 @@ export class BoxJS {
 }
 
 /**
- * 保留标准 BoxJS 展示信息；script 仅为元数据，不执行。
- * Retain standard BoxJS presentation data; script is metadata only and never executed.
+ * 保留原始 BoxJS 展示信息，具体类型由浏览器规范化器校验。
+ * Retain raw BoxJS presentation data; the browser normalizer validates concrete types.
  * @param {object} source BoxJS app 或订阅 / BoxJS app or subscription.
- * @returns {object} 经过类型检查的展示信息 / Type-checked presentation metadata.
+ * @returns {object} 原始展示信息 / Raw presentation metadata.
  */
-function metadata(source) {
+function presentation(source) {
     const result = {};
     for (const key of ["id", "name", "author", "repo", "script", "icon", "description", "desc", "icons", "descs"]) {
         if (source[key] === undefined) continue;
-        const multiple = key === "icons" || key === "descs";
-        const values = multiple ? source[key] : [source[key]];
-        if (!Array.isArray(values) || values.some(item => typeof item !== "string")) throw new TypeError(`Invalid BoxJS app ${key}`);
-        result[key] = multiple ? [...values] : source[key];
+        result[key] = source[key];
     }
     return result;
 }

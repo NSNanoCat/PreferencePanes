@@ -29,7 +29,7 @@ async function start() {
             default:
                 inputs = pageInputs(new URL(location.href));
         }
-        const apiURL = new URL(`/api/module/${encodeURIComponent(inputs.module)}`, inputs.url).href;
+        const apiURL = new URL(`/api/${encodeURIComponent(inputs.module)}`, inputs.url).href;
         const resources = [inputs.css].map(source => {
             if (!source) return null;
             const url = new URL(source, inputs.url);

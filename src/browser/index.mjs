@@ -1,3 +1,5 @@
+import { BoxJS } from "../BoxJS.mjs";
+import { normalizeBoxJs, normalizeStoredValue, validValue } from "../lib/boxjs.mjs";
 import { element, resourceURL } from "./components.mjs";
 import { mountPanel } from "./panel.mjs";
 import { installDefaultStyles } from "./styles.mjs";
@@ -11,7 +13,15 @@ import { installDefaultStyles } from "./styles.mjs";
  */
 export function mount(model, css = "") {
     if (typeof css !== "string") throw new TypeError("CSS must be a string");
-    const { definition } = model;
+    const definition = normalizeBoxJs(new BoxJS(model.boxjs), model.module);
+    const values = { ...model.values };
+    for (const field of definition.fields) {
+        if (values[field.key] === undefined) continue;
+        values[field.key] = normalizeStoredValue(field, values[field.key]);
+        if (!validValue(field, values[field.key])) throw new TypeError(`Invalid stored value: ${field.key}`);
+    }
+    for (const field of definition.fields) if (values[field.key] === undefined && Object.hasOwn(field, "defaultValue")) values[field.key] = structuredClone(field.defaultValue);
+    const rendered = { ...model, definition, values };
     const metadata = definition.metadata ?? {};
     const image = metadata.icon || metadata.icons?.[1] || metadata.icons?.[0];
     if (image) resourceURL(image);
@@ -72,7 +82,7 @@ export function mount(model, css = "") {
     };
     try {
         root.replaceChildren();
-        panel = mountPanel(root, model);
+        panel = mountPanel(root, rendered);
         return view;
     } catch (error) {
         view.destroy();

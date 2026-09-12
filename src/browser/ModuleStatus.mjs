@@ -4,7 +4,7 @@
  * @typedef {object} ModuleProbeOptions
  * @property {typeof globalThis.fetch} [fetch] 可注入的 fetch / Injectable fetch.
  * @property {AbortSignal} [signal] 外部取消信号 / External cancellation signal.
- * @property {string} [json] BoxJS JSON 来源 / BoxJS JSON source.
+ * @property {string} [json] BoxJS JSON 来源，将随探测请求头传递 / BoxJS JSON source sent in the probe header.
  * @property {number} [timeout] 超时毫秒数，默认 3500 / Timeout in milliseconds, defaults to 3500.
  */
 

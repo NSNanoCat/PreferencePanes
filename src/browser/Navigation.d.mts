@@ -169,7 +169,7 @@ export interface ModuleProbeOptions {
     fetch?: typeof globalThis.fetch;
     /** 外部取消信号 / External cancellation signal. */
     signal?: AbortSignal;
-    /** BoxJS JSON 来源 / BoxJS JSON source. */
+    /** 传给模块 API 的 BoxJS JSON 来源 / BoxJS JSON source sent to the module API. */
     json?: string;
     /** 超时毫秒数，默认 3500 / Timeout in milliseconds, defaults to 3500. */
     timeout?: number;

@@ -75,6 +75,16 @@ const server = http.createServer(async (request, reply) => {
                         return true;
                     },
                 },
+                $httpClient: {
+                    head(options, callback) {
+                        const exists = configuration && options.url.endsWith(`/configs/${moduleName}`);
+                        callback(null, { status: exists ? 200 : 404, headers: exists ? { "X-PreferencePanes-Version": "preview" } : {} }, "");
+                    },
+                    get(options, callback) {
+                        const exists = configuration && options.url.endsWith(`/configs/${moduleName}`);
+                        callback(null, { status: exists ? 200 : 404, headers: exists ? { "X-PreferencePanes-Version": "preview" } : {} }, exists ? JSON.stringify(configuration) : "");
+                    },
+                },
                 $request: { url: url.href, method: request.method, headers: request.headers, body },
                 $done: result => resolve(result.response),
                 console,

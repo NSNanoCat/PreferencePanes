@@ -3,12 +3,11 @@ import assets from "#assets";
 import { pageInputs } from "../lib/page-inputs.mjs";
 import { response } from "../lib/response.mjs";
 import { ModuleApi } from "../ModuleApi.mjs";
-import { Store } from "../Store.mjs";
 import { complete } from "./response.mjs";
 
 /**
- * 通用代理入口：提供无鉴权 form 存储 API 及模块页面，不含业务配置。
- * Generic proxy entry serving unauthenticated form storage and module pages without business configuration.
+ * 通用代理入口：提供模块 API 及模块页面，不包含业务配置。
+ * Generic proxy entry serving the module API and pages without bundled business configuration.
  * @returns {Promise<void>} 已交给代理宿主的响应 / Response delivered to the proxy host.
  */
 async function run() {
@@ -18,11 +17,8 @@ async function run() {
         const moduleAPI = new ModuleApi();
         const url = new URL(request.url);
         switch (true) {
-            case url.pathname.startsWith("/api/module/"):
-                result = await moduleAPI.handle(request, url);
-                break;
             case url.pathname.startsWith("/api/"):
-                result = await new Store().handle(request, url);
+                result = await moduleAPI.handle(request, url);
                 break;
             case /^\/settings\/[a-zA-Z0-9_-]+\/?$/.test(url.pathname): {
                 const inputs = encodeURIComponent(JSON.stringify(pageInputs(url, request.headers)));
