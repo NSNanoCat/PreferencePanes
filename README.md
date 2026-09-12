@@ -53,7 +53,7 @@ frame.destroy();
 
 ModuleFrame 在 iframe 元素上保存原请求上下文，HTML 原样加载，不从 about:srcdoc 猜模块、不注入临时 CSS。框架自身管理嵌入模式，通过事件发布标题、忙碌状态和返回能力。Navigation 统一管理 fragment 历史、滑动、滚动保留、加载取消及动画结束后释放；项目提供根页、子页工厂和布局。
 
-项目主页可按需使用导出的 ModuleStatus、ModuleFrame 和 Navigation，也可以自行实现入口。PreferencePanes 不提供主页运行脚本，不识别具体 App，不加载或调用任何客户端 Bridge SDK。调用方若运行在原生 WebView，应在自己的 HTML/页面脚本中直接接入该客户端的官方 SDK，再把 ModuleFrame 事件映射到原生界面。
+项目主页可按需使用导出的 `probeModule`、ModuleStatus、ModuleFrame 和 Navigation，也可以自行实现入口。`probeModule(url)` 是版本检测的公共 API：它只对模块 JSON Mock 发送一次 HEAD，读取 HTTP 状态和 `X-PreferencePanes-Version`，返回 `{ state, version, httpStatus }`；ModuleStatus 仅负责把同一结果渲染到状态行。PreferencePanes 不提供主页运行脚本，不识别具体 App，不加载或调用任何客户端 Bridge SDK。调用方若运行在原生 WebView，应在自己的 HTML/页面脚本中直接接入该客户端的官方 SDK，再把 ModuleFrame 事件映射到原生界面。
 
 每次进入模块读取 JSON/CSS 和设置一次。二级多选返回复用内存缓存，修改立即写入；成功提示、失败回滚由公共组件处理。Caches 按需查看/清空，重置只删除指定模块子树。
 

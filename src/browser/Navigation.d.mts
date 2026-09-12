@@ -161,6 +161,50 @@ export class ActionMenu {
 }
 
 /**
+ * 模块 JSON Mock 的 HEAD 探测结果。
+ * Result returned by a module JSON Mock HEAD probe.
+ */
+export interface ModuleProbeResult {
+    /**
+     * 安装状态。
+     * Installation state.
+     */
+    state: "installed" | "missing";
+    /**
+     * 业务版本，缺失时为 null。
+     * Business version, or null when absent.
+     */
+    version: string | null;
+    /**
+     * HTTP 状态码，网络错误时为 null。
+     * HTTP status, or null for network errors.
+     */
+    httpStatus: number | null;
+}
+
+/**
+ * 模块探测请求选项。
+ * Options for a module probe request.
+ */
+export interface ModuleProbeOptions {
+    /** 可注入的 fetch / Injectable fetch. */
+    fetch?: typeof globalThis.fetch;
+    /** 外部取消信号 / External cancellation signal. */
+    signal?: AbortSignal;
+    /** 超时毫秒数，默认 3500 / Timeout in milliseconds, defaults to 3500. */
+    timeout?: number;
+}
+
+/**
+ * 通过模块 JSON Mock 的 HEAD 响应检测安装状态和业务版本。
+ * Detect module installation and business version from a module JSON Mock HEAD response.
+ * @param url 配置 Mock 地址 / Configuration Mock URL.
+ * @param options 请求选项 / Request options.
+ * @returns 探测结果 / Probe result.
+ */
+export function probeModule(url: string | URL, options?: ModuleProbeOptions): Promise<ModuleProbeResult>;
+
+/**
  * HEAD 探测的固定模块状态行。
  * Fixed module status row backed by HEAD probes.
  */
@@ -180,9 +224,10 @@ export class ModuleStatus extends EventTarget {
      * 探测配置 Mock。
      * Probe a configuration Mock.
      * @param url 配置地址 / Configuration URL.
-     * @returns 探测完成 / Probe completion.
+     * @param options 请求选项 / Request options.
+     * @returns 探测结果 / Probe result.
      */
-    check(url: string | URL): Promise<void>;
+    check(url: string | URL, options?: ModuleProbeOptions): Promise<ModuleProbeResult>;
     /**
      * 取消探测。
      * Cancel probes.
