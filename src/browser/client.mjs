@@ -151,6 +151,18 @@ export function createPreferencesClient({ catalog, fetch: request = globalThis.f
         },
         snapshot,
         /**
+         * 按需重新读取模块 Settings，不更新页面会话缓存。
+         * Reread module Settings on demand without updating the page-session cache.
+         * @param {string} module 已打开的模块 / Open module.
+         * @returns {Promise<unknown>} 设置值，缺失为 undefined / Settings value, or undefined when absent.
+         */
+        async readSettings(module) {
+            const state = sessions.get(module);
+            if (!state?.definition) throw new Error("Open the module first");
+            const response = await send(`@${state.definition.storageKey}.${state.definition.settingsPath.join(".")}`, "get", undefined, state.controller.signal);
+            return response.status === 404 ? undefined : response.json();
+        },
+        /**
          * 按需读取模块 Caches，不自动读取其它设置。
          * Read module Caches on demand without refreshing other settings.
          * @param {string} module 已打开的模块 / Open module.

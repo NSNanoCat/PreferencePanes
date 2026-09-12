@@ -76,13 +76,27 @@ test("imported JSON supports direct module fields without a fixed Settings direc
     assert.equal(calls[0].url, "/api/get");
 });
 
+test("settings and caches are inspected through fresh API reads", async () => {
+    const { client, state, calls } = fixture();
+    await client.open("Module");
+    state.stored = { Home: { enabled: true }, count: 7 };
+    state.caches = { items: [1, 2] };
+    assert.deepEqual(await client.readSettings("Module"), state.stored);
+    assert.deepEqual(await client.readCaches("Module"), state.caches);
+    assert.deepEqual(
+        calls.slice(1).map(({ body, url }) => [url, [...new URLSearchParams(body).keys()][0]]),
+        [
+            ["/api/get", "@Example.Module.Settings"],
+            ["/api/get", "@Example.Module.Caches"],
+        ],
+    );
+});
+
 test("cache inspection is explicit; clear and reset use DELETE without follow-up GET", async () => {
     const { client, state, calls, notifications } = fixture();
-    state.caches = { items: [1, 2] };
     await client.open("Module");
     assert.equal(calls.length, 1);
     const settings = client.snapshot("Module").values;
-    assert.deepEqual(await client.readCaches("Module"), { items: [1, 2] });
     await client.clearCaches("Module");
     assert.deepEqual(client.snapshot("Module").values, settings);
     await client.reset("Module");
@@ -90,7 +104,6 @@ test("cache inspection is explicit; clear and reset use DELETE without follow-up
     assert.deepEqual(
         calls.slice(1).map(({ method, url }) => [method, url]),
         [
-            ["POST", "/api/get"],
             ["POST", "/api/delete"],
             ["POST", "/api/delete"],
         ],

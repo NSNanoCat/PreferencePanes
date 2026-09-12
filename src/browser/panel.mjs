@@ -397,8 +397,21 @@ export function mountPanel(root, catalog) {
         editors.set("$settings", { node: settingsPage, title: "设置" });
         handlers.set("viewSettings", () => {
             if (saving) return;
-            settingsOutput.textContent = JSON.stringify(client.snapshot(active).values, null, 2);
-            navigation.open("$settings");
+            let value;
+            return perform(
+                async () => {
+                    try {
+                        value = await client.readSettings(active);
+                    } catch (error) {
+                        notify({ kind: "error", message: error.message });
+                        throw error;
+                    }
+                },
+                () => {
+                    settingsOutput.textContent = value === undefined ? "暂无设置" : JSON.stringify(value, null, 2);
+                    navigation.open("$settings");
+                },
+            );
         });
         const cachePage = node("section", "pp-cache-page");
         const output = node("pre", "pp-cache");
