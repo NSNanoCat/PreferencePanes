@@ -7,19 +7,20 @@ test("status row uses HEAD and displays module versions or not installed", async
     const status = new ModuleStatus(element);
     let response = new Response(null, { status: 200, headers: { "X-PreferencePanes-Version": "dev.abc1234" } });
     const fetch = t.mock.method(globalThis, "fetch", async () => response);
-    const installed = await status.check("https://example.org/configs/Module");
+    const installed = await status.check("https://example.org/api/module/Module", { json: "/configs/Module" });
     assert.equal(installed.status, 200);
     assert.equal(installed.headers.get("X-PreferencePanes-Version"), "dev.abc1234");
     assert.equal(fetch.mock.calls[0].arguments[1].method, "HEAD");
     assert.equal(fetch.mock.calls[0].arguments[1].cache, "no-store");
     assert.equal(fetch.mock.calls[0].arguments[1].credentials, "omit");
+    assert.equal(fetch.mock.calls[0].arguments[1].headers["X-PreferencePanes-JSON"], "/configs/Module");
     assert.equal(element.textContent, "dev.abc1234");
     assert.equal(status.state.status, "installed");
     response = new Response(null, { status: 404 });
-    await status.check("https://example.org/configs/Module");
+    await status.check("https://example.org/api/module/Module");
     assert.equal(element.textContent, "未安装");
     response = new Response(null, { status: 200 });
-    await status.check("https://example.org/configs/Module");
+    await status.check("https://example.org/api/module/Module");
     assert.equal(element.textContent, "版本未知");
     assert.equal(status.state.status, "installed");
     status.destroy();
@@ -30,14 +31,14 @@ test("late and cancelled probes cannot overwrite newer status", async t => {
     const status = new ModuleStatus(element);
     const pending = [];
     t.mock.method(globalThis, "fetch", () => new Promise(resolve => pending.push(resolve)));
-    const first = status.check("/configs/Module");
-    const second = status.check("/configs/Module");
+    const first = status.check("/api/module/Module");
+    const second = status.check("/api/module/Module");
     pending[1](new Response(null, { status: 404 }));
     await second;
     pending[0](new Response(null, { status: 200 }));
     await first;
     assert.equal(element.textContent, "未安装");
-    const last = status.check("/configs/Module");
+    const last = status.check("/api/module/Module");
     status.destroy();
     pending[2](new Response(null, { status: 200 }));
     await last;
@@ -50,16 +51,17 @@ test("probeModule exposes the shared HEAD contract", async () => {
         calls.push(arguments_);
         return new Response(null, { status: 200, headers: { "X-PreferencePanes-Version": " 0.9.15 " } });
     };
-    const response = await probeModule("https://example.org/configs/Module", { fetch });
+    const response = await probeModule("https://example.org/api/module/Module", { fetch, json: "/configs/Module" });
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("X-PreferencePanes-Version"), "0.9.15");
     assert.equal(calls[0][1].method, "HEAD");
     assert.equal(calls[0][1].cache, "no-store");
     assert.equal(calls[0][1].credentials, "omit");
+    assert.equal(calls[0][1].headers["X-PreferencePanes-JSON"], "/configs/Module");
 });
 
 test("probeModule returns the HTTP status for unavailable modules", async () => {
-    const response = await probeModule("https://example.org/configs/Module", {
+    const response = await probeModule("https://example.org/api/module/Module", {
         fetch: async () => new Response(null, { status: 404 }),
     });
     assert.equal(response.status, 404);
@@ -67,7 +69,7 @@ test("probeModule returns the HTTP status for unavailable modules", async () => 
 
 test("probeModule preserves network failures for the caller", async () => {
     await assert.rejects(
-        probeModule("https://example.org/configs/Module", {
+        probeModule("https://example.org/api/module/Module", {
             fetch: async () => {
                 throw new TypeError("network failure");
             },

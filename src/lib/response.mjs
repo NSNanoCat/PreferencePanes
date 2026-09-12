@@ -5,12 +5,13 @@
  * @param {number} status HTTP 状态 / HTTP status.
  * @param {unknown} body JSON 数据或资源正文 / JSON data or resource body.
  * @param {string} [type] 媒体类型 / Media type.
+ * @param {Record<string, string>} [extraHeaders={}] 额外响应头 / Additional response headers.
  * @returns {import("../index.js").SettingsResponse} 通用响应 / Common response.
  */
-export function response(request, status, body, type = "application/json") {
+export function response(request, status, body, type = "application/json", extraHeaders = {}) {
     return {
         status,
-        headers: { "Content-Type": `${type}; charset=utf-8`, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" },
+        headers: { "Content-Type": `${type}; charset=utf-8`, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...extraHeaders },
         body: request.method === "HEAD" ? "" : type === "application/json" ? JSON.stringify(body) : body,
     };
 }

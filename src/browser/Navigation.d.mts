@@ -169,14 +169,16 @@ export interface ModuleProbeOptions {
     fetch?: typeof globalThis.fetch;
     /** 外部取消信号 / External cancellation signal. */
     signal?: AbortSignal;
+    /** BoxJS JSON 来源 / BoxJS JSON source. */
+    json?: string;
     /** 超时毫秒数，默认 3500 / Timeout in milliseconds, defaults to 3500. */
     timeout?: number;
 }
 
 /**
- * 通过模块 JSON Mock 的 HEAD 响应检测安装状态和业务版本。
- * Probe installation and business version from a module JSON Mock HEAD response.
- * @param url 配置 Mock 地址 / Configuration Mock URL.
+ * 通过模块 API 的 HEAD 响应检测安装状态和业务版本。
+ * Probe installation and business version from a module API HEAD response.
+ * @param url 模块 API 地址 / Module API URL.
  * @param options 请求选项 / Request options.
  * @returns 原始 HTTP 响应 / Native HTTP response.
  */
@@ -199,9 +201,9 @@ export class ModuleStatus extends EventTarget {
      */
     readonly state: { status: "checking" | "installed" | "missing"; version: string | null };
     /**
-     * 探测配置 Mock。
-     * Probe a configuration Mock.
-     * @param url 配置地址 / Configuration URL.
+     * 探测模块 API。
+     * Probe the module API.
+     * @param url 模块 API 地址 / Module API URL.
      * @param options 请求选项 / Request options.
      * @returns 原始 HTTP 响应；网络错误时状态行显示“未安装” / Native HTTP response; network errors render “未安装”.
      */

@@ -1,4 +1,4 @@
-import type { ModuleDefinition, SettingsScalar } from "../index.js";
+import type { ModuleDefinition, ModuleModel, SettingsScalar } from "../index.js";
 /**
  * 单键写入或删除的通知事件，携带对应模块与点分键路径。
  * Notification for a single-key write or delete, including module and dotted key path.
@@ -36,10 +36,15 @@ export interface Notification {
  */
 export interface PreferencesClientOptions {
     /**
-     * 包内从 BoxJS 推导的目录。
-     * Internal catalog derived from BoxJS.
+     * 模块 API 基路径，后接 /{module}/{action}。
+     * Module API base path followed by /{module}/{action}.
      */
-    catalog: { modules: ReadonlyMap<string, { storageKey: string }>; select(module: string): unknown };
+    apiBase?: string;
+    /**
+     * 返回 BoxJS JSON 的资源地址；请求头随 API 请求发送。
+     * BoxJS JSON resource URL sent with module API requests.
+     */
+    configURL?: string | ((module: string) => string);
     /**
      * 默认使用浏览器 fetch，可注入同签名传输
      * Defaults to browser fetch; an equivalent transport may be supplied.
@@ -84,7 +89,7 @@ export interface PreferencesClient {
      * @returns 新会话的独立快照 / Independent snapshot of the new session.
      * @throws {Error} 写入进行中、请求或配置无效、会话被替换 / Active write, invalid request or config, or replaced session.
      */
-    open(module: string): Promise<ModuleSnapshot>;
+    open(module: string, initialModel?: ModuleModel): Promise<ModuleSnapshot>;
     /**
      * 获取已打开模块的快照，不发请求。
      * Get a snapshot of an open module without network requests.
@@ -111,8 +116,8 @@ export interface PreferencesClient {
      */
     set(module: string, key: string, value: SettingsScalar | SettingsScalar[]): Promise<void>;
     /**
-     * POST /api/delete 删除覆盖值，200 后显示默认值，不追加读取。
-     * POST /api/delete removes an override and displays its default after 200, without rereading.
+     * 通过模块 API 删除覆盖值，200 后显示默认值，不追加读取。
+     * Delete an override through the module API and display its default after 200, without rereading.
      * @param module 已打开的模块 / Open module.
      * @param key 完整点分字段路径 / Complete dotted field path.
      * @returns 操作完成 / Completion of the operation.
@@ -151,7 +156,7 @@ export interface PreferencesClient {
 /**
  * 创建包内客户端，接管请求和会话。
  * Create an internal client for requests and sessions.
- * @param options 包内目录与运行环境 / Internal catalog and runtime environment.
+ * @param options API 地址与运行环境 / API URL and runtime environment.
  * @returns 会话客户端 / Session client.
  */
 export function createPreferencesClient(options: PreferencesClientOptions): PreferencesClient;

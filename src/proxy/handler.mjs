@@ -2,6 +2,7 @@ import { URL } from "@nsnanocat/url";
 import assets from "#assets";
 import { pageInputs } from "../lib/page-inputs.mjs";
 import { response } from "../lib/response.mjs";
+import { ModuleApi } from "../ModuleApi.mjs";
 import { Store } from "../Store.mjs";
 import { complete } from "./response.mjs";
 
@@ -14,8 +15,12 @@ async function run() {
     const request = globalThis.$request;
     let result;
     try {
+        const moduleAPI = new ModuleApi();
         const url = new URL(request.url);
         switch (true) {
+            case url.pathname.startsWith("/api/module/"):
+                result = await moduleAPI.handle(request, url);
+                break;
             case url.pathname.startsWith("/api/"):
                 result = await new Store().handle(request, url);
                 break;

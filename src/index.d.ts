@@ -201,6 +201,20 @@ export interface ModuleDefinition {
     };
 }
 /**
+ * 由代理模块 API 返回的完整页面模型。
+ * Complete page model returned by the proxy module API.
+ */
+export interface ModuleModel {
+    /** 模块标识 / Module identifier. */
+    module: string;
+    /** BoxJS 归一化定义 / Normalized BoxJS definition. */
+    definition: ModuleDefinition;
+    /** 当前值和默认值 / Current and defaulted values. */
+    values: Record<string, SettingsScalar | SettingsScalar[] | null>;
+    /** BoxJS JSON 来源 / BoxJS JSON source. */
+    configURL: string;
+}
+/**
  * 可序列化的 JSON 值。
  * Serializable JSON value.
  */

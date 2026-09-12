@@ -4,18 +4,19 @@ import { fieldControl, element as node, requestConfirmation, resourceURL, settin
 import { Navigation } from "./Navigation.mjs";
 
 /**
- * 挂载已导入 BoxJS 对应的模块表单和短暂通知。
- * Mount the imported BoxJS module form and transient notifications.
+ * 挂载 API 返回的模块模型表单和短暂通知。
+ * Mount the module model returned by the API and transient notifications.
  * @param {HTMLElement} root 包内挂载元素 / Internal mount element.
- * @param {import("../BoxJS.mjs").BoxJS} catalog 包内 BoxJS 目录 / Internal BoxJS catalog.
+ * @param {import("../index.js").ModuleModel} model API 返回的模块模型 / Module model returned by the API.
  * @returns {import("./index.js").MountedPreferences} 面板生命周期句柄 / Panel lifecycle handle.
  */
-export function mountPanel(root, catalog) {
-    const title = catalog.module.metadata.name ?? catalog.module.module;
+export function mountPanel(root, model) {
+    const { definition } = model;
+    const title = definition.metadata?.name ?? definition.module;
     const document = root.ownerDocument;
     const window = document.defaultView;
     const shell = node("div", "pp-panel");
-    shell.dataset.module = catalog.module.module;
+    shell.dataset.module = definition.module;
     const header = node("header", "pp-header");
     const back = node("button", "pp-back", "‹");
     back.setAttribute("aria-label", "返回");
@@ -45,7 +46,7 @@ export function mountPanel(root, catalog) {
         if (!frame?.dataset.preferencePanes) return;
         frame.dispatchEvent(
             new frame.ownerDocument.defaultView.CustomEvent("preferencepanes:change", {
-                detail: { title: heading.textContent, module: catalog.module.module, busy: saving, canGoBack: !back.disabled, actions },
+                detail: { title: heading.textContent, module: definition.module, busy: saving, canGoBack: !back.disabled, actions },
             }),
         );
     };
@@ -102,7 +103,7 @@ export function mountPanel(root, catalog) {
             toast.hidden = true;
         }, 2400);
     };
-    const client = createPreferencesClient({ catalog, notify });
+    const client = createPreferencesClient({ configURL: () => model.configURL, notify });
     /**
      * 两种菜单入口共用异步错误处理，包含宿主确认框错误。
      * Share async error handling between both menus, including host-dialog errors.
@@ -130,7 +131,7 @@ export function mountPanel(root, catalog) {
         publishNavigation();
         viewport.replaceChildren(statusView("读取设置…"));
         try {
-            await client.open(module);
+            await client.open(module, model);
             if (version === generation) controls();
         } catch (error) {
             if (version !== generation) return;
@@ -182,7 +183,7 @@ export function mountPanel(root, catalog) {
             saving = true;
             back.disabled = true;
             publishNavigation();
-            return (queue = queue
+            queue = queue
                 .then(action)
                 .then(() => {
                     if (!destroyed) success();
@@ -198,7 +199,8 @@ export function mountPanel(root, catalog) {
                     if (destroyed && !saving) client.leave(active);
                     back.disabled = saving || !navigation.canGoBack;
                     publishNavigation();
-                }));
+                });
+            return queue;
         }
         const metadata = definition.metadata;
         if (metadata) {
@@ -468,7 +470,7 @@ export function mountPanel(root, catalog) {
         if (navigation) navigation.back();
         else window.history.back();
     };
-    open(catalog.module.module);
+    open(definition.module);
     return {
         /**
          * 移除监听器、定时器、会话和挂载内容。
