@@ -8,7 +8,8 @@ test("status row uses HEAD and displays module versions or not installed", async
     let response = new Response(null, { status: 200, headers: { "X-PreferencePanes-Version": "dev.abc1234" } });
     const fetch = t.mock.method(globalThis, "fetch", async () => response);
     const installed = await status.check("https://example.org/configs/Module");
-    assert.deepEqual(installed, { state: "installed", version: "dev.abc1234", httpStatus: 200 });
+    assert.equal(installed.status, 200);
+    assert.equal(installed.headers.get("X-PreferencePanes-Version"), "dev.abc1234");
     assert.equal(fetch.mock.calls[0].arguments[1].method, "HEAD");
     assert.equal(fetch.mock.calls[0].arguments[1].cache, "no-store");
     assert.equal(fetch.mock.calls[0].arguments[1].credentials, "omit");
@@ -49,28 +50,28 @@ test("probeModule exposes the shared HEAD contract", async () => {
         calls.push(arguments_);
         return new Response(null, { status: 200, headers: { "X-PreferencePanes-Version": " 0.9.15 " } });
     };
-    assert.deepEqual(await probeModule("https://example.org/configs/Module", { fetch }), {
-        state: "installed",
-        version: "0.9.15",
-        httpStatus: 200,
-    });
+    const response = await probeModule("https://example.org/configs/Module", { fetch });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("X-PreferencePanes-Version"), "0.9.15");
     assert.equal(calls[0][1].method, "HEAD");
     assert.equal(calls[0][1].cache, "no-store");
     assert.equal(calls[0][1].credentials, "omit");
 });
 
 test("probeModule returns the HTTP status for unavailable modules", async () => {
-    const result = await probeModule("https://example.org/configs/Module", {
+    const response = await probeModule("https://example.org/configs/Module", {
         fetch: async () => new Response(null, { status: 404 }),
     });
-    assert.deepEqual(result, { state: "missing", version: null, httpStatus: 404 });
+    assert.equal(response.status, 404);
 });
 
-test("probeModule maps network failures to an unavailable module", async () => {
-    const result = await probeModule("https://example.org/configs/Module", {
-        fetch: async () => {
-            throw new TypeError("network failure");
-        },
-    });
-    assert.deepEqual(result, { state: "missing", version: null, httpStatus: null });
+test("probeModule preserves network failures for the caller", async () => {
+    await assert.rejects(
+        probeModule("https://example.org/configs/Module", {
+            fetch: async () => {
+                throw new TypeError("network failure");
+            },
+        }),
+        /network failure/,
+    );
 });
