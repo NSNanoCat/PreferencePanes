@@ -1,5 +1,7 @@
 # PreferencePanes 发布流程与历史记录
 
+0.9.16 将公共模块探测 API 改为原样返回 HEAD 的 Response；可用性使用 response.status，模块版本使用 X-PreferencePanes-Version 响应头，不再暴露自定义 httpStatus 响应字段。
+
 0.9.15 暴露通用 `probeModule(url)` 版本探测 API；ModuleStatus 委托公共 HEAD 探测并返回结构化结果，补充类型、测试与 Apifox 文档。
 
 0.9.14 将“查看设置”改为通过 `POST /api/get` 按需读取当前模块最新 Settings 子树；详情读取不再复用首次打开页面时的内存快照。
