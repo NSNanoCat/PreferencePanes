@@ -57,7 +57,7 @@ get 成功返回原始 JSON 值，缺失返回 404。set 返回 {"saved":true}�
 
 ## 模块页输入与导航
 
-配置 Mock 的 HEAD/GET 响应通过 X-PreferencePanes-Version 提供业务版本。PreferencePanes 的公共浏览器 API `probeModule(url)` 只发送 HEAD 并返回 `{ state, version, httpStatus }`；ModuleStatus 委托该 API，仅负责显示“检测中”、业务版本或“未安装”。HTTP 200 但缺少版本头时显示“版本未知”。该版本由业务模块构建提供，不是 PreferencePanes 版本。
+配置 Mock 的 HEAD/GET 响应通过 X-PreferencePanes-Version 提供业务版本。PreferencePanes 的公共浏览器 API `probeModule(url)` 只发送 HEAD 并原样返回浏览器 `Response`；调用方通过 `response.status` 判断可用性，通过 `response.headers.get("X-PreferencePanes-Version")` 读取业务版本。ModuleStatus 委托该 API，仅负责显示“检测中”、业务版本或“未安装”。HTTP 200 但缺少版本头时显示“版本未知”。该版本由业务模块构建提供，不是 PreferencePanes 版本。
 
 JSON/CSS 资源 URL 可通过 json/css 查询参数，或 X-PreferencePanes-JSON / X-PreferencePanes-CSS Header 传入；Header 分别优先。缺省 JSON 为 /configs/{module}，缺省 CSS 为空，使用内置样式。资源只接受 HTTP(S) 或相对地址。浏览器读取 JSON 后根据完整字段 ID 推导存储根与路径，生成 form 请求。
 

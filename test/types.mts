@@ -12,7 +12,7 @@ menu.destroy();
 const status = new ModuleStatus(document.createElement("span"));
 await status.check("/configs/Module");
 const probe = await probeModule("/configs/Module");
-void probe;
+void probe.status;
 status.destroy();
 
 const frame = new ModuleFrame("/settings/Module", { headers: { "X-PreferencePanes-JSON": "/configs/Module" }, signal: new AbortController().signal });
