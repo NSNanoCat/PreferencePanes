@@ -1,5 +1,7 @@
 # PreferencePanes 发布流程与历史记录
 
+0.9.15 暴露通用 `probeModule(url)` 版本探测 API；ModuleStatus 委托公共 HEAD 探测并返回结构化结果，补充类型、测试与 Apifox 文档。
+
 0.9.14 将“查看设置”改为通过 `POST /api/get` 按需读取当前模块最新 Settings 子树；详情读取不再复用首次打开页面时的内存快照。
 
 0.9.13 增加设置 JSON 查看入口，并将模块重置菜单更名为重置设置；设置和缓存均可从右上角菜单进入可返回的序列化 JSON 页面。
