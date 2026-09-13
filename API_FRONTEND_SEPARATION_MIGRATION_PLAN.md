@@ -86,11 +86,11 @@
 
 ## 页面生命周期 class 与发布追加计划
 
-12. [ ] **计划基线（PreferencePanes）**
+12. [x] **计划基线（PreferencePanes）**
     - 记录四层浏览器生命周期 class、发布兼容边界、版本和多仓库发布顺序。
     - 验证：本步骤只提交计划文件。
 
-13. [ ] **浏览器生命周期 class（PreferencePanes）**
+13. [x] **浏览器生命周期 class（PreferencePanes）**
     - `ModulePage` 管理页面输入、初始 API 请求、BFCache 重载和错误状态。
     - `PreferencesView` 管理 BoxJS 解析与校验、样式、主题和面板生命周期。
     - `PreferencesPanel` 管理控件、导航、操作队列和通知。
@@ -100,13 +100,13 @@
     - 验证：构建、Biome、TypeScript、完整测试和 Apifox 一致性检查。
     - 计划提交：`refactor(browser): 用类管理页面生命周期`。
 
-14. [ ] **1.0 页面入口兼容（PreferencePanes）**
+14. [x] **1.0 页面入口兼容（PreferencePanes）**
     - 新页面和新模板只使用 `/settings/assets/index.mjs`。
     - `web.js` 将 1.0.0 已发布的 `/settings/assets/app.mjs` 映射到同一份 `index.mjs` 正文，不保留第二个源文件或实现。
     - 验证：两个 URL 返回完全相同正文，且 API/前端路由隔离测试继续通过。
     - 计划提交：`fix(web): 保留 1.0 页面入口映射`。
 
-15. [ ] **文档与 1.1.0 发布准备（PreferencePanes）**
+15. [x] **文档与 1.1.0 发布准备（PreferencePanes）**
     - README 记录 class 职责链、推荐实例化方式和公开入口兼容边界。
     - 更新 package 版本和发布历史，不改变 Apifox API 契约。
     - 验证：候选包构建、类型、测试、Apifox 和归档内容检查。
@@ -151,3 +151,7 @@
 | 最终核验 | PreferencePanes | 本步骤提交 | 六仓库均为本地 `dev` 且工作树干净；旧组合路由与旧后端分层引用搜索为零；核心 46 项测试和网站 4 项测试通过 |
 | 模块页面入口收口 | 六仓库 | `674aab9`, `88b38de`, `323d8a1`, `960a98a`, `21362ea`, `51f409b` | 模块页面公共入口由 `app.mjs` 统一改为 `index.mjs`；PreferencePanes 构建、Biome、TypeScript、46 项测试、Apifox 校验，以及网站和四个业务仓库测试通过；六个 `dev` 分支各本地领先 `origin/dev` 1 个提交，未推送 |
 | 当前文档路径同步 | Biliverse/API、Global、Redirect、ADBlock | `ac2c23b`, `5c2b552`, `9c3bf40`, `982662f` | 修正当前说明中的模块 API 动作路径；API 公共 Apifox 资源校验通过；API 使用新建本地 `dev` 分支，未推送 |
+| class 发布计划 | PreferencePanes | `9648cfa` | 记录四层浏览器生命周期、兼容边界和发布顺序 |
+| 浏览器生命周期 class | PreferencePanes | `053f801` | 四层 class 调用链、公开 `PreferencesView`、双语 JSDoc、构建、类型、47 项测试及 Apifox 校验通过 |
+| 1.0 页面入口兼容 | PreferencePanes | `fe978ef` | `app.mjs` 与 `index.mjs` 返回同一正文，不存在第二个源文件或实现 |
+| 1.1.0 发布准备 | PreferencePanes | 本步骤提交 | README、版本和发布历史同步；候选包验证后提交 |
