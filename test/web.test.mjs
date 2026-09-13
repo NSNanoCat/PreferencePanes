@@ -33,6 +33,7 @@ for (const quantumult of [false, true])
             assert.equal(status(result), 200);
             assert.match(result.body, /PreferencePanes|preference-panes/);
         }
+        assert.equal((await run("/settings/assets/app.mjs")).body, (await run("/settings/assets/index.mjs")).body);
         assert.equal(status(await run("/settings/Module", "POST")), 405);
         for (const path of ["/api/Module", "/configs/Module", "/settings/assets/host.mjs"]) {
             const result = await run(path);

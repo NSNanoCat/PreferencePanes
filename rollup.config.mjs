@@ -28,7 +28,7 @@ function resources() {
                     try {
                         const output = Object.fromEntries(await Promise.all(bundles.map(async ([name, bundle]) => [name, (await bundle.generate({ format: "es" })).output[0].code])));
                         const html = (await readFile(new URL("./src/browser/module.html", import.meta.url), "utf8")).replaceAll("__VERSION__", pkg.version);
-                        return `export default ${JSON.stringify({ page: { type: "text/html", body: html }, "/settings/assets/index.mjs": { type: "text/javascript", body: output.index }, "/settings/assets/navigation.mjs": { type: "text/javascript", body: output.navigation } })};`;
+                        return `export default ${JSON.stringify({ page: { type: "text/html", body: html }, "/settings/assets/index.mjs": { type: "text/javascript", body: output.index }, "/settings/assets/app.mjs": { type: "text/javascript", body: output.index }, "/settings/assets/navigation.mjs": { type: "text/javascript", body: output.navigation } })};`;
                     } finally {
                         await Promise.all(bundles.map(([, bundle]) => bundle.close()));
                     }
