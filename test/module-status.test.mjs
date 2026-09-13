@@ -7,13 +7,13 @@ test("status row uses HEAD and displays module versions or not installed", async
     const status = new ModuleStatus(element);
     let response = new Response(null, { status: 200, headers: { "X-PreferencePanes-Version": "dev.abc1234" } });
     const fetch = t.mock.method(globalThis, "fetch", async () => response);
-    const installed = await status.check("https://example.org/api/Module", { json: "/configs/Module" });
+    const installed = await status.check("https://example.org/api/Module");
     assert.equal(installed.status, 200);
     assert.equal(installed.headers.get("X-PreferencePanes-Version"), "dev.abc1234");
     assert.equal(fetch.mock.calls[0].arguments[1].method, "HEAD");
     assert.equal(fetch.mock.calls[0].arguments[1].cache, "no-store");
     assert.equal(fetch.mock.calls[0].arguments[1].credentials, "omit");
-    assert.equal(fetch.mock.calls[0].arguments[1].headers["X-PreferencePanes-JSON"], "/configs/Module");
+    assert.equal(fetch.mock.calls[0].arguments[1].headers, undefined);
     assert.equal(element.textContent, "dev.abc1234");
     assert.equal(status.state.status, "installed");
     response = new Response(null, { status: 404 });
@@ -51,13 +51,13 @@ test("probeModule exposes the shared HEAD contract", async () => {
         calls.push(arguments_);
         return new Response(null, { status: 200, headers: { "X-PreferencePanes-Version": " 0.9.15 " } });
     };
-    const response = await probeModule("https://example.org/api/Module", { fetch, json: "/configs/Module" });
+    const response = await probeModule("https://example.org/api/Module", { fetch });
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("X-PreferencePanes-Version"), "0.9.15");
     assert.equal(calls[0][1].method, "HEAD");
     assert.equal(calls[0][1].cache, "no-store");
     assert.equal(calls[0][1].credentials, "omit");
-    assert.equal(calls[0][1].headers["X-PreferencePanes-JSON"], "/configs/Module");
+    assert.equal(calls[0][1].headers, undefined);
 });
 
 test("probeModule returns the HTTP status for unavailable modules", async () => {

@@ -1,8 +1,6 @@
-import { pageInputs } from "../lib/page-inputs.mjs";
-
 /**
- * 模块文档容器：原始 HTML 不改写，请求上下文随 iframe 元素传递。
- * Module document container: preserve HTML verbatim and carry request context on the iframe element.
+ * 模块文档容器：原始 HTML 不改写，只向 iframe 标记模块身份。
+ * Module document container: preserve HTML verbatim and mark only the module identity on the iframe.
  */
 export class ModuleFrame extends EventTarget {
     #url;
@@ -24,23 +22,25 @@ export class ModuleFrame extends EventTarget {
     };
 
     /**
-     * 建立 iframe 与请求输入；调用方挂载 element 后调用 load。
-     * Create the iframe and request inputs; callers mount element and then call load.
+     * 建立 iframe；调用方挂载 element 后调用 load。
+     * Create the iframe; callers mount element and then call load.
      * @param {string | URL} url 模块请求地址 / Module request URL.
-     * @param {RequestInit} [options] 原生请求头和取消信号 / Native headers and cancellation signal.
+     * @param {{signal?: AbortSignal}} [options] 外部取消信号 / External cancellation signal.
      */
     constructor(url, options = {}) {
         super();
         this.#url = new URL(url, document.baseURI);
-        this.#options = { ...options, headers: new Headers(options.headers) };
-        const inputs = pageInputs(this.#url, Object.fromEntries(this.#options.headers));
+        const match = /^\/settings\/([a-zA-Z0-9_-]+)\/?$/.exec(this.#url.pathname);
+        if (!match) throw new TypeError("Open a concrete module URL");
+        this.#options = options;
         this.element = document.createElement("iframe");
-        this.element.title = `${inputs.module} 设置`;
-        this.element.dataset.preferencePanes = JSON.stringify(inputs);
+        this.element.title = `${match[1]} 设置`;
+        this.element.dataset.preferencePanes = "true";
+        this.element.dataset.preferencePanesModule = match[1];
         this.element.addEventListener("preferencepanes:change", this.#change);
         this.element.addEventListener("preferencepanes:confirm", this.#confirmation);
         this.element.addEventListener("preferencepanes:notice", this.#notice);
-        this.#state = { title: inputs.module, module: inputs.module, busy: false, canGoBack: true, actions: [] };
+        this.#state = { title: match[1], module: match[1], busy: false, canGoBack: true, actions: [] };
         options.signal?.addEventListener("abort", this.#abort, { once: true });
     }
 
@@ -61,7 +61,7 @@ export class ModuleFrame extends EventTarget {
         if (this.#options.signal?.aborted) this.destroy();
         const timer = setTimeout(() => this.#controller.abort(), 10000);
         try {
-            const response = await fetch(this.#url, { cache: "no-store", credentials: "omit", ...this.#options, signal: this.#controller.signal });
+            const response = await fetch(this.#url, { cache: "no-store", credentials: "omit", signal: this.#controller.signal });
             if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
             const html = await response.text();
             this.#controller.signal.throwIfAborted();

@@ -1,5 +1,8 @@
+// @ts-expect-error ModuleModel is no longer public.
 import type { BoxJSInput, ModuleDefinition, ModuleModel, SettingsField } from "@nsnanocat/preference-panes";
+// @ts-expect-error build is no longer public.
 import { build } from "@nsnanocat/preference-panes";
+// @ts-expect-error PreferencesView is an internal implementation detail.
 import { mount, PreferencesView } from "@nsnanocat/preference-panes/browser";
 import { ActionMenu, ModuleFrame, ModuleStatus, Navigation, probeModule } from "@nsnanocat/preference-panes/navigation";
 
@@ -10,16 +13,18 @@ menu.close();
 menu.destroy();
 
 const status = new ModuleStatus(document.createElement("span"));
-await status.check("/api/Module", { json: "/configs/Module" });
-const probe = await probeModule("/api/Module", { json: "/configs/Module" });
+await status.check("/api/Module");
+const probe = await probeModule("/api/Module");
 void probe.status;
 status.destroy();
 
-const frame = new ModuleFrame("/settings/Module", { headers: { "X-PreferencePanes-JSON": "/configs/Module" }, signal: new AbortController().signal });
+const frame = new ModuleFrame("/settings/Module", { signal: new AbortController().signal });
 document.body.append(frame.element);
 await frame.load();
 frame.back();
 frame.destroy();
+// @ts-expect-error ModuleFrame no longer accepts private request headers.
+new ModuleFrame("/settings/Module", { headers: { "X-PreferencePanes-JSON": "/configs/Module" } });
 
 const navigation = new Navigation(document.body, document.createElement("main"), (_key, signal) => {
     void signal.aborted;
@@ -30,25 +35,15 @@ navigation.back();
 navigation.destroy();
 
 const boxjs: BoxJSInput = { name: "Example", apps: [{ name: "App", settings: [{ id: "@Root.Module.Settings.flag", name: "Flag", type: "boolean", val: true }] }] };
-const files: Record<string, string> = await build(boxjs);
-await build(boxjs, "body { color: black; }");
-void files;
+mount(boxjs).destroy();
+// @ts-expect-error mount accepts exactly one BoxJS argument.
+mount(boxjs, "body { color: black; }");
+// @ts-expect-error API models are not valid BoxJS input.
+mount({ module: "Module", boxjs, values: {} });
 const definition: ModuleDefinition = { module: "Module", storageKey: "Root", settingsPath: ["Module", "Settings"], fields: [] };
-const model: ModuleModel = { module: "Module", boxjs, values: {}, configURL: "/configs/Module" };
-mount(model).destroy();
-mount(model, "body { color: black; }").destroy();
-new PreferencesView(model).destroy();
-// @ts-expect-error 页面不接受安装对象或元素配置 / Pages do not accept installation or element configuration.
-mount({ element: document.body });
-// @ts-expect-error 不接受样式 URL 列表配置 / Stylesheet URL-list configuration is not accepted.
-mount(boxjs, { stylesheets: [] });
 const field: SettingsField = { key: "Module.Settings.flag", name: "Flag", type: "boolean", defaultValue: false };
 void field;
 void definition;
-
-// @ts-expect-error 安装映射不是 BoxJS 输入 / Installation mappings are not BoxJS input.
-await build({ origin: "https://example.org", storageKey: "Root", module: "Module" });
-// @ts-expect-error CSS 只接受正文字符串 / CSS accepts text strings only.
-await build(boxjs, { stylesheets: ["https://example.org/theme.css"] });
-// @ts-expect-error 不存在第三份配置 / There is no third configuration input.
-await build(boxjs, "", { resources: [] });
+void build;
+void PreferencesView;
+void (null as ModuleModel | null);

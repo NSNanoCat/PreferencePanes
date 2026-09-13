@@ -2,7 +2,6 @@ import { URL } from "@nsnanocat/url";
 import { $app } from "@nsnanocat/util/lib/app.mjs";
 import { done } from "@nsnanocat/util/lib/done.mjs";
 import assets from "#assets";
-import { pageInputs } from "./lib/page-inputs.mjs";
 
 /**
  * 返回模块页面及其公共浏览器资源，不处理 API、网络或持久化。
@@ -16,10 +15,7 @@ function run() {
         const url = new URL(request.url);
         if (/^\/settings\/[a-zA-Z0-9_-]+\/?$/.test(url.pathname)) {
             if (!["GET", "HEAD"].includes(request.method)) result = response(request, 405, { error: "Method not allowed" });
-            else {
-                const inputs = encodeURIComponent(JSON.stringify(pageInputs(url, request.headers)));
-                result = response(request, 200, assets.page.body.replace("</head>", `<meta name="preference-panes-inputs" content="${inputs}"></head>`), "text/html");
-            }
+            else result = response(request, 200, assets.page.body, "text/html");
         } else {
             const asset = assets[url.pathname];
             if (asset) result = ["GET", "HEAD"].includes(request.method) ? response(request, 200, asset.body, asset.type) : response(request, 405, { error: "Method not allowed" });

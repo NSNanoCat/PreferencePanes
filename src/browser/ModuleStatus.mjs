@@ -4,7 +4,6 @@
  * @typedef {object} ModuleProbeOptions
  * @property {typeof globalThis.fetch} [fetch] 可注入的 fetch / Injectable fetch.
  * @property {AbortSignal} [signal] 外部取消信号 / External cancellation signal.
- * @property {string} [json] BoxJS JSON 来源，将随探测请求头传递 / BoxJS JSON source sent in the probe header.
  * @property {number} [timeout] 超时毫秒数，默认 3500 / Timeout in milliseconds, defaults to 3500.
  */
 
@@ -15,14 +14,14 @@
  * @param {ModuleProbeOptions} [options] 请求选项 / Request options.
  * @returns {Promise<Response>} 原始 HTTP 响应，可直接读取 status 和响应头 / Native HTTP response; read status and headers directly.
  */
-export async function probeModule(url, { fetch: request = globalThis.fetch, json, signal, timeout = 3500 } = {}) {
+export async function probeModule(url, { fetch: request = globalThis.fetch, signal, timeout = 3500 } = {}) {
     const controller = new AbortController();
     const abort = () => controller.abort();
     if (signal?.aborted) abort();
     signal?.addEventListener("abort", abort, { once: true });
     const timer = setTimeout(() => controller.abort(), timeout);
     try {
-        return await request(url, { method: "HEAD", cache: "no-store", credentials: "omit", signal: controller.signal, headers: json ? { "X-PreferencePanes-JSON": json } : undefined });
+        return await request(url, { method: "HEAD", cache: "no-store", credentials: "omit", signal: controller.signal });
     } finally {
         clearTimeout(timer);
         signal?.removeEventListener("abort", abort);

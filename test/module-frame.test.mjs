@@ -39,23 +39,20 @@ test("host confirmation is asynchronous and detaches with its module frame", asy
     assert.equal(await requestConfirmation(host, "Standalone?"), true);
 });
 
-test("ModuleFrame preserves response HTML and passes dynamic URL/header inputs outside the document", async t => {
+test("ModuleFrame preserves response HTML and exposes only the module identity", async t => {
     globalThis.document = { baseURI: "https://example.org/settings/", createElement: () => Object.assign(new EventTarget(), { dataset: {} }) };
     t.after(() => {
         delete globalThis.document;
     });
     const html = '<!doctype html><main id="preferences"></main>';
     const fetch = t.mock.method(globalThis, "fetch", async () => new Response(html));
-    const frame = new ModuleFrame("/settings/Other?json=/query.json", { headers: { "X-PreferencePanes-JSON": "/configs/Other", "X-PreferencePanes-CSS": "/theme.css" } });
+    const frame = new ModuleFrame("/settings/Other");
     await frame.load();
     assert.equal(frame.element.srcdoc, html);
-    assert.deepEqual(JSON.parse(frame.element.dataset.preferencePanes), {
-        url: "https://example.org/settings/Other?json=/query.json",
-        module: "Other",
-        json: "/configs/Other",
-        css: "/theme.css",
-    });
-    assert.equal(fetch.mock.calls[0].arguments[1].headers.get("X-PreferencePanes-JSON"), "/configs/Other");
+    assert.equal(frame.element.dataset.preferencePanes, "true");
+    assert.equal(frame.element.dataset.preferencePanesModule, "Other");
+    assert.equal(fetch.mock.calls[0].arguments[0].href, "https://example.org/settings/Other");
+    assert.equal(fetch.mock.calls[0].arguments[1].headers, undefined);
     frame.destroy();
 });
 

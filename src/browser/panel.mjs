@@ -12,24 +12,23 @@ export class PreferencesPanel {
     #release;
 
     /**
-     * 挂载 API 返回的模块模型表单。
-     * Mount the module form returned by the API.
+     * 挂载 BoxJS 定义对应的模块表单。
+     * Mount the module form described by a BoxJS definition.
      * @param {HTMLElement} root 包内挂载元素 / Internal mount element.
-     * @param {import("../index.js").ModuleModel & {definition: import("../index.js").ModuleDefinition}} model 已规范化模块模型 / Normalized module model.
+     * @param {import("../index.js").ModuleDefinition} definition 已规范化字段定义 / Normalized field definition.
      */
-    constructor(root, model) {
-        this.#release = this.#mount(root, model);
+    constructor(root, definition) {
+        this.#release = this.#mount(root, definition);
     }
 
     /**
      * 建立面板 DOM、交互和会话，并返回其释放操作。
      * Build panel DOM, interactions, and session, then return its release operation.
      * @param {HTMLElement} root 包内挂载元素 / Internal mount element.
-     * @param {import("../index.js").ModuleModel & {definition: import("../index.js").ModuleDefinition}} model 已规范化模块模型 / Normalized module model.
+     * @param {import("../index.js").ModuleDefinition} definition 已规范化字段定义 / Normalized field definition.
      * @returns {() => void} 释放操作 / Release operation.
      */
-    #mount(root, model) {
-        const { definition } = model;
+    #mount(root, definition) {
         const title = definition.metadata?.name ?? definition.module;
         const document = root.ownerDocument;
         const window = document.defaultView;
@@ -121,7 +120,7 @@ export class PreferencesPanel {
                 toast.hidden = true;
             }, 2400);
         };
-        const client = new PreferencesClient({ model, definition, notify });
+        const client = new PreferencesClient({ definition, notify });
         /**
          * 两种菜单入口共用异步错误处理，包含宿主确认框错误。
          * Share async error handling between both menus, including host-dialog errors.
@@ -149,6 +148,7 @@ export class PreferencesPanel {
             publishNavigation();
             viewport.replaceChildren(statusView("读取设置…"));
             try {
+                await client.open();
                 if (version === generation) controls();
             } catch (error) {
                 if (version !== generation) return;
