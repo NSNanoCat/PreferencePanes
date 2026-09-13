@@ -24,6 +24,8 @@ PreferencePanes 的 `web.js` 只返回模块 HTML、`index.mjs` 和 `navigation.
 | POST | `/api/{module}/delete` | `api.js` | 删除字段、Settings、Caches 或模块子树 |
 | HEAD、GET | `/configs/{module}` | 业务模块 | 提供版本化 BoxJS 上游 |
 
+`/settings/assets/app.mjs` 只为 1.0.0 已安装模块保留，并与 `/settings/assets/index.mjs` 返回同一正文；当前接口、HTML 和业务模板只使用 `index.mjs`，不存在第二个页面入口实现。
+
 旧的 `/api/get`、`/api/set`、`/api/delete` form 接口和 `/api/module/{module}` 草稿路径均不保留。网页不能提交完整存储根；所有路径都由 API 从本次取得的 BoxJS 字段 ID 推导。
 
 ## 配置来源
@@ -91,7 +93,7 @@ X-PreferencePanes-JSON: /configs/Enhanced
 
 ## 页面渲染
 
-`web.js` 返回的 `index.mjs` 并发读取可选 CSS 与 `GET /api/{module}`，然后把 API 模型交给浏览器 `mount()`。`mount()` 从 `boxjs` 生成控件定义，校验展示元数据、控件类型、选项、默认值和 `values`，再绘制页面。无效模型只在页面显示加载失败，不会由 API 生成或修补控件。
+`web.js` 返回的 `index.mjs` 由 `ModulePage` 并发读取可选 CSS 与 `GET /api/{module}`，然后直接创建 `PreferencesView`。`PreferencesView` 从 `boxjs` 生成控件定义，校验展示元数据、控件类型、选项、默认值和 `values`，再创建负责控件与导航的 `PreferencesPanel`；面板使用 `PreferencesClient` 调用模块 API 并维护当前页面值快照。公开 `mount()` 只是在调用方直接使用浏览器包时创建 `PreferencesView` 的便捷入口。无效模型只在页面显示加载失败，不会由 API 生成或修补控件。
 
 修改控件时，浏览器先按渲染定义校验值，再把字段路径和值提交给模块 API。HTTP 200 后只更新当前页面快照；失败恢复控件。查看设置和缓存按需调用 `get`，清空缓存和重置调用 `delete`，均不直接接触持久化实现。
 
