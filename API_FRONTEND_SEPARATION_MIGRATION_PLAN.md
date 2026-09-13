@@ -45,7 +45,7 @@
    - 验证：静态资源路由、API 路由隔离、构建产物内容检查及完整 `npm run check`。
    - 计划提交：`refactor(web): 独立设置页面交付`。
 
-5. [ ] **契约与文档（PreferencePanes）**
+5. [x] **契约与文档（PreferencePanes）**
    - 更新 README、Apifox Specification、HostIntegration、生成器和原生 Apifox JSON。
    - 明确 `api.js` 与 `web.js` 的安装规则和发布顺序。
    - 验证：`npm run apifox:generate`、`npm run apifox:check`、`git diff --check`。
@@ -99,8 +99,8 @@
 | 计划基线 | PreferencePanes | `9c8165b` | 计划文件单独提交 |
 | 单一后端 API | PreferencePanes | `803bd7d` | 构建、类型、Biome、45 项测试及 API 构建隔离通过 |
 | 前端 BoxJS 解析 | PreferencePanes | `2a90853` | 构建、类型、Biome、44 项测试及前后端导入隔离通过 |
-| 独立前端交付 | PreferencePanes | 本步骤提交 | `api.js`/`web.js` 隔离、构建、类型、Biome 及 46 项测试通过 |
-| 契约与文档 | PreferencePanes | 待填写 | 待填写 |
+| 独立前端交付 | PreferencePanes | `06b683a` | `api.js`/`web.js` 隔离、构建、类型、Biome 及 46 项测试通过 |
+| 契约与文档 | PreferencePanes | 本步骤提交 | Apifox 10 操作/8 路径/3 JSON 动作、完整构建和 46 项测试通过 |
 | 网站调用与预览 | Biliverse.github.io | 待填写 | 待填写 |
 | 业务模板 | Enhanced | 待填写 | 待填写 |
 | 业务模板 | Global | 待填写 | 待填写 |

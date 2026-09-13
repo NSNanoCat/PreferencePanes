@@ -24,7 +24,7 @@ ModuleStatus 只向模块 API 发送 HEAD。代理 API 再探测配置来源并�
 
 ## 模块页面
 
-页面使用 `/settings/{module}`。页面脚本调用 `GET /api/{module}`，由 API 默认读取 `/configs/{module}`；自定义资源通过 `json`/`css` 查询参数或 `X-PreferencePanes-JSON`/`X-PreferencePanes-CSS` 请求头指定，请求头分别优先。示例中的 module 是变量，不预填某个业务项目。
+页面使用 `/settings/{module}`，该路径及公共浏览器资源由 `web.js` 返回。页面脚本调用 `GET /api/{module}`，由独立 `api.js` 默认读取 `/configs/{module}`；自定义资源通过 `json`/`css` 查询参数或 `X-PreferencePanes-JSON`/`X-PreferencePanes-CSS` 请求头指定，请求头分别优先。示例中的 module 是变量，不预填某个业务项目。
 
 ```js
 const frame = new ModuleFrame(`/settings/${module}`, {
@@ -50,6 +50,7 @@ nativeMoreButton.onclick = () => menu.open();
 - `confirm` 事件可由宿主 `preventDefault()` 后通过 `detail.resolve(boolean)`/`reject(error)` 完成；未接管时使用标准浏览器确认。
 - `notice` 事件包含 `{kind, message}`。宿主接管时负责短暂提示；模块不再创建重复 Toast，也不追加读取。
 - BoxJS 获取、字段路径映射和持久化读写全部由模块 API 完成；Web 只规范化、校验和渲染 API 模型。
+- 安装规则必须把 `/settings/**` 指向 `web.js`、把 `/api/{module}` 及动作指向 `api.js`；两个脚本不能互相接管路径。
 - 保存成功只更新当前页面快照；每次重新进入模块再通过 API 读取，二级页面返回继续复用现有快照。
 
 客户端 Bridge 属于项目页面的运行环境。项目 HTML 引入客户端的官方 SDK 后，由项目自己的页面脚本直接调用 SDK；不要把某个客户端的 Bridge、User-Agent、主题值或原生菜单协议加入 PreferencePanes。ModuleFrame 的标准事件是双方唯一的网页边界。

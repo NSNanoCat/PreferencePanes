@@ -71,10 +71,10 @@ const apis = declarations.map(entry => {
           : entry.probe
             ? "网页只探测该 API；代理脚本向 BoxJS 上游发送 HEAD，并透传状态与版本头。"
             : entry.upstream
-              ? "该资源由业务模块提供，只供代理 API 获取；网页不直接调用。"
+              ? "该资源由业务模块提供，只供后端 api.js 获取；网页不直接调用。"
               : entry.asset
-                ? "该资源由同一个 PreferencePanes api.js 返回。项目网站只在 HTML 中引用路径，不托管或复制运行脚本。"
-                : "通用模块页面只调用模块 API，并在 Web 侧完成规范化、校验和渲染。";
+                ? "该资源由 PreferencePanes web.js 返回；web.js 不访问网络或持久化。"
+                : "通用模块页面由 web.js 返回，只调用独立 api.js，并在 Web 侧完成规范化、校验和渲染。";
     return {
         id: entry.id,
         name: entry.name,
@@ -130,7 +130,7 @@ const apis = declarations.map(entry => {
 const document = {
     apifoxProject: "1.0.0",
     $schema: { app: "apifox", type: "project", version: "1.2.0" },
-    info: { name: "Preference Panes", description: "BoxJS 模块 API 与浏览器渲染组件", mockRule: { rules: [], enableSystemRule: true } },
+    info: { name: "Preference Panes", description: "独立的 BoxJS 模块 API 与设置前端", mockRule: { rules: [], enableSystemRule: true } },
     projectSetting: { id: "8852249", auth: {}, securityScheme: {}, gateway: [], language: "zh-CN", apiStatuses: ["developing", "testing", "released", "deprecated"], mockSettings: {}, preProcessors: [], postProcessors: [], advancedSettings: {}, servers: [{ id: "default", name: "默认服务", moduleId }], cloudMock: {} },
     apiCollection: [
         {

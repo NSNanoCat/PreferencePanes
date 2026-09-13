@@ -1,5 +1,7 @@
 # PreferencePanes 发布流程与历史记录
 
+下一版本将后端 API 与设置前端拆成同版本的 `api.js` 和 `web.js`：前者只处理 `/api/{module}`，后者只返回 `/settings/**` 页面资源。业务模板必须同时更新两类规则后才能使用该版本。
+
 0.9.16 将公共模块探测 API 改为原样返回 HEAD 的 Response；可用性使用 response.status，模块版本使用 X-PreferencePanes-Version 响应头，不再暴露自定义 httpStatus 响应字段。
 
 0.9.15 暴露通用 `probeModule(url)` 版本探测 API；ModuleStatus 委托公共 HEAD 探测并返回结构化结果，补充类型、测试与 Apifox 文档。
