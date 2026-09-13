@@ -1,6 +1,6 @@
 # @nsnanocat/preference-panes
 
-PreferencePanes 提供一个由 BoxJS JSON 驱动的通用设置前端，以及一个独立的代理持久化 API。业务模块只发布自己的 `/configs/{module}` 和 `/api/{module}`；通用 `/settings/**` 前端只需要安装一次。
+PreferencePanes 提供一个由 BoxJS JSON 驱动的通用设置前端，以及一个独立的代理配置与持久化 API。业务模块只发布自己的 `/configs/{module}`；通用 `/settings/**` 前端和 `/api/**` 后端分别只需要安装一次。
 
 在 Biliverse 中，Enhanced 是唯一安装 `web.js` 的模块。Global、Redirect、ADBlock 不携带 `web.js`，它们的设置页仍由同一份通用前端读取各自 BoxJS 后渲染。
 
@@ -16,7 +16,7 @@ interface MountedPreferences { destroy(): void }
 ```js
 import { mount } from "@nsnanocat/preference-panes/browser";
 
-const boxjs = await fetch("/configs/Module", {
+const boxjs = await fetch("/api/Module", {
     cache: "no-store",
     credentials: "omit",
 }).then(response => response.json());
@@ -39,29 +39,27 @@ preferences.destroy();
 - `GET /settings/assets/index.mjs`
 - `GET /settings/assets/navigation.mjs`
 
-模块页面从 URL 或 `ModuleFrame` 的模块标记取得模块名，直接读取同源 `/configs/{module}`，然后调用 `mount(boxjs)`。页面不接受 JSON/CSS 查询参数、私有请求头或兼容资源别名。
+模块页面从 URL 或 `ModuleFrame` 的模块标记取得模块名，通过同源 `/api/{module}` 读取原始 BoxJS，然后调用 `mount(boxjs)`。页面不接受 JSON/CSS 查询参数、私有请求头或兼容资源别名，也不直接访问 `/configs/**`。
 
 `api.js` 只处理：
 
 - `HEAD /api/{module}`：探测同源 `/configs/{module}`，透传状态与 `X-PreferencePanes-Version`。
-- `POST /api/{module}/get`：读取声明字段或 Settings、Caches、module 子树。
-- `POST /api/{module}/set`：写入当前 BoxJS 声明的字段。
-- `POST /api/{module}/delete`：删除声明字段或模块子树。
+- `GET /api/{module}`：原样返回同源 `/configs/{module}` 的 BoxJS JSON 与版本头。
+- `POST /api/get`：读取完整 `@root.path`。
+- `POST /api/set`：写入完整 `@root.path`。
+- `POST /api/delete`：删除完整 `@root.path` 或子树。
 
-`GET /api/{module}` 和其它未规定方法返回 `405`。API 每次动作都从 `/configs/{module}` 建立字段目录，只负责字段授权与 util `Storage` 读写，不解释控件、选项或默认值。
+模块 API 只转发业务配置；固定存储 API 不下载或解析 BoxJS。BoxJS 字段、控件、选项、默认值与写入值都由浏览器校验。
 
 ```js
-await fetch("/api/Enhanced/set", {
+await fetch("/api/set", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-        key: "Enhanced.Settings.Home.Top_left",
-        value: "mine",
-    }),
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams([["@BiliBili.Enhanced.Settings.Home.Top_left", JSON.stringify("mine")]]),
 });
 ```
 
-页面初始化时只执行一次 `POST /api/{module}/get` 读取 Settings 子树。写入成功后仅更新当前页面快照；查看 Settings/Caches 时按需读取，清空和重置通过 delete 动作完成。
+页面初始化时只执行一次 `POST /api/get` 读取 Settings 子树。写入成功后仅更新当前页面快照；查看 Settings/Caches 时按需读取，清空和重置通过 `/api/delete` 完成。
 
 ## 宿主集成
 
