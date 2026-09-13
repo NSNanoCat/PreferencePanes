@@ -92,8 +92,8 @@ export interface SettingsRequest {
      */
     headers?: Record<string, string | undefined>;
     /**
-     * 模块动作的 JSON 正文
-     * JSON body for a module action.
+     * 存储动作的 form 正文
+     * Form body for a storage action.
      */
     body?: string;
 }

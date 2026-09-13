@@ -22,13 +22,16 @@ test("browser client reads Settings once, normalizes stored values and then muta
     });
     await client.set("Module.Settings.Home.mode", "a");
     assert.deepEqual(
-        calls.map(call => [call.method, call.url, JSON.parse(call.body)]),
+        calls.map(call => {
+            const [entry] = new URLSearchParams(call.body);
+            return [call.method, call.url, ...entry];
+        }),
         [
-            ["POST", "/api/Module/get", { scope: "settings" }],
-            ["POST", "/api/Module/set", { key: "Module.Settings.Home.mode", value: "a" }],
+            ["POST", "/api/get", "@Example.Module.Settings", ""],
+            ["POST", "/api/set", "@Example.Module.Settings.Home.mode", '"a"'],
         ],
     );
-    assert.deepEqual(calls[0].headers, { "Content-Type": "application/json" });
+    assert.deepEqual(calls[0].headers, { "Content-Type": "application/x-www-form-urlencoded" });
     assert.equal(client.snapshot().values["Module.Settings.Home.mode"], "a");
 });
 
@@ -43,25 +46,40 @@ test("missing Settings initializes the page from BoxJS defaults", async () => {
     });
 });
 
-test("settings and caches are read through module API actions", async () => {
+test("settings and caches are read through fixed form actions", async () => {
     const calls = [];
     const client = new PreferencesClient({
         definition,
         fetch: async (url, options) => {
             calls.push({ url, ...options });
-            const scope = JSON.parse(options.body).scope;
-            return scope === "caches" ? new Response(JSON.stringify({ items: [1, 2] }), { status: 200 }) : new Response(JSON.stringify({ count: 7 }), { status: 200 });
+            const [key] = new URLSearchParams(options.body).keys();
+            return key.endsWith(".Caches") ? new Response(JSON.stringify({ items: [1, 2] }), { status: 200 }) : new Response(JSON.stringify({ count: 7 }), { status: 200 });
         },
     });
     assert.deepEqual(await client.readSettings(), { count: 7 });
     assert.deepEqual(await client.readCaches(), { items: [1, 2] });
     assert.deepEqual(
-        calls.map(call => [call.method, call.url, JSON.parse(call.body)]),
+        calls.map(call => [call.method, call.url, [...new URLSearchParams(call.body).keys()][0]]),
         [
-            ["POST", "/api/Module/get", { scope: "settings" }],
-            ["POST", "/api/Module/get", { scope: "caches" }],
+            ["POST", "/api/get", "@Example.Module.Settings"],
+            ["POST", "/api/get", "@Example.Module.Caches"],
         ],
     );
+});
+
+test("invalid fields and values are rejected before a storage request", async () => {
+    const calls = [];
+    const client = new PreferencesClient({
+        definition,
+        fetch: async (url, options) => {
+            calls.push({ url, ...options });
+            return new Response(null, { status: 200 });
+        },
+    });
+    await assert.rejects(client.set("Module.Settings.Unknown", true), /Invalid setting value/);
+    await assert.rejects(client.set("Module.Settings.count", Number.NaN), /Invalid setting value/);
+    await assert.rejects(client.remove("Module.Settings.Unknown"), /Invalid setting value/);
+    assert.equal(calls.length, 0);
 });
 
 test("successful mutations update the page cache without rereading", async () => {

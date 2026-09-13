@@ -5,19 +5,28 @@ import vm from "node:vm";
 
 const source = await readFile(new URL("../dist/web.js", import.meta.url), "utf8");
 
-for (const quantumult of [false, true])
-    test(`${quantumult ? "Quantumult X" : "Surge"}: web script serves pages and assets without intercepting APIs`, async () => {
+const hosts = [
+    { name: "Surge", globals: { $environment: { "surge-version": "test" } } },
+    { name: "Loon", globals: { $loon: {} } },
+    { name: "Stash", globals: { $environment: { "stash-version": "test" } } },
+    { name: "Shadowrocket", globals: { $rocket: {} } },
+    { name: "Egern", globals: { Egern: {} } },
+    { name: "Quantumult X", quantumult: true, globals: { $task: {} } },
+];
+
+for (const host of hosts)
+    test(`${host.name}: web script serves pages and assets without intercepting APIs`, async () => {
         const run = (path, method = "GET", headers = {}) =>
             new Promise(resolve => {
                 vm.runInNewContext(source, {
-                    ...(quantumult ? { $task: {} } : { $environment: { "surge-version": "test" } }),
+                    ...host.globals,
                     $request: { url: `https://example.org${path}`, method, headers },
                     $script: { startTime: Date.now() / 1000 },
-                    $done: result => resolve(quantumult ? result : result.response),
+                    $done: result => resolve(host.quantumult ? result : result.response),
                     console: { log() {}, error() {} },
                 });
             });
-        const status = value => (quantumult ? Number(value.status.split(" ")[1]) : value.status);
+        const status = value => (host.quantumult ? Number(value.status.split(" ")[1]) : value.status);
         const page = await run("/settings/Module");
         assert.equal(status(page), 200);
         assert.match(page.body, /<!doctype html>/i);
@@ -28,12 +37,12 @@ for (const quantumult of [false, true])
             assert.match(result.body, /PreferencePanes|preference-panes/);
         }
         const legacy = await run("/settings/assets/app.mjs");
-        if (quantumult) assert.deepEqual(JSON.parse(JSON.stringify(legacy)), {});
+        if (host.quantumult) assert.deepEqual(JSON.parse(JSON.stringify(legacy)), {});
         else assert.equal(legacy, undefined);
         assert.equal(status(await run("/settings/Module", "POST")), 405);
         for (const path of ["/api/Module", "/configs/Module", "/settings/assets/host.mjs"]) {
             const result = await run(path);
-            if (quantumult) assert.deepEqual(JSON.parse(JSON.stringify(result)), {});
+            if (host.quantumult) assert.deepEqual(JSON.parse(JSON.stringify(result)), {});
             else assert.equal(result, undefined);
         }
     });

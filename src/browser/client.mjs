@@ -67,7 +67,7 @@ export class PreferencesClient {
      * @returns {Promise<unknown>} Settings 内容或 undefined / Settings content or undefined.
      */
     async readSettings() {
-        const response = await this.#send("get", { scope: "settings" });
+        const response = await this.#send("get", `@${this.#definition.storageKey}.${this.#definition.settingsPath.join(".")}`);
         return response.status === 404 ? undefined : response.json();
     }
 
@@ -77,7 +77,7 @@ export class PreferencesClient {
      * @returns {Promise<unknown>} Caches 内容或 undefined / Caches content or undefined.
      */
     async readCaches() {
-        const response = await this.#send("get", { scope: "caches" });
+        const response = await this.#send("get", `@${this.#definition.storageKey}.${this.#module}.Caches`);
         return response.status === 404 ? undefined : response.json();
     }
 
@@ -87,7 +87,7 @@ export class PreferencesClient {
      * @returns {Promise<void>} 操作完成 / Operation completion.
      */
     clearCaches() {
-        return this.#change("delete", { scope: "caches" }, "clearCaches");
+        return this.#change("delete", `${this.#module}.Caches`, undefined, "clearCaches");
     }
 
     /**
@@ -96,7 +96,7 @@ export class PreferencesClient {
      * @returns {Promise<void>} 操作完成 / Operation completion.
      */
     reset() {
-        return this.#change("delete", { scope: "module" }, "reset");
+        return this.#change("delete", this.#module, undefined, "reset");
     }
 
     /**
@@ -116,7 +116,7 @@ export class PreferencesClient {
      * @returns {Promise<void>} 操作完成 / Operation completion.
      */
     set(key, value) {
-        return this.#change("set", { key, value }, "write", key);
+        return this.#change("set", key, value, "write");
     }
 
     /**
@@ -126,30 +126,31 @@ export class PreferencesClient {
      * @returns {Promise<void>} 操作完成 / Operation completion.
      */
     remove(key) {
-        return this.#change("delete", { key }, "delete", key);
+        return this.#change("delete", key, undefined, "delete");
     }
 
     /**
-     * 向模块 API 发送 JSON 动作。
-     * Send a JSON action to the module API.
-     * @param {"get" | "set" | "delete"} action 模块动作 / Module action.
-     * @param {unknown} payload JSON 请求体 / JSON request body.
+     * 向固定存储 API 发送完整路径的 form 动作。
+     * Send a complete-path form action to the fixed storage API.
+     * @param {"get" | "set" | "delete"} action 存储动作 / Storage action.
+     * @param {string} path 完整 @root.path / Complete @root.path.
+     * @param {unknown} [value] set 写入值 / Value written by set.
      * @returns {Promise<Response>} 原始响应 / Raw response.
      */
-    async #send(action, payload) {
+    async #send(action, path, value) {
         const controller = new AbortController();
         const abort = () => controller.abort();
         if (this.#session.signal.aborted) abort();
         this.#session.signal.addEventListener("abort", abort, { once: true });
         const timer = setTimeout(abort, this.#timeout);
         try {
-            const response = await this.#request(`/api/${encodeURIComponent(this.#module)}/${action}`, {
+            const response = await this.#request(`/api/${action}`, {
                 method: "POST",
                 credentials: "omit",
                 cache: "no-store",
                 signal: controller.signal,
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams([[path, action === "set" ? JSON.stringify(value) : ""]]).toString(),
             });
             if (response.status !== 200 && !(action === "get" && response.status === 404)) throw new Error(`HTTP ${response.status}`);
             return response;
@@ -163,28 +164,28 @@ export class PreferencesClient {
      * 执行写入动作；成功后只更新当前页面值。
      * Execute a mutation and update only the current page values after success.
      * @param {"set" | "delete"} action API 动作 / API action.
-     * @param {Record<string, unknown>} payload JSON 请求体 / JSON request body.
+     * @param {string} key 不含存储根的路径 / Path without the storage root.
+     * @param {unknown} value set 写入值 / Value written by set.
      * @param {"write" | "delete" | "clearCaches" | "reset"} operation 通知操作 / Notification operation.
-     * @param {string} [key] 字段路径 / Field path.
      * @returns {Promise<void>} 操作完成 / Operation completion.
      */
-    async #change(action, payload, operation, key) {
+    async #change(action, key, value, operation) {
         if (this.#saving) throw new Error("A settings write is already in progress");
         this.#saving = true;
         try {
-            if (operation === "write") {
-                const field = this.#definition.fields.find(candidate => candidate.key === key);
-                if (!field || !validValue(field, payload.value)) throw new TypeError("Invalid setting value");
+            let field;
+            if (operation === "write" || operation === "delete") {
+                field = this.#definition.fields.find(candidate => candidate.key === key);
+                if (!field || (operation === "write" && !validValue(field, value))) throw new TypeError("Invalid setting value");
             }
-            await this.#send(action, payload);
+            await this.#send(action, `@${this.#definition.storageKey}.${key}`, value);
             switch (operation) {
                 case "write":
-                    this.#values[key] = structuredClone(payload.value);
+                    this.#values[key] = structuredClone(value);
                     break;
                 case "delete": {
-                    const field = this.#definition.fields.find(candidate => candidate.key === key);
                     delete this.#values[key];
-                    if (field && Object.hasOwn(field, "defaultValue")) this.#values[key] = structuredClone(field.defaultValue);
+                    if (Object.hasOwn(field, "defaultValue")) this.#values[key] = structuredClone(field.defaultValue);
                     break;
                 }
                 case "clearCaches":

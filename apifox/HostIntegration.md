@@ -24,7 +24,7 @@ PreferencePanes 不提供项目主页，也不绑定客户端 SDK。宿主负责
 
 ## 模块页面
 
-`ModuleFrame` 只打开规范 `/settings/{module}` 页面并标记模块身份。页面自行读取同源 `/configs/{module}`；调用方不传 JSON、CSS 或私有 Header。
+`ModuleFrame` 只打开规范 `/settings/{module}` 页面并标记模块身份。页面通过同源 `/api/{module}` 读取 BoxJS；调用方不传 JSON、CSS 或私有 Header，页面也不直接访问 `/configs/**`。
 
 ```js
 const frame = new ModuleFrame(`/settings/${module}`, { signal });
@@ -47,6 +47,6 @@ nativeMoreButton.onclick = () => menu.open();
 - `confirm` 事件可由宿主 `preventDefault()` 后通过 `detail.resolve(boolean)` 或 `reject(error)` 完成；未接管时使用浏览器确认。
 - `notice` 事件包含 `{kind, message}`。宿主接管后负责提示；模块不再创建重复 Toast。
 - 保存成功只更新当前页面快照；重新进入模块时重新读取 BoxJS 和 Settings。
-- 通用前端规则由一个宿主模块提供；业务模块只安装自己的配置与 API 规则。
+- 通用前端与后端规则由一个宿主模块分别提供；业务模块只安装自己的配置规则。
 
 客户端 Bridge 属于项目页面。项目 HTML 引入官方 SDK 后，由自己的页面脚本直接调用，再将 `ModuleFrame` 事件映射到原生界面。不要把具体客户端的 Bridge、User-Agent、主题值或原生菜单协议加入 PreferencePanes。
