@@ -1,31 +1,55 @@
+import { normalizeStoredValue, validValue } from "./boxjs.mjs";
+
 /**
  * 管理单模块页面的 API 请求、值快照和会话终止。
  * Manage API requests, value snapshots, and session termination for one module page.
  */
 export class PreferencesClient {
     #module;
-    #configURL;
     #definition;
     #request;
     #notify;
     #timeout;
     #session = new AbortController();
-    #values;
+    #values = {};
     #saving = false;
 
     /**
-     * 创建只调用模块 API、不读取或解析 BoxJS 的页面客户端。
-     * Create a page client that only calls the module API and never reads or parses BoxJS.
-     * @param {import("./client.mjs").PreferencesClientOptions} options API 模型、请求与通知 / API model, requests, and notifications.
+     * 创建从 BoxJS 定义读取和持久化设置的页面客户端。
+     * Create a page client that reads and persists settings from a BoxJS definition.
+     * @param {import("./client.mjs").PreferencesClientOptions} options 字段定义、请求与通知 / Field definition, requests, and notifications.
      */
-    constructor({ model, definition, fetch: request = globalThis.fetch.bind(globalThis), notify = () => {}, timeout = 10000 }) {
-        this.#module = model.module;
-        this.#configURL = model.configURL;
+    constructor({ definition, fetch: request = globalThis.fetch.bind(globalThis), notify = () => {}, timeout = 10000 }) {
+        this.#module = definition.module;
         this.#definition = definition;
         this.#request = request;
         this.#notify = notify;
         this.#timeout = timeout;
-        this.#values = structuredClone(model.values);
+    }
+
+    /**
+     * 读取一次 Settings 子树并建立页面值快照。
+     * Read the Settings subtree once and establish the page value snapshot.
+     * @returns {Promise<import("./client.mjs").ModuleSnapshot>} 页面快照 / Page snapshot.
+     */
+    async open() {
+        let subtree = await this.readSettings();
+        if (subtree === undefined) subtree = {};
+        if (typeof subtree === "string") subtree = JSON.parse(subtree);
+        if (!subtree || typeof subtree !== "object" || Array.isArray(subtree)) throw new TypeError("Expected a settings subtree object");
+        const values = {};
+        for (const field of this.#definition.fields) {
+            const stored = field.key
+                .split(".")
+                .slice(this.#definition.settingsPath.length)
+                .reduce((parent, part) => Object(parent)[part], subtree);
+            const value = normalizeStoredValue(field, stored === undefined ? field.defaultValue : stored);
+            if (value === undefined) continue;
+            if (!validValue(field, value)) throw new TypeError(`Invalid stored value: ${field.key}`);
+            values[field.key] = value;
+        }
+        this.#values = values;
+        return this.snapshot();
     }
 
     /**
@@ -124,7 +148,7 @@ export class PreferencesClient {
                 credentials: "omit",
                 cache: "no-store",
                 signal: controller.signal,
-                headers: { "Content-Type": "application/json", "X-PreferencePanes-JSON": this.#configURL },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
             });
             if (response.status !== 200 && !(action === "get" && response.status === 404)) throw new Error(`HTTP ${response.status}`);
@@ -148,6 +172,10 @@ export class PreferencesClient {
         if (this.#saving) throw new Error("A settings write is already in progress");
         this.#saving = true;
         try {
+            if (operation === "write") {
+                const field = this.#definition.fields.find(candidate => candidate.key === key);
+                if (!field || !validValue(field, payload.value)) throw new TypeError("Invalid setting value");
+            }
             await this.#send(action, payload);
             switch (operation) {
                 case "write":

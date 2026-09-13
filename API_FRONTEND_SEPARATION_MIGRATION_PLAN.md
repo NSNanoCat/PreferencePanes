@@ -1,161 +1,36 @@
-# API 前后端分离迁移计划
+# PreferencePanes 单前端整改记录
 
-本文是本次迁移的执行记录，不是当前接口规范。当前契约以 `apifox/Specification.md`、公开类型和测试为准。
+本文记录 2026-09-13 的架构纠偏。当前公开契约以 `apifox/Specification.md`、类型声明和测试为准。
 
-## 已确认边界
+## 最终边界
 
-- 后端 `api.js` 只接管 `/api/{module}`、`/api/{module}/get`、`set`、`delete`。
-- 后端取得原始 BoxJS，只按字段 ID 确认允许访问的完整 `@root.path`，不解释控件、选项、默认值或展示元数据。
-- 后端直接调用 `@nsnanocat/util` 的 `Storage.getItem`、`setItem`、`removeItem`，不再维护第二层 Store 封装。
-- 前端独占 BoxJS 控件解析、值规范化、值校验和 DOM 渲染。
-- 前端页面与静态资源由独立 `web.js` 提供；后端 `api.js` 不包含、映射或返回 HTML、CSS、浏览器 JavaScript。
-- HTML 只加载前端脚本并调用 API，不承担后端 URL 路由。
+- 浏览器包只公开 `mount(boxjs)`，同步返回 `destroy()` 句柄。
+- 模块页面直接读取同源 `/configs/{module}`，不经过 API Model。
+- `api.js` 只处理 HEAD 探测与 POST get/set/delete。
+- `web.js` 只提供通用 `/settings/**` 页面和 `index.mjs`、`navigation.mjs`。
+- 页面不接受 JSON/CSS 参数、私有 Header 或旧资源别名。
+- Biliverse 仅 Enhanced 安装通用 `web.js`；其它业务模块只提供配置与 API。
 
 ## 非目标
 
-- 不改变业务模块的 BoxJS 字段、存储键和默认值。
-- 不引入鉴权、中间件、兼容旧 `/api/get|set|delete` 的回退或新的配置层。
-- 不修改 Biliverse 客户端 Bridge、页面视觉样式和模块业务脚本。
-- 步骤 1-11 只创建本地 `dev` 提交；后续用户已明确要求完成页面 class 收口并提交发布，按下述追加计划执行。
+- 不改变业务模块 BoxJS 字段、默认值、存储根或运行逻辑。
+- 不把 Bilibili JSBridge、项目主页、主题实现或原生菜单协议加入 PreferencePanes。
+- 不保留旧架构兼容层、并行入口或按模块生成页面。
 
-## 执行顺序
+## 验证
 
-1. [x] **计划基线（PreferencePanes）**
-   - 提交本文件。
-   - 验证：工作树除本文件外无变化；提交遵守 Conventional Commits。
+- PreferencePanes 构建、Biome、TypeScript、node:test、Apifox 生成校验和包清单。
+- Surge 与 Quantumult X VM 路由隔离。
+- 同一前端依次加载 Enhanced、Global、Redirect、ADBlock 的 BoxJS，并读写各自 API。
+- Global、Redirect、ADBlock 所有模板不含 `web.js` 或 `/settings/**`；Enhanced 每份模板只含一个通用前端 provider。
+- ADBlock 与聚合 BoxJs 的空降助手字段完全一致且只出现一次。
 
-2. [x] **单一后端 API（PreferencePanes）**
-   - 用 `src/api.mjs` 取代 `src/proxy/handler.mjs` 和 `src/ModuleApi.mjs`。
-   - 将响应构造、代理宿主完成响应和字段 ID 查找收进同一后端文件。
-   - 删除 `src/Store.mjs`、`src/lib/response.mjs`、`src/proxy/response.mjs`，直接使用 util `Storage` 深路径 API。
-   - `dist/api.js` 不再包含 HTML 或浏览器资源。
-   - 验证：模块 API、平台 Storage、构建隔离测试及完整 `npm run check`。
-   - 计划提交：`refactor(api): 收敛独立后端入口`。
+## 发布顺序
 
-3. [x] **前端 BoxJS 解析（PreferencePanes）**
-   - 将公共 `src/BoxJS.mjs` 与 `src/lib/boxjs.mjs` 收敛为浏览器侧 BoxJS 解析模块。
-   - 后端不得导入前端解析器；构建器只读取生成前端路径所需的单模块名称。
-   - 验证：BoxJS、浏览器渲染、构建和类型测试。
-   - 计划提交：`refactor(browser): 收敛 BoxJS 页面解析`。
+1. PreferencePanes v1.1.1。
+2. Enhanced v0.5.14。
+3. Global v0.8.22、Redirect v0.2.21、ADBlock v0.6.25。
+4. BoxJs main 与 Biliverse.github.io main。
+5. Universe dev gitlink。
 
-4. [x] **独立前端交付（PreferencePanes）**
-   - 新增只返回 `/settings/{module}`、`index.mjs`、`navigation.mjs` 的 `web.js` 构建入口。
-   - 保持现有静态 `dist/module/` 产物；`web.js` 不访问网络或 Storage。
-   - Release 工作流分别上传 `api.js` 和 `web.js`。
-   - 验证：静态资源路由、API 路由隔离、构建产物内容检查及完整 `npm run check`。
-   - 计划提交：`refactor(web): 独立设置页面交付`。
-
-5. [x] **契约与文档（PreferencePanes）**
-   - 更新 README、Apifox Specification、HostIntegration、生成器和原生 Apifox JSON。
-   - 明确 `api.js` 与 `web.js` 的安装规则和发布顺序。
-   - 验证：`npm run apifox:generate`、`npm run apifox:check`、`git diff --check`。
-   - 计划提交：`docs(api): 记录前后端独立契约`。
-
-6. [x] **网站调用与预览（Biliverse.github.io）**
-   - 模块页面和公共浏览器资源交给 `web.js`，模块数据请求交给 `api.js`。
-   - 更新本地预览、网站说明和测试，不改变 Biliverse Bridge 与视觉代码。
-   - 验证：`pnpm settings:build`、`settings:check`、`settings:test`。
-   - 计划提交：`refactor(settings): 分离页面与模块 API`。
-
-7. [x] **业务模板（Enhanced）**
-   - API 规则只匹配 `/api/{module}` 路径；页面与静态资源规则改用 `web.js`。
-   - 重新生成模板产物并运行仓库既有检查。
-   - 计划提交：`refactor(settings): 分离页面与模块 API`。
-
-8. [x] **业务模板（Global）**
-   - 与 Enhanced 使用同一前后端规则，保持 Global 自己的配置 Mock 不变。
-   - 重新生成模板产物并运行仓库既有检查。
-   - 计划提交：`refactor(settings): 分离页面与模块 API`。
-
-9. [x] **业务模板（Redirect）**
-   - 与 Enhanced 使用同一前后端规则，保持 Redirect 自己的配置 Mock 不变。
-   - 重新生成模板产物并运行仓库既有检查。
-   - 计划提交：`refactor(settings): 分离页面与模块 API`。
-
-10. [x] **业务模板（ADBlock）**
-    - 修改前先将本地 `dev` 快进到 `origin/dev`，不得覆盖远端新增提交。
-    - 与 Enhanced 使用同一前后端规则，保持 ADBlock 自己的配置 Mock 不变。
-    - 重新生成模板产物并运行仓库既有检查。
-    - 计划提交：`refactor(settings): 分离页面与模块 API`。
-
-11. [x] **最终核验与计划收口**
-    - 核对六个仓库的分支、工作树、提交范围和未推送状态。
-    - 搜索旧 API 路径以及由 `api.js` 返回 `/settings/**` 的残留。
-    - 在本文件记录各步骤提交哈希和最终验证结果。
-    - 计划提交：`docs(plan): 完成 API 前后端分离记录`。
-
-## 页面生命周期 class 与发布追加计划
-
-12. [x] **计划基线（PreferencePanes）**
-    - 记录四层浏览器生命周期 class、发布兼容边界、版本和多仓库发布顺序。
-    - 验证：本步骤只提交计划文件。
-
-13. [x] **浏览器生命周期 class（PreferencePanes）**
-    - `ModulePage` 管理页面输入、初始 API 请求、BFCache 重载和错误状态。
-    - `PreferencesView` 管理 BoxJS 解析与校验、样式、主题和面板生命周期。
-    - `PreferencesPanel` 管理控件、导航、操作队列和通知。
-    - `PreferencesClient` 只管理 API 请求、页面值快照和会话终止。
-    - `index.mjs` 直接实例化 `ModulePage`，各层直接实例化下一层；公开导出 `PreferencesView`，保留 `mount()` 便捷入口。
-    - 所有新增 class 与公开方法使用中英双语说明和 JSDoc。
-    - 验证：构建、Biome、TypeScript、完整测试和 Apifox 一致性检查。
-    - 计划提交：`refactor(browser): 用类管理页面生命周期`。
-
-14. [x] **1.0 页面入口兼容（PreferencePanes）**
-    - 新页面和新模板只使用 `/settings/assets/index.mjs`。
-    - `web.js` 将 1.0.0 已发布的 `/settings/assets/app.mjs` 映射到同一份 `index.mjs` 正文，不保留第二个源文件或实现。
-    - 验证：两个 URL 返回完全相同正文，且 API/前端路由隔离测试继续通过。
-    - 计划提交：`fix(web): 保留 1.0 页面入口映射`。
-
-15. [x] **文档与 1.1.0 发布准备（PreferencePanes）**
-    - README 记录 class 职责链、推荐实例化方式和公开入口兼容边界。
-    - 更新 package 版本和发布历史，不改变 Apifox API 契约。
-    - 验证：候选包构建、类型、测试、Apifox 和归档内容检查。
-    - 计划提交：`chore(release): 准备 1.1.0 发布`。
-
-16. [x] **依赖仓库 dev 推送**
-    - 推送 Biliverse.github.io、Enhanced、Global、Redirect、ADBlock 的 `index.mjs` 模板提交。
-    - Biliverse/API 本地 `dev` 含无关未推送祖先，因此从 `origin/main` 临时分支只 cherry-pick 本次接口文档并发布到远端 `dev`。
-    - 不创建业务模块正式版本；只发布已验证的 `dev` 分支改动。
-    - 验证：五个运行时仓库的本地 `dev` 与 `origin/dev` 一致；API 远端 `dev` 只含本次两文件文档改动。
-
-17. [x] **PreferencePanes 1.1.0 正式发布**
-    - 推送 PreferencePanes `dev`，合并到 `main`，创建并推送注释标签 `v1.1.0`。
-    - 等待 npm、GitHub Packages 与 Release Assets 工作流完成。
-    - 验证：GitHub Release 含 `api.js`、`web.js`，npm 可读取 1.1.0，`main`、`dev` 和标签指向预期提交。
-
-18. [x] **发布记录收口**
-    - 回填步骤 12-17 的提交、推送和发布验证结果。
-    - 计划提交：`docs(plan): 记录 1.1.0 发布结果`。
-
-## 上下文压缩后的恢复步骤
-
-1. 重新读取本文件，不重新设计已经确认的边界。
-2. 分别检查 PreferencePanes、Biliverse.github.io、Enhanced、Global、Redirect、ADBlock 的 `dev`、工作树和最近提交。
-3. 用上述计划提交信息判断已完成步骤，从第一个未完成步骤继续。
-4. 不重做已经提交的步骤，不修改无关文件，不推送或发布。
-5. 每个步骤都先验证、检查 staged 路径和 `git diff --cached --check`，再创建对应提交。
-
-## 完成记录
-
-| 步骤 | 仓库 | 提交 | 验证 |
-| --- | --- | --- | --- |
-| 计划基线 | PreferencePanes | `9c8165b` | 计划文件单独提交 |
-| 单一后端 API | PreferencePanes | `803bd7d` | 构建、类型、Biome、45 项测试及 API 构建隔离通过 |
-| 前端 BoxJS 解析 | PreferencePanes | `2a90853` | 构建、类型、Biome、44 项测试及前后端导入隔离通过 |
-| 独立前端交付 | PreferencePanes | `06b683a` | `api.js`/`web.js` 隔离、构建、类型、Biome 及 46 项测试通过 |
-| 契约与文档 | PreferencePanes | `078616a` | Apifox 10 操作/8 路径/3 JSON 动作、完整构建和 46 项测试通过 |
-| 网站调用与预览 | Biliverse.github.io | `5e7f859` | 9 个设置输出、4 项测试及改动文件 Biome 通过 |
-| 业务模板 | Enhanced | `57b8758` | release/dev 生成、28 项测试及改动文件 Biome 通过；全仓 Biome 仍有既有 `example`、`unreleased` 和旧源码问题 |
-| 业务模板 | Global | `79b650a` | release/dev 生成、5 项测试及改动文件 Biome 通过；全仓 Biome 仍有既有 `example`、`unreleased` 和旧源码问题 |
-| 业务模板 | Redirect | `9547952` | release/dev 生成、5 项测试及改动文件 Biome 通过；全仓 Biome 仍有既有生成文件和旧源码问题 |
-| 业务模板 | ADBlock | `fb857f5` | 先快进到 `f24d1d4`；release/dev 生成、25 项测试及改动文件 Biome 通过；全仓 Biome 仍有既有生成文件和旧源码问题 |
-| 最终核验 | PreferencePanes | 本步骤提交 | 六仓库均为本地 `dev` 且工作树干净；旧组合路由与旧后端分层引用搜索为零；核心 46 项测试和网站 4 项测试通过 |
-| 模块页面入口收口 | 六仓库 | `674aab9`, `88b38de`, `323d8a1`, `960a98a`, `21362ea`, `51f409b` | 模块页面公共入口由 `app.mjs` 统一改为 `index.mjs`；PreferencePanes 构建、Biome、TypeScript、46 项测试、Apifox 校验，以及网站和四个业务仓库测试通过；六个 `dev` 分支各本地领先 `origin/dev` 1 个提交，未推送 |
-| 当前文档路径同步 | Biliverse/API、Global、Redirect、ADBlock | `ac2c23b`, `5c2b552`, `9c3bf40`, `982662f` | 修正当前说明中的模块 API 动作路径；API 公共 Apifox 资源校验通过；API 使用新建本地 `dev` 分支，未推送 |
-| class 发布计划 | PreferencePanes | `9648cfa` | 记录四层浏览器生命周期、兼容边界和发布顺序 |
-| 浏览器生命周期 class | PreferencePanes | `053f801` | 四层 class 调用链、公开 `PreferencesView`、双语 JSDoc、构建、类型、47 项测试及 Apifox 校验通过 |
-| 1.0 页面入口兼容 | PreferencePanes | `fe978ef` | `app.mjs` 与 `index.mjs` 返回同一正文，不存在第二个源文件或实现 |
-| 1.1.0 发布准备 | PreferencePanes | `634bddb` | README、版本和发布历史同步；构建、类型、47 项测试、Apifox 和 32 文件候选包通过 |
-| 依赖仓库 dev 发布 | Biliverse.github.io、Enhanced、Global、Redirect、ADBlock、API | `88b38de`, `323d8a1`, `5c2b552`, `9c3bf40`, `982662f`, `f0691d4` | 五个运行时仓库快进推送；API 从 `origin/main` 只发布两文件文档提交，未携带本地无关祖先 |
-| 1.1.0 正式发布 | PreferencePanes | `e780ca5`, `v1.1.0` | npm、GitHub Packages、Release Assets 三个工作流成功；Release 含 `api.js` 与 `web.js`；npm 1.1.0 为 32 文件，SHA-1 `6969c8a90c7880a57995ceecdc1abe9d733d6a5a`；发布版新旧入口均为 200 且正文相同 |
-| 发布记录收口 | PreferencePanes | 本步骤提交 | 回填提交、推送、registry、Release 资产和线上入口验证结果 |
+远端发布完成后下载全部资产计算 SHA-256，并按“先 Enhanced，后其它业务模块”的安装顺序复验客户端规则。

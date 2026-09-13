@@ -1,34 +1,10 @@
-# PreferencePanes 发布流程与历史记录
+# PreferencePanes 发布流程
 
-1.1.0 将模块页面生命周期收拢为 `ModulePage`、`PreferencesView`、`PreferencesPanel` 和 `PreferencesClient` 四层 class；公开浏览器入口新增 `PreferencesView`，`mount()` 保留为便捷入口。新页面统一使用 `index.mjs`，发布资源继续将 1.0.0 的 `app.mjs` URL 映射到同一正文。
+## 1.1.1
 
-1.0.0 将后端 API 与设置前端拆分为同版本的 `api.js` 和 `web.js`；后端只处理 `/api/{module}` 及读写动作，前端只提供 `/settings/**` 页面资源。BoxJS 控件解析归属浏览器，后端只按字段 ID 直接调用 util `Storage`。
+1.1.1 恢复 BoxJS 单输入公开契约：浏览器只导出 `mount(boxjs)`，页面直接读取同源 `/configs/{module}`，API 只保留 HEAD 探测与 POST get/set/delete。删除 API Model、自定义 JSON/CSS 输入、私有 Header、按模块构建器和旧页面资源别名。
 
-0.9.16 将公共模块探测 API 改为原样返回 HEAD 的 Response；可用性使用 response.status，模块版本使用 X-PreferencePanes-Version 响应头，不再暴露自定义 httpStatus 响应字段。
-
-0.9.15 暴露通用 `probeModule(url)` 版本探测 API；ModuleStatus 委托公共 HEAD 探测并返回结构化结果，补充类型、测试与 Apifox 文档。
-
-0.9.14 将“查看设置”改为通过 `POST /api/get` 按需读取当前模块最新 Settings 子树；详情读取不再复用首次打开页面时的内存快照。
-
-0.9.13 增加设置 JSON 查看入口，并将模块重置菜单更名为重置设置；设置和缓存均可从右上角菜单进入可返回的序列化 JSON 页面。
-
-0.9.12 将 JSON/CSS 导入、模块存储读取和失败重试统一为屏幕居中的状态组件；默认样式在异步导入前安装，重试按钮固定排列在转圈与状态文本下方。
-
-0.9.11 修正通用底部操作菜单在窄屏 WebView 中因 Shadow DOM 盒模型独立而超出视口的问题；菜单在手机上保留对称边距，在宽屏上居中限制为 540px。
-
-0.9.10 为宿主暴露通用底部操作菜单的 `open()` 入口；common WebView 可保留原生 MORE 按钮作为触发器，菜单项与执行仍由 PreferencePanes 统一管理。
-
-0.9.9 将模块页横向滚动限制为纵向内容滚动，并把模块图标移动到固定搜索栏左侧。
-
-0.7.0 的 build(boxjs, css?) 与 mount(boxjs, css?) 只生成具体模块设置页，不生成项目主页或入口目录。发布前应在文件导入测试台验证 JSON、可选 CSS、iframe 隔离、模块保存与二级多选。以下版本信息是历史记录，不代表当前输入契约。
-
-已发布 `0.3.0`：SettingsHandler 改为安装配置驱动的存储桥接，参数为 origin/storageKey/module，API 不再下载 BoxJS；GET/POST/DELETE 支持模块内任意键和子树。前端增加 Caches 查看/清空与模块重置。由于移除 configURL/resolver 并放开字段限制，消费者必须同步更新安装参数。
-
-两个 registry 的 `0.3.0` 包 SHA-1 均为 `32232da92719e6f5c7cb7a588b4fd88a8f7ad4c4`。
-
-首版沿用 package.json 的 `0.1.0`，发布标签为 `v0.1.0`。包名为 `@nsnanocat/preference-panes`，与 NSNanoCat 其它 package 一样全部小写。
-
-`0.1.0` 已于 2026-09-08 通过两个发布工作流完成首发。npm 和 GitHub Packages tarball 的 SHA-1 均为 `58f0ed3b056936a5e90b3406b802640ddca67c91`。npm 首发使用仓库 secret `NPM_TOKEN`；Trusted Publisher 尚待配置，因此暂时保留该 secret。
+这是破坏性纠偏版本。npm 已发布版本不可覆盖，因此不能复用 1.1.0；发布 1.1.1 后将 npm 1.1.0 标记为 deprecated。
 
 ## 发布前验证
 
@@ -39,29 +15,35 @@ npm ci --registry=https://registry.npmjs.org/ --@nsnanocat:registry=https://regi
 npm run build
 npm run check
 npm run apifox:check
-npm pack
+npm pack --dry-run
 ```
 
-普通 main/dev 推送和手动运行 CI 只验证并上传候选 tgz，不发布。下载 Actions 的 `preference-panes-package` artifact，可在消费者中用 `npm install --no-save --package-lock=false /path/to/package.tgz` 验证候选包。
+必须确认：
 
-## 首次注册 npm
+- 根包没有运行时导出，browser 包只导出 `mount`。
+- `dist/api.js` 不包含页面资源，`dist/web.js` 不接管 API 或配置。
+- 所有产物都不包含旧 Model、配置来源字段、PreferencePanes JSON/CSS Header 或旧页面资源别名。
+- Surge 与 Quantumult X VM 测试、浏览器客户端测试和导入预览全部通过。
 
-npm 要求包已存在才能配置 Trusted Publisher。首次发布需要具有 `@nsnanocat` 发布权限的登录会话，或仓库中配置的 `NPM_TOKEN`；如果使用 token，必须满足 npm 的首发及 2FA 要求。不要将 token 写入源码或本地提交。
+## 发布
 
-首发后在 npm 为此包添加 GitHub Trusted Publisher：
+1. 将 `dev` 合入 `main`，确认 `main` 与发布提交一致。
+2. 创建并推送 `v1.1.1` 标签。
+3. 等待 npm、GitHub Packages 和 Release Assets 工作流成功。
+4. 确认 GitHub Release 完整包含 `api.js` 与 `web.js`。
+5. 将 npm `@nsnanocat/preference-panes@1.1.0` 标记为 deprecated，说明升级到 1.1.1。
+6. 下载 registry 包与 Release 资产，复核版本、内容和 SHA-256。
 
-| 设置 | 值 |
-| --- | --- |
-| Organization | `NSNanoCat` |
-| Repository | `PreferencePanes` |
-| Workflow | `release-package-to-npm.yml` |
+普通 main/dev 推送和手动 CI 只验证候选包，不发布。两个 registry 的版本取自 tag；正式版本使用 `latest`。
 
-配置完成后移除首发 secret `NPM_TOKEN`，后续使用 OIDC。GitHub Packages 工作流使用该仓库自己的 `GITHUB_TOKEN`，需要 `packages: write`；不复用其它 package 的发布凭证。
+## 消费方顺序
 
-## 发布与验收
+Biliverse 必须先更新并发布 Enhanced，使唯一通用 `web.js` 生效；随后更新 Global、Redirect、ADBlock，删除它们旧有的页面规则。最后部署站点、合入 BoxJs，并更新 Universe gitlink。
 
-确认候选包后，在同一提交创建并推送 `v0.1.0`。两个 `release-package-to-*.yml` 工作流分别发布 npm 和 GitHub Packages；版本取自 tag，预发布标签取版本的 prerelease 段，正式版本使用 latest。
+业务 Release 使用整改后的 main 提交重定向现有 Tag，并用 `--clobber` 替换完整资产。发布后下载所有资产复验，不只检查单个模板文件。
 
-两个发布任务都成功后，分别核对两个 registry 的版本和安装结果，再让 Enhanced 从正式 registry 安装并更新 package-lock.json。不要用本地 tgz 的路径或尚不存在的下载地址伪造正式 lockfile。包发布与 Enhanced 的 dev 部署分开验收；页面静态资源还需同步其托管仓库。
+## 历史
 
-参考：[npm Trusted Publishers](https://docs.npmjs.com/trusted-publishers/)、[npm trust 的前置条件](https://docs.npmjs.com/cli/v11/commands/npm-trust/)。
+- 1.1.0：曾公开 API Model、视图 class 与页面输入，并为每个业务模块交付 `web.js`；该结构已由 1.1.1 移除。
+- 1.0.0：首次分离 `api.js` 与 `web.js`。
+- 0.1.0：2026-09-08 首次发布。

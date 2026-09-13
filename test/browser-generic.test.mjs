@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { config } from "./fixtures/module.mjs";
 
 const browserSources = ["../src/browser/index.mjs", "../src/browser/components.mjs", "../src/browser/panel.css", "../src/browser/panel.mjs", "../src/browser/styles.mjs"];
 
@@ -46,25 +45,25 @@ test("proxy and browser sources keep storage, validation and navigation responsi
     const api = await readFile(new URL("../src/api.mjs", import.meta.url), "utf8");
     const web = await readFile(new URL("../src/web.mjs", import.meta.url), "utf8");
     const navigation = await readFile(new URL("../src/browser/Navigation.mjs", import.meta.url), "utf8");
-    const { mount } = await import("../dist/preference-panes.mjs");
     assert.doesNotMatch(api, /normalizeBoxJs|normalizeStoredValue|validValue|mountPanel|document\.|module\.html|#assets/);
     assert.doesNotMatch(web, /Storage|@nsnanocat\/util"|transport|\/api\//);
     assert.doesNotMatch(navigation, /BoxJS|Storage|api\/(?:get|set|delete)/);
-    assert.throws(() => mount({ module: "Module", boxjs: config, values: { "Module.Settings.count": "not-a-number" }, configURL: "/configs/Module" }), /Invalid stored value: Module\.Settings\.count/);
+    assert.doesNotMatch(api + web, /X-PreferencePanes-(?:JSON|CSS)|configURL/);
 });
 
-test("browser lifecycle is owned by explicit classes", async () => {
+test("browser lifecycle keeps page and view classes internal", async () => {
     const page = await readFile(new URL("../src/browser/index.mjs", import.meta.url), "utf8");
     const view = await readFile(new URL("../src/browser/mount.mjs", import.meta.url), "utf8");
     const panel = await readFile(new URL("../src/browser/panel.mjs", import.meta.url), "utf8");
     const client = await readFile(new URL("../src/browser/client.mjs", import.meta.url), "utf8");
     const browser = await import("../dist/preference-panes.mjs");
-    assert.match(page, /export class ModulePage/);
-    assert.match(page, /new PreferencesView/);
-    assert.match(view, /export class PreferencesView/);
+    assert.match(page, /class ModulePage/);
+    assert.match(page, /mount\(await response\.json\(\)\)/);
+    assert.match(view, /class PreferencesView/);
     assert.match(view, /new PreferencesPanel/);
     assert.match(panel, /export class PreferencesPanel/);
     assert.match(panel, /new PreferencesClient/);
     assert.match(client, /export class PreferencesClient/);
-    assert.equal(typeof browser.PreferencesView, "function");
+    assert.deepEqual(Object.keys(browser), ["mount"]);
+    assert.equal(typeof browser.mount, "function");
 });

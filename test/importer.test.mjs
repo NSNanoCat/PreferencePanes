@@ -24,11 +24,11 @@ test("import testbench starts empty and generates only the uploaded module", { t
         assert.doesNotMatch(page, /pp-home|data-module|安装模块/);
         assert.equal((await fetch(`${base}configs/Module`)).status, 404);
         const boxjs = [{ id: "@Root.Module.flag", name: "Flag", type: "boolean", val: true }];
-        const result = await fetch(`${base}preview`, { method: "POST", body: JSON.stringify({ boxjs, css: "body { color: green; }" }) });
+        const result = await fetch(`${base}preview`, { method: "POST", body: JSON.stringify({ boxjs }) });
         assert.equal(result.status, 200);
-        assert.deepEqual(await result.json(), { url: "/settings/Module/?css=/settings/assets/Module.css", module: "Module" });
+        assert.deepEqual(await result.json(), { url: "/settings/Module", module: "Module" });
         assert.deepEqual(await (await fetch(`${base}configs/Module`)).json(), boxjs);
-        assert.equal(await (await fetch(`${base}settings/assets/Module.css`)).text(), "body { color: green; }");
+        assert.equal((await fetch(`${base}settings/assets/Module.css`)).status, 404);
         assert.equal((await fetch(`${base}configs/Other`)).status, 404);
         assert.equal((await fetch(`${base}preview`, { method: "POST", body: "{" })).status, 400);
         assert.equal((await fetch(`${base}configs/Module`)).status, 404);

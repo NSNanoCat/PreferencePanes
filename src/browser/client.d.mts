@@ -1,4 +1,4 @@
-import type { ModuleDefinition, ModuleModel, SettingsScalar } from "../index.js";
+import type { ModuleDefinition, SettingsScalar } from "../index.js";
 /**
  * 单键写入或删除的通知事件。
  * Notification for a single-key write or delete.
@@ -16,12 +16,10 @@ export interface Notification {
     message?: string;
 }
 /**
- * 浏览器页面客户端选项；模型由 API 提供。
- * Browser page client options; the model is supplied by the API.
+ * 浏览器页面客户端选项；字段定义来自 BoxJS。
+ * Browser page client options; the field definition comes from BoxJS.
  */
 export interface PreferencesClientOptions {
-    /** API 返回的模块模型 / Module model returned by the API. */
-    model: ModuleModel;
     /** 用于渲染的归一化字段定义 / Normalized field definition for rendering. */
     definition: ModuleDefinition;
     /** 默认使用浏览器 fetch / Defaults to browser fetch. */
@@ -48,6 +46,8 @@ export interface ModuleSnapshot {
 export class PreferencesClient {
     /** 创建页面客户端 / Create the page client. */
     constructor(options: PreferencesClientOptions);
+    /** 读取设置并建立页面快照 / Read settings and establish the page snapshot. */
+    open(): Promise<ModuleSnapshot>;
     /** 获取页面快照，不发请求 / Get a page snapshot without a request. */
     snapshot(): ModuleSnapshot;
     /** 读取 Settings 子树 / Read the Settings subtree. */

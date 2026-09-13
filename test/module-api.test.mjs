@@ -48,35 +48,26 @@ test("module HEAD probes the BoxJS source through the backend API", async () => 
     assert.equal(calls[0].method, "HEAD");
 });
 
-test("module GET returns raw BoxJS and values read directly through util Storage", async () => {
-    const { run } = fixture();
+test("module GET model endpoint is removed and performs no upstream or storage work", async () => {
+    const { calls, run, storage } = fixture();
+    const before = storage.get("Example");
     const result = await run("GET", "/api/Module");
-    const body = JSON.parse(result.body);
-    assert.deepEqual(body.boxjs, config);
-    assert.equal(body.values["Module.Settings.Home.enabled"], false);
-    assert.equal(body.values["Module.Settings.Home.mode"], "b");
-    assert.equal(body.configURL, "https://example.test/configs/Module");
-});
-
-test("module GET accepts an explicit JSON source header", async () => {
-    const { calls, run } = fixture();
-    await run("GET", "/api/Module", undefined, { "X-PreferencePanes-JSON": "https://cdn.example.test/Module.json" });
-    assert.equal(calls[0].url, "https://cdn.example.test/Module.json");
-});
-
-test("module API rejects non-HTTP BoxJS sources before transport", async () => {
-    const { calls, run } = fixture();
-    const result = await run("GET", "/api/Module", undefined, { "X-PreferencePanes-JSON": "file:///tmp/Module.json" });
-    assert.equal(result.status, 400);
+    assert.equal(result.status, 405);
     assert.equal(calls.length, 0);
+    assert.equal(storage.get("Example"), before);
+});
+
+test("module API always uses the same-origin conventional configuration path", async () => {
+    const { calls, run } = fixture();
+    await run("POST", "/api/Module/get", JSON.stringify({ scope: "settings" }), { "X-PreferencePanes-JSON": "https://cdn.example.test/Module.json" });
+    assert.equal(calls[0].url, "https://example.test/configs/Module");
 });
 
 test("module API does not validate browser control semantics", async () => {
     const invalidControl = [{ ...config[0], type: "unsupported" }];
     const { run } = fixture(invalidControl);
-    const result = await run("GET", "/api/Module");
+    const result = await run("POST", "/api/Module/get", JSON.stringify({ scope: "settings" }));
     assert.equal(result.status, 200);
-    assert.deepEqual(JSON.parse(result.body).boxjs, invalidControl);
 });
 
 test("module actions use BoxJS field IDs with util Storage deep paths", async () => {

@@ -11,9 +11,9 @@ export class ModuleFrame extends EventTarget {
      * 创建容器。
      * Create a container.
      * @param url 模块地址 / Module URL.
-     * @param options 原生请求参数 / Native request options.
+     * @param options 外部取消选项 / External cancellation options.
      */
-    constructor(url: string | URL, options?: RequestInit);
+    constructor(url: string | URL, options?: { signal?: AbortSignal });
     /**
      * 宿主挂载节点。
      * Host-mounted element.
@@ -169,8 +169,6 @@ export interface ModuleProbeOptions {
     fetch?: typeof globalThis.fetch;
     /** 外部取消信号 / External cancellation signal. */
     signal?: AbortSignal;
-    /** 传给模块 API 的 BoxJS JSON 来源 / BoxJS JSON source sent to the module API. */
-    json?: string;
     /** 超时毫秒数，默认 3500 / Timeout in milliseconds, defaults to 3500. */
     timeout?: number;
 }

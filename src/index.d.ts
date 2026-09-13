@@ -268,25 +268,3 @@ export interface BoxJSSubscription extends BoxJSMetadata {
  * The sole data configuration input.
  */
 export type BoxJSInput = BoxJSSetting[] | BoxJSApp | BoxJSSubscription;
-/**
- * 模块 API 返回的原始 BoxJS 与当前值模型。
- * Raw BoxJS and current-value model returned by the module API.
- */
-export interface ModuleModel {
-    /** 模块路径段 / Module path segment. */
-    module: string;
-    /** API 获取的原始 BoxJS JSON / Raw BoxJS JSON fetched by the API. */
-    boxjs: BoxJSInput;
-    /** API 读取到的原始已保存字段值 / Raw persisted field values read by the API. */
-    values: Record<string, JsonValue>;
-    /** 后续 API 动作使用的 BoxJS JSON 地址 / BoxJS JSON URL used by later API actions. */
-    configURL: string;
-}
-/**
- * 生成模块前端文件，不复制配置、不生成绑定模块的代理脚本。
- * Build module frontend files without copying configuration or producing bound proxy scripts.
- * @param boxjs 恰好包含一个模块的 BoxJS JSON / BoxJS JSON describing exactly one module.
- * @param css 可选 CSS 正文 / Optional CSS text.
- * @returns 相对路径到文件内容的映射 / Relative paths mapped to file contents.
- */
-export function build(boxjs: BoxJSInput, css?: string): Promise<Record<string, string>>;

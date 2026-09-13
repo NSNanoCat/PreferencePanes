@@ -2,17 +2,11 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
-import { build } from "../src/index.mjs";
 import { config } from "./fixtures/module.mjs";
 
-const document = { name: "First", settings: config };
-const other = { name: "Other", settings: [{ id: "@Another.Other.flag", name: "Flag", type: "boolean", val: true }] };
-const files = await build(document, ".pp-panel { color: red; }");
-const otherFiles = await build(other);
-
-test("public browser is module-only and contains no project menu or installer", async () => {
-    assert.deepEqual(Object.keys(await import("../src/index.mjs")), ["build"]);
-    assert.deepEqual(Object.keys(await import("../dist/preference-panes.mjs")), ["PreferencesView", "mount"]);
+test("public browser exposes only the generic BoxJS mount contract", async () => {
+    assert.deepEqual(Object.keys(await import("../src/index.mjs")), []);
+    assert.deepEqual(Object.keys(await import("../dist/preference-panes.mjs")), ["mount"]);
     assert.deepEqual(Object.keys(await import("@nsnanocat/preference-panes/navigation")), ["ActionMenu", "ModuleFrame", "ModuleStatus", "Navigation", "probeModule"]);
     const { ActionMenu } = await import("@nsnanocat/preference-panes/navigation");
     assert.equal(typeof ActionMenu.prototype.open, "function");
@@ -22,23 +16,11 @@ test("public browser is module-only and contains no project menu or installer", 
     const navigation = await readFile(new URL("../dist/module/navigation.mjs", import.meta.url), "utf8");
     assert.match(navigation, /\*,\*::before,\*::after\{box-sizing:border-box\}/);
     assert.match(navigation, /#sheet\{[^}]*width:100%;max-width:540px/);
-    for (const file of ["preference-panes.request.js", "settings/home.css"]) await assert.rejects(access(new URL(`../dist/${file}`, import.meta.url)), { code: "ENOENT" });
-});
-
-test("each build creates only one module and never overwrites a project landing page", async () => {
-    assert.equal(files["settings/index.html"], undefined);
-    assert.equal(files["settings/assets/index.html"], undefined);
-    assert.equal(files["settings/assets/boxjs.json"], undefined);
-    assert.ok(Object.keys(files).every(name => !/\.(json|request.js|config.js)$/.test(name)));
-    assert.equal(files["settings/assets/Module.css"], ".pp-panel { color: red; }");
-    assert.equal(otherFiles["settings/assets/Other.css"], "");
-    assert.equal(files["settings/Other/index.html"], undefined);
-    assert.equal(files["settings/assets/index.mjs"], otherFiles["settings/assets/index.mjs"]);
-    assert.equal(files["settings/assets/Module.html"], undefined);
-    assert.equal(files["settings/assets/navigation.mjs"], undefined);
-    await assert.rejects(build({ apps: [document, other] }), /exactly one module/);
-    await assert.rejects(build([]), /exactly one module/);
-    await assert.rejects(build(document, { stylesheets: [] }));
+    for (const file of ["preference-panes.request.js", "settings/home.css", "settings/assets/app.mjs"]) await assert.rejects(access(new URL(`../dist/${file}`, import.meta.url)), { code: "ENOENT" });
+    for (const path of ["../dist/preference-panes.mjs", "../dist/module/index.mjs", "../dist/api.js", "../dist/web.js"]) {
+        const source = await readFile(new URL(path, import.meta.url), "utf8");
+        assert.doesNotMatch(source, /ModuleModel|configURL|X-PreferencePanes-(?:JSON|CSS)|settings\/assets\/app\.mjs/);
+    }
 });
 
 for (const quantumult of [false, true])
@@ -80,20 +62,16 @@ for (const quantumult of [false, true])
                 });
             });
         const status = value => (quantumult ? Number(value.status.split(" ")[1]) : value.status);
-        for (const path of ["/settings/", "/configs/Module"]) {
+        for (const path of ["/settings/", "/configs/Module", "/settings/Module", "/settings/assets/index.mjs", "/settings/assets/navigation.mjs", "/settings/assets/app.mjs", "/settings/assets/host.mjs"]) {
             const result = await run(path);
             if (quantumult) assert.deepEqual(JSON.parse(JSON.stringify(result)), {});
             else assert.equal(result, undefined);
         }
         assert.equal(reads, 0);
-        for (const path of ["/settings/Module", "/settings/assets/index.mjs", "/settings/assets/navigation.mjs", "/settings/assets/host.mjs"]) {
-            const result = await run(path);
-            if (quantumult) assert.deepEqual(JSON.parse(JSON.stringify(result)), {});
-            else assert.equal(result, undefined);
-        }
-        const jsonHeaders = { "Content-Type": "application/json", "X-PreferencePanes-JSON": "/configs/Module" };
+        const jsonHeaders = { "Content-Type": "application/json" };
         assert.equal(status(await run("/api/Module", "HEAD", undefined, jsonHeaders)), 200);
+        assert.equal(status(await run("/api/Module", "GET", undefined, jsonHeaders)), 405);
         assert.equal(status(await run("/api/Module/set", "POST", JSON.stringify({ key: "Module.Settings.Home.enabled", value: { raw: true } }), jsonHeaders)), 200);
         assert.equal(status(await run("/api/Module/delete", "POST", JSON.stringify({ scope: "module" }), jsonHeaders)), 200);
-        assert.equal(status(await run("/api/Other", "HEAD", undefined, { "Content-Type": "application/json" })), 404);
+        assert.equal(status(await run("/api/Other", "HEAD", undefined, jsonHeaders)), 404);
     });

@@ -1,13 +1,15 @@
 import { readFile } from "node:fs/promises";
 import http from "node:http";
 import vm from "node:vm";
-import { build } from "../src/index.mjs";
+import { normalizeBoxJs } from "../src/browser/boxjs.mjs";
 
 // 测试台不生成项目入口。上传的两个文件只供模块预览，存储为独立内存。
 // The testbench is not a project landing page; uploads feed only module previews with isolated storage.
 const importer = await readFile(new URL("./index.html", import.meta.url), "utf8");
 const script = await readFile(new URL("./importer.mjs", import.meta.url), "utf8");
-let files = {};
+const page = await readFile(new URL("../dist/module/index.html", import.meta.url), "utf8");
+const index = await readFile(new URL("../dist/module/index.mjs", import.meta.url), "utf8");
+const navigation = await readFile(new URL("../dist/module/navigation.mjs", import.meta.url), "utf8");
 let configuration;
 let moduleName;
 const store = new Map();
@@ -27,30 +29,30 @@ const server = http.createServer(async (request, reply) => {
         let body = "";
         for await (const chunk of request) body += chunk;
         if (url.pathname === "/preview" && request.method === "POST") {
-            files = {};
             configuration = undefined;
             moduleName = undefined;
             store.clear();
             try {
                 const input = JSON.parse(body);
-                files = await build(input.boxjs, input.css);
-                const page = Object.keys(files).find(path => path.endsWith("/index.html"));
                 configuration = input.boxjs;
-                moduleName = page.split("/")[1];
+                moduleName = normalizeBoxJs(configuration).module;
                 reply.writeHead(200, { "Content-Type": "application/json" });
-                reply.end(JSON.stringify({ url: `/${page.slice(0, -"index.html".length)}?css=/settings/assets/${moduleName}.css`, module: moduleName }));
+                reply.end(JSON.stringify({ url: `/settings/${moduleName}`, module: moduleName }));
             } catch (error) {
                 reply.writeHead(400, { "Content-Type": "application/json" });
                 reply.end(JSON.stringify({ error: error.message }));
             }
             return;
         }
-        const path = url.pathname.slice(1);
-        const entry = files[path] ?? files[`${path.replace(/\/$/, "")}/index.html`];
-        if (entry !== undefined && ["GET", "HEAD"].includes(request.method)) {
-            const type = path.endsWith(".css") ? "text/css" : path.endsWith(".mjs") || path.endsWith(".js") ? "text/javascript" : path.endsWith(".json") ? "application/json" : "text/html";
-            reply.writeHead(200, { "Content-Type": `${type}; charset=utf-8`, "Cache-Control": "no-store" });
-            reply.end(request.method === "HEAD" ? "" : entry);
+        const asset = {
+            [`/settings/${moduleName}`]: ["text/html", page],
+            [`/settings/${moduleName}/`]: ["text/html", page],
+            "/settings/assets/index.mjs": ["text/javascript", index],
+            "/settings/assets/navigation.mjs": ["text/javascript", navigation],
+        }[url.pathname];
+        if (asset && ["GET", "HEAD"].includes(request.method)) {
+            reply.writeHead(200, { "Content-Type": `${asset[0]}; charset=utf-8`, "Cache-Control": "no-store" });
+            reply.end(request.method === "HEAD" ? "" : asset[1]);
             return;
         }
         if (configuration && url.pathname === `/configs/${moduleName}` && ["HEAD", "GET"].includes(request.method)) {

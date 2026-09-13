@@ -1,18 +1,17 @@
-import { normalizeBoxJs, normalizeStoredValue, validValue } from "./boxjs.mjs";
+import { normalizeBoxJs } from "./boxjs.mjs";
 import { element, resourceURL } from "./components.mjs";
 import { PreferencesPanel } from "./panel.mjs";
 import { installDefaultStyles } from "./styles.mjs";
 
 /**
- * 管理模块设置视图的模型规范化、样式、主题同步和面板生命周期。
- * Manage model normalization, styles, theme synchronization, and panel lifecycle for a module settings view.
+ * 管理 BoxJS 规范化、主题同步和面板生命周期。
+ * Manage BoxJS normalization, theme synchronization, and panel lifecycle.
  */
-export class PreferencesView {
+class PreferencesView {
     #existing;
     #root;
     #base;
     #ownsBase;
-    #custom;
     #previousTitle;
     #previousTheme;
     #systemTheme;
@@ -22,22 +21,12 @@ export class PreferencesView {
     #panel;
 
     /**
-     * 使用模块 API 返回的模型挂载设置页。
-     * Mount a settings page from the model returned by the module API.
-     * @param {import("../index.js").ModuleModel} model API 返回的模块模型 / Module model returned by the API.
-     * @param {string} [css] 可选 CSS 正文 / Optional module-scoped CSS text.
+     * 使用原始 BoxJS JSON 挂载设置页。
+     * Mount a settings page from raw BoxJS JSON.
+     * @param {import("../index.js").BoxJSInput} boxjs 单模块 BoxJS JSON / Single-module BoxJS JSON.
      */
-    constructor(model, css = "") {
-        if (typeof css !== "string") throw new TypeError("CSS must be a string");
-        const definition = normalizeBoxJs(model.boxjs, model.module);
-        const values = { ...model.values };
-        for (const field of definition.fields) {
-            if (values[field.key] === undefined) continue;
-            values[field.key] = normalizeStoredValue(field, values[field.key]);
-            if (!validValue(field, values[field.key])) throw new TypeError(`Invalid stored value: ${field.key}`);
-        }
-        for (const field of definition.fields) if (values[field.key] === undefined && Object.hasOwn(field, "defaultValue")) values[field.key] = structuredClone(field.defaultValue);
-        const rendered = { ...model, definition, values };
+    constructor(boxjs) {
+        const definition = normalizeBoxJs(boxjs);
         const metadata = definition.metadata ?? {};
         const image = metadata.icon || metadata.icons?.[1] || metadata.icons?.[0];
         if (image) resourceURL(image);
@@ -52,9 +41,6 @@ export class PreferencesView {
         const styles = installDefaultStyles(document);
         this.#base = styles.element;
         this.#ownsBase = styles.owned;
-        this.#custom = element("style", "");
-        this.#custom.textContent = css;
-        document.head.append(this.#custom);
         this.#previousTitle = document.title;
         this.#previousTheme = document.documentElement.dataset.theme;
         this.#systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
@@ -69,7 +55,7 @@ export class PreferencesView {
         document.title = metadata.name ?? definition.module;
         try {
             this.#root.replaceChildren();
-            this.#panel = new PreferencesPanel(this.#root, rendered);
+            this.#panel = new PreferencesPanel(this.#root, definition);
         } catch (error) {
             this.destroy();
             throw error;
@@ -97,7 +83,6 @@ export class PreferencesView {
         this.#systemTheme.removeEventListener("change", this.#syncAppearance);
         this.#panel?.destroy();
         if (this.#ownsBase) this.#base.remove();
-        this.#custom.remove();
         if (this.#existing) this.#root.replaceChildren();
         else this.#root.remove();
         document.title = this.#previousTitle;
@@ -108,12 +93,11 @@ export class PreferencesView {
 }
 
 /**
- * 使用模块 API 返回的模型挂载设置页；CSS 仅覆盖当前模块。
- * Mount a settings page from a module API model; CSS only overrides this module.
- * @param {import("../index.js").ModuleModel} model API 返回的模块模型 / Module model returned by the API.
- * @param {string} [css] 可选 CSS 正文 / Optional module-scoped CSS text.
- * @returns {PreferencesView} 模块视图 / Module view.
+ * 使用原始 BoxJS JSON 挂载设置页。
+ * Mount a settings page from raw BoxJS JSON.
+ * @param {import("../index.js").BoxJSInput} boxjs 单模块 BoxJS JSON / Single-module BoxJS JSON.
+ * @returns {import("./index.js").MountedPreferences} 模块视图 / Module view.
  */
-export function mount(model, css = "") {
-    return new PreferencesView(model, css);
+export function mount(boxjs) {
+    return new PreferencesView(boxjs);
 }
