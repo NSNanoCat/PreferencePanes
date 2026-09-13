@@ -38,7 +38,7 @@
    - 验证：BoxJS、浏览器渲染、构建和类型测试。
    - 计划提交：`refactor(browser): 收敛 BoxJS 页面解析`。
 
-4. [ ] **独立前端交付（PreferencePanes）**
+4. [x] **独立前端交付（PreferencePanes）**
    - 新增只返回 `/settings/{module}`、`app.mjs`、`navigation.mjs` 的 `web.js` 构建入口。
    - 保持现有静态 `dist/module/` 产物；`web.js` 不访问网络或 Storage。
    - Release 工作流分别上传 `api.js` 和 `web.js`。
@@ -98,8 +98,8 @@
 | --- | --- | --- | --- |
 | 计划基线 | PreferencePanes | `9c8165b` | 计划文件单独提交 |
 | 单一后端 API | PreferencePanes | `803bd7d` | 构建、类型、Biome、45 项测试及 API 构建隔离通过 |
-| 前端 BoxJS 解析 | PreferencePanes | 本步骤提交 | 构建、类型、Biome、44 项测试及前后端导入隔离通过 |
-| 独立前端交付 | PreferencePanes | 待填写 | 待填写 |
+| 前端 BoxJS 解析 | PreferencePanes | `2a90853` | 构建、类型、Biome、44 项测试及前后端导入隔离通过 |
+| 独立前端交付 | PreferencePanes | 本步骤提交 | `api.js`/`web.js` 隔离、构建、类型、Biome 及 46 项测试通过 |
 | 契约与文档 | PreferencePanes | 待填写 | 待填写 |
 | 网站调用与预览 | Biliverse.github.io | 待填写 | 待填写 |
 | 业务模板 | Enhanced | 待填写 | 待填写 |

@@ -49,6 +49,7 @@ export default [
     { input: "src/browser/index.mjs", output: { file: "dist/preference-panes.mjs", format: "es" } },
     { input: "src/browser/Navigation.mjs", output: { file: "dist/module/navigation.mjs", format: "es" } },
     { input: "src/api.mjs", output: { file: "dist/api.js", format: "iife" } },
+    { input: "src/web.mjs", output: { file: "dist/web.js", format: "iife" } },
     {
         input: "src/browser/app.mjs",
         output: { file: "dist/module/app.mjs", format: "es" },
