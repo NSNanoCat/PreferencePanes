@@ -52,3 +52,19 @@ test("proxy and browser sources keep storage, validation and navigation responsi
     assert.doesNotMatch(navigation, /BoxJS|Storage|api\/(?:get|set|delete)/);
     assert.throws(() => mount({ module: "Module", boxjs: config, values: { "Module.Settings.count": "not-a-number" }, configURL: "/configs/Module" }), /Invalid stored value: Module\.Settings\.count/);
 });
+
+test("browser lifecycle is owned by explicit classes", async () => {
+    const page = await readFile(new URL("../src/browser/index.mjs", import.meta.url), "utf8");
+    const view = await readFile(new URL("../src/browser/mount.mjs", import.meta.url), "utf8");
+    const panel = await readFile(new URL("../src/browser/panel.mjs", import.meta.url), "utf8");
+    const client = await readFile(new URL("../src/browser/client.mjs", import.meta.url), "utf8");
+    const browser = await import("../dist/preference-panes.mjs");
+    assert.match(page, /export class ModulePage/);
+    assert.match(page, /new PreferencesView/);
+    assert.match(view, /export class PreferencesView/);
+    assert.match(view, /new PreferencesPanel/);
+    assert.match(panel, /export class PreferencesPanel/);
+    assert.match(panel, /new PreferencesClient/);
+    assert.match(client, /export class PreferencesClient/);
+    assert.equal(typeof browser.PreferencesView, "function");
+});

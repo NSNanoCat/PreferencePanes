@@ -12,7 +12,7 @@ const otherFiles = await build(other);
 
 test("public browser is module-only and contains no project menu or installer", async () => {
     assert.deepEqual(Object.keys(await import("../src/index.mjs")), ["build"]);
-    assert.deepEqual(Object.keys(await import("../dist/preference-panes.mjs")), ["mount"]);
+    assert.deepEqual(Object.keys(await import("../dist/preference-panes.mjs")), ["PreferencesView", "mount"]);
     assert.deepEqual(Object.keys(await import("@nsnanocat/preference-panes/navigation")), ["ActionMenu", "ModuleFrame", "ModuleStatus", "Navigation", "probeModule"]);
     const { ActionMenu } = await import("@nsnanocat/preference-panes/navigation");
     assert.equal(typeof ActionMenu.prototype.open, "function");
