@@ -108,3 +108,4 @@
 | 业务模板 | ADBlock | `fb857f5` | 先快进到 `f24d1d4`；release/dev 生成、25 项测试及改动文件 Biome 通过；全仓 Biome 仍有既有生成文件和旧源码问题 |
 | 最终核验 | PreferencePanes | 本步骤提交 | 六仓库均为本地 `dev` 且工作树干净；旧组合路由与旧后端分层引用搜索为零；核心 46 项测试和网站 4 项测试通过 |
 | 模块页面入口收口 | 六仓库 | `674aab9`, `88b38de`, `323d8a1`, `960a98a`, `21362ea`, `51f409b` | 模块页面公共入口由 `app.mjs` 统一改为 `index.mjs`；PreferencePanes 构建、Biome、TypeScript、46 项测试、Apifox 校验，以及网站和四个业务仓库测试通过；六个 `dev` 分支各本地领先 `origin/dev` 1 个提交，未推送 |
+| 当前文档路径同步 | Biliverse/API、Global、Redirect、ADBlock | `ac2c23b`, `5c2b552`, `9c3bf40`, `982662f` | 修正当前说明中的模块 API 动作路径；API 公共 Apifox 资源校验通过；API 使用新建本地 `dev` 分支，未推送 |
