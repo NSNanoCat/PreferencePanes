@@ -52,7 +52,7 @@ const modelSchema = {
 };
 const declarations = [
     { id: "pp-page-get", method: "get", path: "/settings/{module}", name: "打开模块设置页面", group: "模块设置页面", page: true },
-    { id: "pp-app-get", method: "get", path: "/settings/assets/app.mjs", name: "加载模块设置渲染器", group: "通用页面资源", asset: true },
+    { id: "pp-index-get", method: "get", path: "/settings/assets/index.mjs", name: "加载模块设置入口", group: "通用页面资源", asset: true },
     { id: "pp-navigation-get", method: "get", path: "/settings/assets/navigation.mjs", name: "加载通用页面导航组件", group: "通用页面资源", asset: true },
     { id: "pp-module-head", method: "head", path: "/api/{module}", name: "探测模块可用性与版本", group: "模块 API", api: true, probe: true },
     { id: "pp-module-get", method: "get", path: "/api/{module}", name: "取得 BoxJS 与当前值", group: "模块 API", api: true, model: true },

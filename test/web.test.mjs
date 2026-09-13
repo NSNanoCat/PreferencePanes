@@ -28,7 +28,7 @@ for (const quantumult of [false, true])
             json: "/header.json",
             css: "/theme.css",
         });
-        for (const asset of ["app.mjs", "navigation.mjs"]) {
+        for (const asset of ["index.mjs", "navigation.mjs"]) {
             const result = await run(`/settings/assets/${asset}`);
             assert.equal(status(result), 200);
             assert.match(result.body, /PreferencePanes|preference-panes/);

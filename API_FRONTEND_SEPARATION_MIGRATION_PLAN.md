@@ -39,7 +39,7 @@
    - 计划提交：`refactor(browser): 收敛 BoxJS 页面解析`。
 
 4. [x] **独立前端交付（PreferencePanes）**
-   - 新增只返回 `/settings/{module}`、`app.mjs`、`navigation.mjs` 的 `web.js` 构建入口。
+   - 新增只返回 `/settings/{module}`、`index.mjs`、`navigation.mjs` 的 `web.js` 构建入口。
    - 保持现有静态 `dist/module/` 产物；`web.js` 不访问网络或 Storage。
    - Release 工作流分别上传 `api.js` 和 `web.js`。
    - 验证：静态资源路由、API 路由隔离、构建产物内容检查及完整 `npm run check`。

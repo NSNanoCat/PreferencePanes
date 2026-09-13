@@ -13,7 +13,7 @@ test("browser renderer has no client-specific SDK or stylesheet dependency", asy
 });
 
 test("built renderer contains generic defaults without remote stylesheets", async () => {
-    for (const path of ["../dist/preference-panes.mjs", "../dist/module/app.mjs", "../dist/api.js", "../dist/web.js"]) {
+    for (const path of ["../dist/preference-panes.mjs", "../dist/module/index.mjs", "../dist/api.js", "../dist/web.js"]) {
         const source = await readFile(new URL(path, import.meta.url), "utf8");
         assert.doesNotMatch(source, /bilibili|bili_dark|hdslb|b-style|js-bridge/i, path);
         assert.doesNotMatch(source, /<link[^>]+stylesheet|s1\.hdslb\.com/i, path);
@@ -30,7 +30,7 @@ test("module renderer omits the search toolbar row", async () => {
 test("loading and retry states share the centered status component", async () => {
     const components = await readFile(new URL("../src/browser/components.mjs", import.meta.url), "utf8");
     const panel = await readFile(new URL("../src/browser/panel.mjs", import.meta.url), "utf8");
-    const app = await readFile(new URL("../src/browser/app.mjs", import.meta.url), "utf8");
+    const app = await readFile(new URL("../src/browser/index.mjs", import.meta.url), "utf8");
     const styles = await readFile(new URL("../src/browser/panel.css", import.meta.url), "utf8");
     assert.match(components, /export function statusView/);
     assert.match(panel, /statusView\("读取设置…"\)/);
