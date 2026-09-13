@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { config } from "./fixtures/module.mjs";
 
 const browserSources = ["../src/browser/index.mjs", "../src/browser/components.mjs", "../src/browser/panel.css", "../src/browser/panel.mjs", "../src/browser/styles.mjs"];
 
@@ -12,7 +13,7 @@ test("browser renderer has no client-specific SDK or stylesheet dependency", asy
 });
 
 test("built renderer contains generic defaults without remote stylesheets", async () => {
-    for (const path of ["../dist/preference-panes.mjs", "../dist/module/app.mjs", "../dist/api.js"]) {
+    for (const path of ["../dist/preference-panes.mjs", "../dist/module/app.mjs", "../dist/api.js", "../dist/web.js"]) {
         const source = await readFile(new URL(path, import.meta.url), "utf8");
         assert.doesNotMatch(source, /bilibili|bili_dark|hdslb|b-style|js-bridge/i, path);
         assert.doesNotMatch(source, /<link[^>]+stylesheet|s1\.hdslb\.com/i, path);
@@ -39,4 +40,15 @@ test("loading and retry states share the centered status component", async () =>
     assert.match(styles, /\.pp-status-action/);
     assert.doesNotMatch(components, /pp-error/);
     assert.doesNotMatch(panel, /pp-loading/);
+});
+
+test("proxy and browser sources keep storage, validation and navigation responsibilities separate", async () => {
+    const api = await readFile(new URL("../src/api.mjs", import.meta.url), "utf8");
+    const web = await readFile(new URL("../src/web.mjs", import.meta.url), "utf8");
+    const navigation = await readFile(new URL("../src/browser/Navigation.mjs", import.meta.url), "utf8");
+    const { mount } = await import("../dist/preference-panes.mjs");
+    assert.doesNotMatch(api, /normalizeBoxJs|normalizeStoredValue|validValue|mountPanel|document\.|module\.html|#assets/);
+    assert.doesNotMatch(web, /Storage|@nsnanocat\/util"|transport|\/api\//);
+    assert.doesNotMatch(navigation, /BoxJS|Storage|api\/(?:get|set|delete)/);
+    assert.throws(() => mount({ module: "Module", boxjs: config, values: { "Module.Settings.count": "not-a-number" }, configURL: "/configs/Module" }), /Invalid stored value: Module\.Settings\.count/);
 });

@@ -13,4 +13,6 @@ npm run apifox:check
 
 原生格式按 Method 与 Path 匹配接口并覆盖；接口模式为 `methodAndPath`，文档和数据模型模式为 `name`。保持“删除未匹配资源”关闭。导入在本机客户端每 30 分钟执行，也可在绑定数据源页面立即导入；推送后应按分支回读确认，不能仅凭导入时间判断成功。
 
-本次开发版将旧 /api/{module}/{path} 替换为 POST /api/get、set、delete。生成文件只含新接口；同步远端 Apifox 时需明确移除已废弃的旧路径，不能将旧接口与新接口并存当作完成迁移。form 字段名使用 {{storageKey}} 变量，示例写在说明中。
+本次开发版将旧的通用 form 存储接口替换为模块 API：`HEAD/GET /api/{module}` 与 `POST /api/{module}/get|set|delete`。生成文件只含当前接口；同步远端 Apifox 时需移除 `/api/get|set|delete` 和 `/api/module/{module}` 草稿路径，不能让旧接口与新接口并存。
+
+接口集合同时记录三个责任域：`web.js` 提供 `/settings/**`，`api.js` 提供 `/api/{module}`，业务模块提供 `/configs/{module}`。Apifox 中共同展示不代表三个路径由同一个脚本处理。

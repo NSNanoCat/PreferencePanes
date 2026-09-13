@@ -4,24 +4,25 @@
  * @typedef {object} ModuleProbeOptions
  * @property {typeof globalThis.fetch} [fetch] 可注入的 fetch / Injectable fetch.
  * @property {AbortSignal} [signal] 外部取消信号 / External cancellation signal.
+ * @property {string} [json] BoxJS JSON 来源，将随探测请求头传递 / BoxJS JSON source sent in the probe header.
  * @property {number} [timeout] 超时毫秒数，默认 3500 / Timeout in milliseconds, defaults to 3500.
  */
 
 /**
- * 通过模块 JSON Mock 的 HEAD 响应检测安装状态和业务版本。
- * Probe installation and business version from the native HEAD response of a module JSON Mock.
- * @param {string | URL} url 配置 Mock 地址 / Configuration Mock URL.
+ * 通过模块 API 的 HEAD 响应检测安装状态和业务版本。
+ * Probe installation and business version from the module API HEAD response.
+ * @param {string | URL} url 模块 API 地址 / Module API URL.
  * @param {ModuleProbeOptions} [options] 请求选项 / Request options.
  * @returns {Promise<Response>} 原始 HTTP 响应，可直接读取 status 和响应头 / Native HTTP response; read status and headers directly.
  */
-export async function probeModule(url, { fetch: request = globalThis.fetch, signal, timeout = 3500 } = {}) {
+export async function probeModule(url, { fetch: request = globalThis.fetch, json, signal, timeout = 3500 } = {}) {
     const controller = new AbortController();
     const abort = () => controller.abort();
     if (signal?.aborted) abort();
     signal?.addEventListener("abort", abort, { once: true });
     const timer = setTimeout(() => controller.abort(), timeout);
     try {
-        return await request(url, { method: "HEAD", cache: "no-store", credentials: "omit", signal: controller.signal });
+        return await request(url, { method: "HEAD", cache: "no-store", credentials: "omit", signal: controller.signal, headers: json ? { "X-PreferencePanes-JSON": json } : undefined });
     } finally {
         clearTimeout(timer);
         signal?.removeEventListener("abort", abort);
@@ -59,7 +60,7 @@ export class ModuleStatus extends EventTarget {
     /**
      * 每次进入重新探测，取消旧请求并忽略其迟到结果。
      * Reprobe on entry, cancelling old requests and ignoring late results.
-     * @param {string | URL} url 配置 Mock 地址 / Configuration Mock URL.
+     * @param {string | URL} url 模块 API 地址 / Module API URL.
      * @param {ModuleProbeOptions} [options] 请求选项 / Request options.
      * @returns {Promise<Response | undefined>} 原始响应；被取消时无返回值 / Native response; undefined when cancelled.
      */

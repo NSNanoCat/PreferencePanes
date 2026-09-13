@@ -42,11 +42,11 @@ test("each build creates only one module and never overwrites a project landing 
 });
 
 for (const quantumult of [false, true])
-    test(`${quantumult ? "Quantumult X" : "Surge"}: module script leaves the landing page, other modules and configuration requests alone`, async () => {
+    test(`${quantumult ? "Quantumult X" : "Surge"}: backend API leaves pages, assets and configuration requests alone`, async () => {
         const store = new Map();
         let reads = 0;
         const api = await readFile(new URL("../dist/api.js", import.meta.url), "utf8");
-        const run = (path, method = "GET", body = undefined) =>
+        const run = (path, method = "GET", body = undefined, headers = {}) =>
             new Promise(resolve => {
                 const read = key => {
                     reads++;
@@ -57,11 +57,26 @@ for (const quantumult of [false, true])
                     return true;
                 };
                 vm.runInNewContext(api, {
-                    ...(quantumult ? { $task: {}, $prefs: { valueForKey: read, setValueForKey: write } } : { $environment: { "surge-version": "test" }, $persistentStore: { read, write } }),
-                    $request: { url: `https://example.org${path}`, method, body, headers: { "Content-Type": "application/x-www-form-urlencoded" } },
+                    ...(quantumult
+                        ? {
+                              $task: { fetch: resource => Promise.resolve({ statusCode: resource.url.endsWith("/configs/Module") ? 200 : 404, headers: { "X-PreferencePanes-Version": "preview" }, body: resource.url.endsWith("/configs/Module") ? JSON.stringify(config) : "" }) },
+                              $prefs: { valueForKey: read, setValueForKey: write },
+                          }
+                        : { $environment: { "surge-version": "test" }, $persistentStore: { read, write } }),
+                    $request: { url: `https://example.org${path}`, method, body, headers },
                     $script: { startTime: Date.now() / 1000 },
                     $done: result => resolve(quantumult ? result : result.response),
+                    $httpClient: {
+                        head(options, callback) {
+                            callback(null, { status: options.url.endsWith("/configs/Module") ? 200 : 404, headers: { "X-PreferencePanes-Version": "preview" } }, "");
+                        },
+                        get(options, callback) {
+                            callback(null, { status: options.url.endsWith("/configs/Module") ? 200 : 404, headers: { "X-PreferencePanes-Version": "preview" } }, options.url.endsWith("/configs/Module") ? JSON.stringify(config) : "");
+                        },
+                    },
                     console: { log() {}, error() {} },
+                    setTimeout,
+                    clearTimeout,
                 });
             });
         const status = value => (quantumult ? Number(value.status.split(" ")[1]) : value.status);
@@ -71,17 +86,14 @@ for (const quantumult of [false, true])
             else assert.equal(result, undefined);
         }
         assert.equal(reads, 0);
-        assert.match((await run("/settings/Module")).body, /<!doctype html>/i);
-        for (const asset of ["app.mjs", "navigation.mjs"]) {
-            const result = await run(`/settings/assets/${asset}`);
-            assert.equal(status(result), 200);
-            assert.match(result.body, /PreferencePanes|preference-panes/);
+        for (const path of ["/settings/Module", "/settings/assets/app.mjs", "/settings/assets/navigation.mjs", "/settings/assets/host.mjs"]) {
+            const result = await run(path);
+            if (quantumult) assert.deepEqual(JSON.parse(JSON.stringify(result)), {});
+            else assert.equal(result, undefined);
         }
-        const host = await run("/settings/assets/host.mjs");
-        if (quantumult) assert.deepEqual(JSON.parse(JSON.stringify(host)), {});
-        else assert.equal(host, undefined);
-        assert.equal(status(await run("/api/set", "POST", "@Root.Module.Settings.unlisted=%7B%22raw%22%3Atrue%7D")), 200);
-        assert.equal(status(await run("/api/set", "POST", "@Another.Other.flag=false")), 200);
-        assert.equal(status(await run("/api/delete", "POST", "@Root.Module=")), 200);
-        assert.equal(JSON.parse(store.get("Another")).Other.flag, false);
+        const jsonHeaders = { "Content-Type": "application/json", "X-PreferencePanes-JSON": "/configs/Module" };
+        assert.equal(status(await run("/api/Module", "HEAD", undefined, jsonHeaders)), 200);
+        assert.equal(status(await run("/api/Module/set", "POST", JSON.stringify({ key: "Module.Settings.Home.enabled", value: { raw: true } }), jsonHeaders)), 200);
+        assert.equal(status(await run("/api/Module/delete", "POST", JSON.stringify({ scope: "module" }), jsonHeaders)), 200);
+        assert.equal(status(await run("/api/Other", "HEAD", undefined, { "Content-Type": "application/json" })), 404);
     });

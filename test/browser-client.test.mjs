@@ -1,236 +1,87 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BoxJS } from "../src/BoxJS.mjs";
+import { normalizeBoxJs } from "../src/browser/boxjs.mjs";
 import { createPreferencesClient } from "../src/browser/client.mjs";
 import { config } from "./fixtures/module.mjs";
 
-test("missing or invalid module never sends a request", async () => {
-    const { client, calls } = fixture();
-    for (const module of [undefined, "", "Module/Other", "__proto__", "https://example.org/config.json"]) {
-        await assert.rejects(client.open(module));
-    }
-    assert.equal(calls.length, 0);
-});
+const definition = normalizeBoxJs(config, "Module");
+const model = { module: "Module", boxjs: config, values: { "Module.Settings.Home.enabled": false, "Module.Settings.Home.mode": "b", "Module.Settings.items": ["a", "b"], "Module.Settings.note": "", "Module.Settings.count": 1 }, configURL: "/configs/Module" };
 
-test("missing or invalid imported JSON never reads storage", async () => {
-    for (const input of [[], { apps: [] }, [{ id: "@Example.Module.key", name: "Bad", type: "unknown" }]]) {
-        const { client, calls } = fixture(input);
-        await assert.rejects(client.open("Module"));
-        assert.equal(calls.length, 0);
-    }
-});
-
-test("native subtree reads preserve falsy values and default only for undefined", async () => {
-    const { client, state } = fixture();
-    state.stored = { Home: { enabled: false, mode: "a" }, items: [], count: 0, note: "" };
-    const { values } = await client.open("Module");
-    assert.equal(values["Module.Settings.Home.enabled"], false);
-    assert.equal(values["Module.Settings.count"], 0);
-    assert.equal(values["Module.Settings.note"], "");
-    assert.deepEqual(values["Module.Settings.items"], []);
-    state.stored = { Home: null, note: null };
-    const reopened = await client.open("Module");
-    assert.equal(reopened.values["Module.Settings.Home.enabled"], true);
-    assert.equal(reopened.values["Module.Settings.note"], null);
-    assert.equal(reopened.values["Module.Settings.count"], 1);
-});
-
-function fixture(input = config) {
-    const calls = [],
-        notifications = [];
-    const state = { stored: { Home: { enabled: "false", mode: "b" }, items: "a,b" }, status: 200 };
+test("browser client consumes an API model and sends no BoxJS request", async () => {
+    const calls = [];
     const client = createPreferencesClient({
-        catalog: new BoxJS(input),
-        notify: event => notifications.push(event),
-        fetch: async (url, options) => {
-            calls.push({ url, ...options });
-            if (state.error) throw state.error;
-            const key = [...new URLSearchParams(options.body).keys()][0];
-            const data = key.endsWith(".Caches") ? state.caches : state.stored;
-            const status = url === "/api/get" && key.endsWith(".Settings") ? (state.settingsStatus ?? state.status) : state.status;
-            const body = options.method === "HEAD" || status === 204 ? null : JSON.stringify(data);
-            return new Response(body, { status });
+        model,
+        definition,
+        fetch: async (...args) => {
+            calls.push(args);
+            return new Response(JSON.stringify({}), { status: 200 });
         },
     });
-    return { client, calls, notifications, state };
-}
-
-test("fresh or reset modules load defaults when their stored subtree is absent", async () => {
-    const { client, state, calls } = fixture();
-    state.settingsStatus = 404;
-    const result = await client.open("Module");
-    assert.equal(result.values["Module.Settings.Home.enabled"], true);
-    assert.equal(result.values["Module.Settings.count"], 1);
-    assert.equal(calls.length, 1);
-    state.settingsStatus = 200;
-    state.stored = JSON.stringify({ count: 9 });
-    assert.equal((await client.open("Module")).values["Module.Settings.count"], 9);
+    assert.deepEqual(client.snapshot(), { definition, values: model.values });
+    await client.set("Module.Settings.Home.mode", "a");
+    assert.equal(calls[0][0], "/api/Module/set");
+    assert.deepEqual(JSON.parse(calls[0][1].body), { key: "Module.Settings.Home.mode", value: "a" });
+    assert.equal(calls[0][1].headers["X-PreferencePanes-JSON"], "/configs/Module");
 });
 
-test("imported JSON supports direct module fields without a fixed Settings directory", async () => {
-    const { client, state, calls } = fixture([{ id: "@Example.Module.flag", name: "Flag", type: "boolean", val: false }]);
-    state.stored = { flag: true };
-    const result = await client.open("Module");
-    assert.deepEqual(result.definition.settingsPath, ["Module"]);
-    assert.equal(result.values["Module.flag"], true);
-    assert.equal(calls[0].url, "/api/get");
-});
-
-test("settings and caches are inspected through fresh API reads", async () => {
-    const { client, state, calls } = fixture();
-    await client.open("Module");
-    state.stored = { Home: { enabled: true }, count: 7 };
-    state.caches = { items: [1, 2] };
-    assert.deepEqual(await client.readSettings("Module"), state.stored);
-    assert.deepEqual(await client.readCaches("Module"), state.caches);
+test("settings and caches are read through module API actions", async () => {
+    const calls = [];
+    const client = createPreferencesClient({
+        model,
+        definition,
+        fetch: async (url, options) => {
+            calls.push({ url, ...options });
+            const scope = JSON.parse(options.body).scope;
+            return scope === "caches" ? new Response(JSON.stringify({ items: [1, 2] }), { status: 200 }) : new Response(JSON.stringify({ count: 7 }), { status: 200 });
+        },
+    });
+    assert.deepEqual(await client.readSettings(), { count: 7 });
+    assert.deepEqual(await client.readCaches(), { items: [1, 2] });
     assert.deepEqual(
-        calls.slice(1).map(({ body, url }) => [url, [...new URLSearchParams(body).keys()][0]]),
+        calls.map(call => [call.method, call.url, JSON.parse(call.body)]),
         [
-            ["/api/get", "@Example.Module.Settings"],
-            ["/api/get", "@Example.Module.Caches"],
+            ["POST", "/api/Module/get", { scope: "settings" }],
+            ["POST", "/api/Module/get", { scope: "caches" }],
         ],
     );
 });
 
-test("cache inspection is explicit; clear and reset use DELETE without follow-up GET", async () => {
-    const { client, state, calls, notifications } = fixture();
-    await client.open("Module");
-    assert.equal(calls.length, 1);
-    const settings = client.snapshot("Module").values;
-    await client.clearCaches("Module");
-    assert.deepEqual(client.snapshot("Module").values, settings);
-    await client.reset("Module");
-    assert.equal(client.snapshot("Module").values["Module.Settings.Home.enabled"], true);
+test("successful mutations update the page cache without rereading", async () => {
+    const notifications = [];
+    const client = createPreferencesClient({ model, definition, notify: event => notifications.push(event), fetch: async () => new Response(JSON.stringify({}), { status: 200 }) });
+    await client.set("Module.Settings.Home.mode", "a");
+    await client.remove("Module.Settings.items");
+    await client.clearCaches();
+    await client.reset();
+    assert.equal(client.snapshot().values["Module.Settings.Home.mode"], "a");
     assert.deepEqual(
-        calls.slice(1).map(({ method, url }) => [method, url]),
-        [
-            ["POST", "/api/delete"],
-            ["POST", "/api/delete"],
-        ],
+        notifications.map(event => event.operation),
+        ["write", "delete", "clearCaches", "reset"],
     );
-    assert.deepEqual(
-        notifications.map(({ operation }) => operation),
-        ["clearCaches", "reset"],
-    );
-    state.status = 500;
-    const before = client.snapshot("Module");
-    await assert.rejects(client.reset("Module"), /HTTP 500/);
-    assert.deepEqual(client.snapshot("Module"), before);
+});
+
+test("API errors notify and preserve the cached model", async () => {
+    const notifications = [];
+    const client = createPreferencesClient({ model, definition, notify: event => notifications.push(event), fetch: async () => new Response(null, { status: 500 }) });
+    const before = client.snapshot();
+    await assert.rejects(client.set("Module.Settings.count", 2), /HTTP 500/);
+    assert.deepEqual(client.snapshot(), before);
     assert.equal(notifications.at(-1).kind, "error");
 });
 
-test("opening uses the supplied JSON and only requests its stored values", async () => {
-    const { client, calls } = fixture();
-    const { values } = await client.open("Module");
-    assert.equal(values["Module.Settings.Home.enabled"], false);
-    assert.deepEqual(
-        calls.map(call => [call.method, call.url]),
-        [["POST", "/api/get"]],
-    );
-    assert.equal(calls[0].headers["Content-Type"], "application/x-www-form-urlencoded");
-    assert.equal(calls[0].cache, "no-store");
-});
-
-test("HTTP 200 writes and deletes update isolated cache without GET", async () => {
-    const { client, calls, notifications } = fixture();
-    await client.open("Module");
-    const snapshot = client.snapshot("Module");
-    snapshot.values["Module.Settings.items"].push("x");
-    snapshot.definition.fields.length = 0;
-    assert.equal(client.snapshot("Module").definition.fields.length, 5);
-    assert.deepEqual(client.snapshot("Module").values["Module.Settings.items"], ["a", "b"]);
-    await client.set("Module", "Module.Settings.Home.mode", "a");
-    await client.remove("Module", "Module.Settings.items");
-    assert.equal(client.snapshot("Module").values["Module.Settings.Home.mode"], "a");
-    assert.deepEqual(client.snapshot("Module").values["Module.Settings.items"], ["a"]);
-    assert.deepEqual(
-        calls.slice(1).map(call => [call.method, call.url, call.body]),
-        [
-            ["POST", "/api/set", new URLSearchParams([["@Example.Module.Settings.Home.mode", '"a"']]).toString()],
-            ["POST", "/api/delete", new URLSearchParams([["@Example.Module.Settings.items", ""]]).toString()],
-        ],
-    );
-    assert.deepEqual(
-        notifications.map(event => [event.kind, event.operation]),
-        [
-            ["success", "write"],
-            ["success", "delete"],
-        ],
-    );
-});
-
-test("non-200, network and invalid value errors notify and preserve cached values", async () => {
-    const { client, calls, notifications, state } = fixture();
-    await client.open("Module");
-    const previous = client.snapshot("Module");
-    for (const status of [204, 400, 500]) {
-        state.status = status;
-        await assert.rejects(client.set("Module", "Module.Settings.Home.mode", "a"), new RegExp(`HTTP ${status}`));
-        await assert.rejects(client.remove("Module", "Module.Settings.items"));
-    }
-    state.error = new Error("offline");
-    await assert.rejects(client.set("Module", "Module.Settings.Home.mode", "a"), /offline/);
-    const count = calls.length;
-    await assert.rejects(client.set("Module", "Module.Settings.count", Number.NaN), /Invalid/);
-    assert.equal(calls.length, count);
-    assert.deepEqual(client.snapshot("Module"), previous);
-    assert.equal(notifications.length, 8);
-    assert.ok(notifications.every(event => event.kind === "error"));
-});
-
-test("reopening refreshes values and failure clears the module session", async () => {
-    const { client, calls, state } = fixture();
-    await client.open("Module");
-    client.leave("Module");
-    assert.throws(() => client.snapshot("Module"), /Open/);
-    state.stored = { count: 9 };
-    await client.open("Module");
-    assert.equal(client.snapshot("Module").values["Module.Settings.count"], 9);
-    state.stored = { count: 10 };
-    await client.open("Module");
-    assert.equal(client.snapshot("Module").values["Module.Settings.count"], 10);
-    assert.equal(calls.length, 3);
-    state.status = 500;
-    await assert.rejects(client.open("Module"));
-    assert.throws(() => client.snapshot("Module"), /Open/);
-});
-
-test("leaving cancels pending entry; an older entry cannot restore a replaced session", async () => {
-    const pending = [];
-    const client = createPreferencesClient({ catalog: new BoxJS(config), fetch: (url, options) => new Promise(resolve => pending.push({ url, options, resolve })) });
-    const first = client.open("Module");
-    const second = client.open("Module");
-    assert.equal(pending[0].options.signal.aborted, true);
-    pending[1].resolve(Response.json({ count: 7 }));
-    await second;
-    pending[0].resolve(Response.json({ count: 3 }));
-    await assert.rejects(first, /replaced/);
-    assert.equal(client.snapshot("Module").values["Module.Settings.count"], 7);
-    client.leave("Module");
-    assert.throws(() => client.snapshot("Module"), /Open/);
-});
-
-test("writes are serialized and completing after leave cannot resurrect cache", async () => {
-    let finish;
-    const notifications = [];
+test("a timed out request does not abort later API actions", async () => {
+    let calls = 0;
     const client = createPreferencesClient({
-        catalog: new BoxJS(config),
-        notify: event => notifications.push(event),
-        fetch: async (url, options) => {
-            if (url === "/api/set")
-                return new Promise(resolve => {
-                    finish = resolve;
-                });
-            return Response.json({});
+        model,
+        definition,
+        timeout: 5,
+        fetch: (_url, options) => {
+            calls++;
+            if (calls === 1) return new Promise((_resolve, reject) => options.signal.addEventListener("abort", () => reject(options.signal.reason), { once: true }));
+            return Promise.resolve(new Response(null, { status: 200 }));
         },
     });
-    await client.open("Module");
-    const write = client.set("Module", "Module.Settings.count", 2);
-    await assert.rejects(client.open("Module"), /saving/);
-    await assert.rejects(client.set("Module", "Module.Settings.count", 3), /progress/);
-    client.leave("Module");
-    finish(Response.json({ saved: true }));
-    await write;
-    assert.throws(() => client.snapshot("Module"), /Open/);
-    assert.equal(notifications[0].kind, "success");
+    await assert.rejects(client.set("Module.Settings.count", 2));
+    await client.set("Module.Settings.count", 3);
+    assert.equal(client.snapshot().values["Module.Settings.count"], 3);
 });

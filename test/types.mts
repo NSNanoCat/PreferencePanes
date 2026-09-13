@@ -1,4 +1,4 @@
-import type { BoxJSInput, ModuleDefinition, SettingsField } from "@nsnanocat/preference-panes";
+import type { BoxJSInput, ModuleDefinition, ModuleModel, SettingsField } from "@nsnanocat/preference-panes";
 import { build } from "@nsnanocat/preference-panes";
 import { mount } from "@nsnanocat/preference-panes/browser";
 import { ActionMenu, ModuleFrame, ModuleStatus, Navigation, probeModule } from "@nsnanocat/preference-panes/navigation";
@@ -10,8 +10,8 @@ menu.close();
 menu.destroy();
 
 const status = new ModuleStatus(document.createElement("span"));
-await status.check("/configs/Module");
-const probe = await probeModule("/configs/Module");
+await status.check("/api/Module", { json: "/configs/Module" });
+const probe = await probeModule("/api/Module", { json: "/configs/Module" });
 void probe.status;
 status.destroy();
 
@@ -33,15 +33,16 @@ const boxjs: BoxJSInput = { name: "Example", apps: [{ name: "App", settings: [{ 
 const files: Record<string, string> = await build(boxjs);
 await build(boxjs, "body { color: black; }");
 void files;
-mount(boxjs).destroy();
-mount(boxjs, "body { color: black; }").destroy();
+const definition: ModuleDefinition = { module: "Module", storageKey: "Root", settingsPath: ["Module", "Settings"], fields: [] };
+const model: ModuleModel = { module: "Module", boxjs, values: {}, configURL: "/configs/Module" };
+mount(model).destroy();
+mount(model, "body { color: black; }").destroy();
 // @ts-expect-error 页面不接受安装对象或元素配置 / Pages do not accept installation or element configuration.
 mount({ element: document.body });
 // @ts-expect-error 不接受样式 URL 列表配置 / Stylesheet URL-list configuration is not accepted.
 mount(boxjs, { stylesheets: [] });
 const field: SettingsField = { key: "Module.Settings.flag", name: "Flag", type: "boolean", defaultValue: false };
 void field;
-const definition: ModuleDefinition = { module: "Module", storageKey: "Root", settingsPath: ["Module", "Settings"], fields: [] };
 void definition;
 
 // @ts-expect-error 安装映射不是 BoxJS 输入 / Installation mappings are not BoxJS input.

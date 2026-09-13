@@ -92,8 +92,8 @@ export interface SettingsRequest {
      */
     headers?: Record<string, string | undefined>;
     /**
-     * POST 的正文为一个 form 字段，字段名是完整 @root.path
-     * POST contains one form field whose name is the complete @root.path.
+     * 模块动作的 JSON 正文
+     * JSON body for a module action.
      */
     body?: string;
 }
@@ -268,6 +268,20 @@ export interface BoxJSSubscription extends BoxJSMetadata {
  * The sole data configuration input.
  */
 export type BoxJSInput = BoxJSSetting[] | BoxJSApp | BoxJSSubscription;
+/**
+ * 模块 API 返回的原始 BoxJS 与当前值模型。
+ * Raw BoxJS and current-value model returned by the module API.
+ */
+export interface ModuleModel {
+    /** 模块路径段 / Module path segment. */
+    module: string;
+    /** API 获取的原始 BoxJS JSON / Raw BoxJS JSON fetched by the API. */
+    boxjs: BoxJSInput;
+    /** API 读取到的原始已保存字段值 / Raw persisted field values read by the API. */
+    values: Record<string, JsonValue>;
+    /** 后续 API 动作使用的 BoxJS JSON 地址 / BoxJS JSON URL used by later API actions. */
+    configURL: string;
+}
 /**
  * 生成模块前端文件，不复制配置、不生成绑定模块的代理脚本。
  * Build module frontend files without copying configuration or producing bound proxy scripts.

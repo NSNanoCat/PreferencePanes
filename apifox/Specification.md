@@ -1,76 +1,100 @@
-# PreferencePanes form API 规范
+# PreferencePanes 模块 API 规范
 
 ## 职责
 
-业务仓库按版本发布 BoxJS JSON 与必要的配置 Mock 响应，模块安装配置 Mock 和 PreferencePanes latest Release 的 api.js。PreferencePanes 只负责具体模块设置页、通用网页组件和 util 存储桥接；api.js 不包含业务配置、存储根映射、项目主页或客户端 SDK 逻辑。项目主页、入口探测和原生 WebView 交互由调用方负责。
+业务模块按版本提供 `/configs/{module}` 的 BoxJS JSON Mock，并与业务脚本使用同一个 `X-PreferencePanes-Version`。PreferencePanes 的 `api.js` 负责取得该 JSON、确认字段 ID、直接调用 util `Storage` 读取当前值，以及执行写入和删除。
+
+浏览器不直接请求 `/configs/{module}`，也不拼接 `@root.path`。浏览器只调用模块 API，收到原始 BoxJS 与已存值后，在 Web 侧完成控件规范化、展示属性校验、已存值校验和页面渲染。`api.js` 不解释控件类型、选项、默认值或 CSS，不包含 HTML、浏览器 JavaScript 或 Web DOM。
+
+PreferencePanes 的 `web.js` 只返回模块 HTML、`app.mjs` 和 `navigation.mjs`，不访问 BoxJS 上游或持久化存储。HTML 负责加载前端脚本，后端 URL 路由仍由 `api.js` 处理。
+
+`Navigation` 只管理页内历史、前进后退和切换动画；`ModuleFrame` 只管理模块 iframe；`ModuleStatus` 只调用模块 API 并显示探测结果。客户端 Bridge、项目主页和原生导航仍由调用方负责。
 
 ## 接口
 
-| HTTP 方法 | 路径 | 用途 |
-| --- | --- | --- |
-| GET | /settings/{module} | 通用模块页，JSON/CSS 动态导入 |
-| GET | /settings/assets/app.mjs | 具体模块页的通用渲染器 |
-| GET | /settings/assets/navigation.mjs | ModuleStatus、ModuleFrame 和 Navigation 网页组件 |
-| HEAD、GET | /configs/{module} | 业务模块提供的版本化 JSON Mock |
-| POST | /api/get | 读取完整存储键或子树 |
-| POST | /api/set | 替换完整存储键处的值 |
-| POST | /api/delete | 删除键或子树 |
+| HTTP 方法 | 路径 | 负责产物 | 用途 |
+| --- | --- | --- | --- |
+| GET | `/settings/{module}` | `web.js` | 通用模块 HTML |
+| GET | `/settings/assets/app.mjs` | `web.js` | 模块 API 调用与渲染入口 |
+| GET | `/settings/assets/navigation.mjs` | `web.js` | Navigation、ModuleFrame、ModuleStatus |
+| HEAD | `/api/{module}` | `api.js` | 探测 BoxJS 上游并透传状态、版本 |
+| GET | `/api/{module}` | `api.js` | 取得 BoxJS 并读取当前字段值 |
+| POST | `/api/{module}/get` | `api.js` | 读取字段或 Settings/Caches 子树 |
+| POST | `/api/{module}/set` | `api.js` | 写入 BoxJS 中已声明的字段 |
+| POST | `/api/{module}/delete` | `api.js` | 删除字段、Settings、Caches 或模块子树 |
+| HEAD、GET | `/configs/{module}` | 业务模块 | 提供版本化 BoxJS 上游 |
 
-旧 /api/{module}/{path} 接口移除。get/set/delete 都是 POST，避免 GET 请求体在浏览器中不可用。API 不鉴权，不要求 X-Settings-Client、Origin、token 或 BoxJS 配置；实际读写在已安装代理脚本的本地环境完成。
+旧的 `/api/get`、`/api/set`、`/api/delete` form 接口和 `/api/module/{module}` 草稿路径均不保留。网页不能提交完整存储根；所有路径都由 API 从本次取得的 BoxJS 字段 ID 推导。
 
-## Form 正文
+## 配置来源
 
-Content-Type 为 application/x-www-form-urlencoded，正文必须恰好一个字段。字段名是完整 @root.path，至少包含存储根和一个子键。根与路径使用字母、数字、下划线、连字符，各段以点分隔；拒绝原型属性名及空路径段。字段名和值按标准 form 编码，空格用 + 或 %20，内容中的 +、&、= 必须编码。
+模块 API 默认从同源 `/configs/{module}` 获取 JSON。自定义来源通过 `X-PreferencePanes-JSON` 传入，接受 HTTP(S) 绝对地址或同源相对地址。模块页的 `json` 查询参数和页面请求上的同名 Header 最终只用于构造模块 API 请求，浏览器不会直接下载该 JSON。
 
-读取：
+`HEAD /api/{module}` 由代理脚本向配置来源发送 HEAD，原样使用上游状态码，并透传 `X-PreferencePanes-Version`。网络失败返回 502。主页每次进入时并发调用四个模块 API，而不是直接探测配置 Mock。
+
+`GET /api/{module}` 由代理脚本向配置来源发送 GET，返回：
+
+```json
+{
+  "module": "Enhanced",
+  "boxjs": { "apps": [] },
+  "values": {
+    "Enhanced.Settings.Home.Top_left": "mine"
+  },
+  "configURL": "https://app.bilibili.com/configs/Enhanced"
+}
+```
+
+`boxjs` 是上游原始 JSON；`values` 只包含实际已保存的字段值，不补默认值、不转换控件类型。`configURL` 供同一页面后续动作继续指定同一来源。JSON 语法或字段 ID 无法安全识别时返回 422；控件类型、选项、默认值和展示元数据是否可渲染由浏览器校验。
+
+## JSON 动作
+
+三个动作都使用 `Content-Type: application/json`，正文最大 65536 字符。
+
+读取 Settings 或 Caches：
 
 ```http
-POST /api/get
-Content-Type: application/x-www-form-urlencoded
+POST /api/Enhanced/get
+Content-Type: application/json
+X-PreferencePanes-JSON: /configs/Enhanced
 
-%40BiliBili.Enhanced.Settings.Home.Top_left=
+{"scope":"settings"}
 ```
 
-写入普通文本，结果是字符串 mine：
+`scope` 可为 `settings`、`caches` 或 `module`；也可用 `{"key":"Enhanced.Settings.Home.Top_left"}` 读取一个已声明字段。缺失返回 404，成功返回原始 JSON 值。
+
+写入字段：
 
 ```http
-POST /api/set
-Content-Type: application/x-www-form-urlencoded
+POST /api/Enhanced/set
+Content-Type: application/json
+X-PreferencePanes-JSON: /configs/Enhanced
 
-%40BiliBili.Enhanced.Settings.Home.Top_left=mine
+{"key":"Enhanced.Settings.Home.Top_left","value":"mine"}
 ```
 
-值若是合法 JSON，则保留对应类型；否则作为普通字符串。前端统一使用 JSON.stringify(value) 后再用 URLSearchParams 编码，因此字符串 "true" 与布尔 true、字符串 "0" 与数值 0 不混淆。JSON 对象/数组/null 都可以写入，不做控件或枚举校验，不合并补丁对象。
+API 只确认 `key` 对应本次 BoxJS 中的完整字段 ID，再把该 `@root.path` 直接交给 util `Storage.setItem`；值的控件类型和枚举已经由 Web 校验，API 不重复解释。成功返回 `{"saved":true}`。
 
-```js
-const body = new URLSearchParams([["@BiliBili.Enhanced.Settings.Home.Switch", JSON.stringify(false)]]);
-await fetch("/api/set", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
+删除字段或子树：
+
+```http
+POST /api/Enhanced/delete
+Content-Type: application/json
+X-PreferencePanes-JSON: /configs/Enhanced
+
+{"scope":"caches"}
 ```
 
-删除字段值留空。清理 Caches 使用 @BiliBili.Enhanced.Caches，重置模块使用 @BiliBili.Enhanced；保留同根的其它模块。不存在的键删除也返回 200。不支持直接删除整个存储根。
+字段删除使用 `key`；子树删除使用 `scope`。删除 `module` 只移除当前模块，保留同一存储根中的其它模块。成功返回 `{"deleted":true}`，不存在的路径也视为完成。
 
-## 持久化与响应
+400 表示动作正文、字段或 scope 无效，405 表示方法错误，415 表示正文类型错误，422 表示 BoxJS JSON 无法建立安全字段目录，500 表示存储错误，502 表示上游请求失败。所有响应均为 `no-store`。
 
-Store 每次操作通过 util Storage 读取当前根对象，用 util Lodash 定位子路径；set/delete 修改后写回一次。保留旧存储中 JSON 字符串中间节点的解码，读取字符串叶子不改变其类型。API 不下载 BoxJS，不保存鉴权状态，没有预置允许模块目录。
+## 页面渲染
 
-get 成功返回原始 JSON 值，缺失返回 404。set 返回 {"saved":true}，delete 返回 {"deleted":true}。200 后前端更新当前页面缓存并显示临时通知；不追加读取。400 表示 form/路径或大小错误（正文至多 65536 字符），405 表示非 POST，415 表示正文类型错误，500 表示存储错误。所有响应 no-store。
+`web.js` 返回的 `app.mjs` 并发读取可选 CSS 与 `GET /api/{module}`，然后把 API 模型交给浏览器 `mount()`。`mount()` 从 `boxjs` 生成控件定义，校验展示元数据、控件类型、选项、默认值和 `values`，再绘制页面。无效模型只在页面显示加载失败，不会由 API 生成或修补控件。
 
-## 模块页输入与导航
-
-配置 Mock 的 HEAD/GET 响应通过 X-PreferencePanes-Version 提供业务版本。PreferencePanes 的公共浏览器 API `probeModule(url)` 只发送 HEAD 并原样返回浏览器 `Response`；调用方通过 `response.status` 判断可用性，通过 `response.headers.get("X-PreferencePanes-Version")` 读取业务版本。ModuleStatus 委托该 API，仅负责显示“检测中”、业务版本或“未安装”。HTTP 200 但缺少版本头时显示“版本未知”。该版本由业务模块构建提供，不是 PreferencePanes 版本。
-
-JSON/CSS 资源 URL 可通过 json/css 查询参数，或 X-PreferencePanes-JSON / X-PreferencePanes-CSS Header 传入；Header 分别优先。缺省 JSON 为 /configs/{module}，缺省 CSS 为空，使用内置样式。资源只接受 HTTP(S) 或相对地址。浏览器读取 JSON 后根据完整字段 ID 推导存储根与路径，生成 form 请求。
-
-PreferencePanes 不提供项目主页资源。调用方可选用 npm 包导出的 ModuleStatus、ModuleFrame 和 Navigation 实现配置 HEAD 探测、iframe、历史、左右切换与滚动保留，也可以使用自己的页面框架。
-
-客户端 Bridge、User-Agent、主题、原生导航、菜单和提示均由项目页面直接调用对应客户端的官方 SDK。PreferencePanes 不识别 Bilibili 或其它 App，也不提供客户端适配器或中间宿主层。
-
-默认样式只包含包内 `pp-*` 类和 CSS 变量，不加载任何项目、客户端或远程样式。调用方传入的 CSS 仅作用于当前模块，可覆盖变量与组件，也可由调用方自行引用其客户端的官方资源。输入控件采用标准 HTML。
-
-每次进入或刷新模块读 JSON/CSS 并读取设置一次；二级多选返回复用内存缓存。修改立即生效；Caches 按需读取，删除和重置后不额外 GET。主页仅 HEAD 对应配置，不读取存储。
-
-模块设置页不显示独立模块图标，标题栏只显示文字。查看设置、查看缓存、清空缓存、重置设置收敛到标题栏右侧菜单。ActionMenu 提供共用的底部操作菜单、遮罩和取消按钮；独立网页由组件自身三点按钮打开，网页宿主或只有原生按钮的 WebView 宿主可在宿主按钮点击时调用 open()。ModuleFrame 的导航状态包括 actions 描述，宿主把它传给 ActionMenu.update(actions, busy)，选择后只调用 perform(id)；模块接收操作事件并使用通用 get/delete 接口执行。写入或维护操作进行时 actions 的 busy 状态通知宿主禁用菜单，模块自身网页返回按钮禁用；原生返回行为由宿主客户端管理。查看设置和查看缓存分别通过 `POST /api/get` 按需读取最新 Settings 或 Caches 子树，再展示为可返回的序列化 JSON 子页；返回详情页不会触发额外读取，清空与重置设置保留确认步骤。
+修改控件时，浏览器先按渲染定义校验值，再把字段路径和值提交给模块 API。HTTP 200 后只更新当前页面快照；失败恢复控件。查看设置和缓存按需调用 `get`，清空缓存和重置调用 `delete`，均不直接接触持久化实现。
 
 ## 发布
 
-Release 只发布包含模块页面、模块渲染器和存储 API 的 api.js。业务模块引用 https://github.com/NSNanoCat/PreferencePanes/releases/latest/download/api.js，自动更新遵循代理工具的缓存周期。业务仓库不生成 settings.bundle.js；网站不发布 API 或模块渲染产物。必须先发布该通用 API，再上线引用它的新模块模板。
+Release 分别发布后端 `api.js` 和前端 `web.js`。业务模块为 `/api/{module}` 路径引用 `api.js`，为 `/settings/{module}` 与公共浏览器资源引用 `web.js`。两个产物必须来自同一版本，再更新项目主页和业务模块模板。

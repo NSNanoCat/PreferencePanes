@@ -1,4 +1,3 @@
-import { BoxJS } from "../BoxJS.mjs";
 import { pageInputs } from "../lib/page-inputs.mjs";
 import { statusView } from "./components.mjs";
 import { mount } from "./index.mjs";
@@ -30,17 +29,16 @@ async function start() {
             default:
                 inputs = pageInputs(new URL(location.href));
         }
-        const resources = [inputs.json, inputs.css].map(source => {
+        const apiURL = new URL(`/api/${encodeURIComponent(inputs.module)}`, inputs.url).href;
+        const resources = [inputs.css].map(source => {
             if (!source) return null;
             const url = new URL(source, inputs.url);
             if (!["http:", "https:"].includes(url.protocol)) throw new TypeError("Resources must use HTTP(S) URLs");
             return url.href;
         });
-        const [data, style] = await Promise.all(resources.map(url => (url ? fetch(url, { cache: "no-store", credentials: "omit" }) : null)));
-        if (data.status !== 200 || (style && style.status !== 200)) throw new Error(`HTTP ${data.status !== 200 ? data.status : style.status}`);
-        const catalog = new BoxJS(await data.json());
-        if (catalog.module.module !== inputs.module) throw new Error("Imported JSON does not match the module URL");
-        view = mount(catalog, style ? await style.text() : "");
+        const [style, modelResponse] = await Promise.all([...resources.map(url => (url ? fetch(url, { cache: "no-store", credentials: "omit" }) : null)), fetch(apiURL, { cache: "no-store", credentials: "omit", headers: { Accept: "application/json", "X-PreferencePanes-JSON": inputs.json } })]);
+        if ((style && style.status !== 200) || modelResponse.status !== 200) throw new Error(`HTTP ${modelResponse.status !== 200 ? modelResponse.status : style.status}`);
+        view = mount(await modelResponse.json(), style ? await style.text() : "");
     } catch (error) {
         document.querySelector("#preferences").replaceChildren(statusView(`加载失败：${error.message}`, start));
     }
