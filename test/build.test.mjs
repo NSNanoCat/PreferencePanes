@@ -21,10 +21,22 @@ test("public browser exposes only the generic BoxJS mount contract", async () =>
         const source = await readFile(new URL(path, import.meta.url), "utf8");
         assert.doesNotMatch(source, /ModuleModel|configURL|X-PreferencePanes-(?:JSON|CSS)|settings\/assets\/app\.mjs/);
     }
+    const page = await readFile(new URL("../dist/module/index.mjs", import.meta.url), "utf8");
+    assert.match(page, /\/api\//);
+    assert.doesNotMatch(page, /\/configs\//);
 });
 
-for (const quantumult of [false, true])
-    test(`${quantumult ? "Quantumult X" : "Surge"}: backend API leaves pages, assets and configuration requests alone`, async () => {
+const hosts = [
+    { name: "Surge", globals: { $environment: { "surge-version": "test" } } },
+    { name: "Loon", globals: { $loon: {} } },
+    { name: "Stash", globals: { $environment: { "stash-version": "test" } } },
+    { name: "Shadowrocket", globals: { $rocket: {} } },
+    { name: "Egern", globals: { Egern: {} } },
+    { name: "Quantumult X", quantumult: true, globals: {} },
+];
+
+for (const host of hosts)
+    test(`${host.name}: backend API leaves pages, assets and configuration requests alone`, async () => {
         const store = new Map();
         let reads = 0;
         const api = await readFile(new URL("../dist/api.js", import.meta.url), "utf8");
@@ -39,15 +51,15 @@ for (const quantumult of [false, true])
                     return true;
                 };
                 vm.runInNewContext(api, {
-                    ...(quantumult
+                    ...(host.quantumult
                         ? {
                               $task: { fetch: resource => Promise.resolve({ statusCode: resource.url.endsWith("/configs/Module") ? 200 : 404, headers: { "X-PreferencePanes-Version": "preview" }, body: resource.url.endsWith("/configs/Module") ? JSON.stringify(config) : "" }) },
                               $prefs: { valueForKey: read, setValueForKey: write },
                           }
-                        : { $environment: { "surge-version": "test" }, $persistentStore: { read, write } }),
+                        : { ...host.globals, $persistentStore: { read, write } }),
                     $request: { url: `https://example.org${path}`, method, body, headers },
                     $script: { startTime: Date.now() / 1000 },
-                    $done: result => resolve(quantumult ? result : result.response),
+                    $done: result => resolve(host.quantumult ? result : result.response),
                     $httpClient: {
                         head(options, callback) {
                             callback(null, { status: options.url.endsWith("/configs/Module") ? 200 : 404, headers: { "X-PreferencePanes-Version": "preview" } }, "");
@@ -61,17 +73,20 @@ for (const quantumult of [false, true])
                     clearTimeout,
                 });
             });
-        const status = value => (quantumult ? Number(value.status.split(" ")[1]) : value.status);
+        const status = value => (host.quantumult ? Number(value.status.split(" ")[1]) : value.status);
         for (const path of ["/settings/", "/configs/Module", "/settings/Module", "/settings/assets/index.mjs", "/settings/assets/navigation.mjs", "/settings/assets/app.mjs", "/settings/assets/host.mjs"]) {
             const result = await run(path);
-            if (quantumult) assert.deepEqual(JSON.parse(JSON.stringify(result)), {});
+            if (host.quantumult) assert.deepEqual(JSON.parse(JSON.stringify(result)), {});
             else assert.equal(result, undefined);
         }
         assert.equal(reads, 0);
-        const jsonHeaders = { "Content-Type": "application/json" };
-        assert.equal(status(await run("/api/Module", "HEAD", undefined, jsonHeaders)), 200);
-        assert.equal(status(await run("/api/Module", "GET", undefined, jsonHeaders)), 405);
-        assert.equal(status(await run("/api/Module/set", "POST", JSON.stringify({ key: "Module.Settings.Home.enabled", value: { raw: true } }), jsonHeaders)), 200);
-        assert.equal(status(await run("/api/Module/delete", "POST", JSON.stringify({ scope: "module" }), jsonHeaders)), 200);
-        assert.equal(status(await run("/api/Other", "HEAD", undefined, jsonHeaders)), 404);
+        assert.equal(status(await run("/api/Module", "HEAD")), 200);
+        assert.equal(status(await run("/api/Module", "GET")), 200);
+        const formHeaders = { "Content-Type": "application/x-www-form-urlencoded" };
+        assert.equal(status(await run("/api/set", "POST", new URLSearchParams([["@Example.Module.Settings.Home.enabled", JSON.stringify({ raw: true })]]).toString(), formHeaders)), 200);
+        assert.equal(status(await run("/api/delete", "POST", new URLSearchParams([["@Example.Module", ""]]).toString(), formHeaders)), 200);
+        const removedAction = await run("/api/Module/set", "POST");
+        if (host.quantumult) assert.deepEqual(JSON.parse(JSON.stringify(removedAction)), {});
+        else assert.equal(removedAction, undefined);
+        assert.equal(status(await run("/api/Other", "HEAD")), 404);
     });

@@ -58,7 +58,10 @@ test("browser lifecycle keeps page and view classes internal", async () => {
     const client = await readFile(new URL("../src/browser/client.mjs", import.meta.url), "utf8");
     const browser = await import("../dist/preference-panes.mjs");
     assert.match(page, /class ModulePage/);
-    assert.match(page, /mount\(await response\.json\(\)\)/);
+    assert.match(page, /fetch\(`\/api\/\$\{encodeURIComponent\(module\)\}`/);
+    assert.match(page, /normalizeBoxJs\(boxjs, module\)/);
+    assert.match(page, /mount\(boxjs\)/);
+    assert.doesNotMatch(page, /\/configs\//);
     assert.match(view, /class PreferencesView/);
     assert.match(view, /new PreferencesPanel/);
     assert.match(panel, /export class PreferencesPanel/);
