@@ -51,35 +51,35 @@
    - 验证：`npm run apifox:generate`、`npm run apifox:check`、`git diff --check`。
    - 计划提交：`docs(api): 记录前后端独立契约`。
 
-6. [ ] **网站调用与预览（Biliverse.github.io）**
+6. [x] **网站调用与预览（Biliverse.github.io）**
    - 模块页面和公共浏览器资源交给 `web.js`，模块数据请求交给 `api.js`。
    - 更新本地预览、网站说明和测试，不改变 Biliverse Bridge 与视觉代码。
    - 验证：`pnpm settings:build`、`settings:check`、`settings:test`。
    - 计划提交：`refactor(settings): 分离页面与模块 API`。
 
-7. [ ] **业务模板（Enhanced）**
+7. [x] **业务模板（Enhanced）**
    - API 规则只匹配 `/api/{module}` 路径；页面与静态资源规则改用 `web.js`。
    - 重新生成模板产物并运行仓库既有检查。
    - 计划提交：`refactor(settings): 分离页面与模块 API`。
 
-8. [ ] **业务模板（Global）**
+8. [x] **业务模板（Global）**
    - 与 Enhanced 使用同一前后端规则，保持 Global 自己的配置 Mock 不变。
    - 重新生成模板产物并运行仓库既有检查。
    - 计划提交：`refactor(settings): 分离页面与模块 API`。
 
-9. [ ] **业务模板（Redirect）**
+9. [x] **业务模板（Redirect）**
    - 与 Enhanced 使用同一前后端规则，保持 Redirect 自己的配置 Mock 不变。
    - 重新生成模板产物并运行仓库既有检查。
    - 计划提交：`refactor(settings): 分离页面与模块 API`。
 
-10. [ ] **业务模板（ADBlock）**
+10. [x] **业务模板（ADBlock）**
     - 修改前先将本地 `dev` 快进到 `origin/dev`，不得覆盖远端新增提交。
     - 与 Enhanced 使用同一前后端规则，保持 ADBlock 自己的配置 Mock 不变。
     - 重新生成模板产物并运行仓库既有检查。
     - 计划提交：`refactor(settings): 分离页面与模块 API`。
 
-11. [ ] **最终核验与计划收口**
-    - 核对五个仓库的分支、工作树、提交范围和未推送状态。
+11. [x] **最终核验与计划收口**
+    - 核对六个仓库的分支、工作树、提交范围和未推送状态。
     - 搜索旧 API 路径以及由 `api.js` 返回 `/settings/**` 的残留。
     - 在本文件记录各步骤提交哈希和最终验证结果。
     - 计划提交：`docs(plan): 完成 API 前后端分离记录`。
@@ -100,10 +100,10 @@
 | 单一后端 API | PreferencePanes | `803bd7d` | 构建、类型、Biome、45 项测试及 API 构建隔离通过 |
 | 前端 BoxJS 解析 | PreferencePanes | `2a90853` | 构建、类型、Biome、44 项测试及前后端导入隔离通过 |
 | 独立前端交付 | PreferencePanes | `06b683a` | `api.js`/`web.js` 隔离、构建、类型、Biome 及 46 项测试通过 |
-| 契约与文档 | PreferencePanes | 本步骤提交 | Apifox 10 操作/8 路径/3 JSON 动作、完整构建和 46 项测试通过 |
-| 网站调用与预览 | Biliverse.github.io | 待填写 | 待填写 |
-| 业务模板 | Enhanced | 待填写 | 待填写 |
-| 业务模板 | Global | 待填写 | 待填写 |
-| 业务模板 | Redirect | 待填写 | 待填写 |
-| 业务模板 | ADBlock | 待填写 | 待填写 |
-| 最终核验 | PreferencePanes | 待填写 | 待填写 |
+| 契约与文档 | PreferencePanes | `078616a` | Apifox 10 操作/8 路径/3 JSON 动作、完整构建和 46 项测试通过 |
+| 网站调用与预览 | Biliverse.github.io | `5e7f859` | 9 个设置输出、4 项测试及改动文件 Biome 通过 |
+| 业务模板 | Enhanced | `57b8758` | release/dev 生成、28 项测试及改动文件 Biome 通过；全仓 Biome 仍有既有 `example`、`unreleased` 和旧源码问题 |
+| 业务模板 | Global | `79b650a` | release/dev 生成、5 项测试及改动文件 Biome 通过；全仓 Biome 仍有既有 `example`、`unreleased` 和旧源码问题 |
+| 业务模板 | Redirect | `9547952` | release/dev 生成、5 项测试及改动文件 Biome 通过；全仓 Biome 仍有既有生成文件和旧源码问题 |
+| 业务模板 | ADBlock | `fb857f5` | 先快进到 `f24d1d4`；release/dev 生成、25 项测试及改动文件 Biome 通过；全仓 Biome 仍有既有生成文件和旧源码问题 |
+| 最终核验 | PreferencePanes | 本步骤提交 | 六仓库均为本地 `dev` 且工作树干净；旧组合路由与旧后端分层引用搜索为零；核心 46 项测试和网站 4 项测试通过 |
