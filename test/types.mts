@@ -1,6 +1,6 @@
 import type { BoxJSInput, ModuleDefinition, ModuleModel, SettingsField } from "@nsnanocat/preference-panes";
 import { build } from "@nsnanocat/preference-panes";
-import { mount } from "@nsnanocat/preference-panes/browser";
+import { mount, PreferencesView } from "@nsnanocat/preference-panes/browser";
 import { ActionMenu, ModuleFrame, ModuleStatus, Navigation, probeModule } from "@nsnanocat/preference-panes/navigation";
 
 const menu = new ActionMenu(id => frame.perform(id));
@@ -37,6 +37,7 @@ const definition: ModuleDefinition = { module: "Module", storageKey: "Root", set
 const model: ModuleModel = { module: "Module", boxjs, values: {}, configURL: "/configs/Module" };
 mount(model).destroy();
 mount(model, "body { color: black; }").destroy();
+new PreferencesView(model).destroy();
 // @ts-expect-error 页面不接受安装对象或元素配置 / Pages do not accept installation or element configuration.
 mount({ element: document.body });
 // @ts-expect-error 不接受样式 URL 列表配置 / Stylesheet URL-list configuration is not accepted.

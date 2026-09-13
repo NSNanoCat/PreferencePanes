@@ -21,14 +21,14 @@ function resources() {
                 case "#assets": {
                     const bundles = await Promise.all(
                         [
-                            ["app", "src/browser/app.mjs"],
+                            ["index", "src/browser/index.mjs"],
                             ["navigation", "src/browser/Navigation.mjs"],
                         ].map(async ([name, input]) => [name, await rollup({ input, plugins: [nodeResolve({ browser: true }), resources()] })]),
                     );
                     try {
                         const output = Object.fromEntries(await Promise.all(bundles.map(async ([name, bundle]) => [name, (await bundle.generate({ format: "es" })).output[0].code])));
                         const html = (await readFile(new URL("./src/browser/module.html", import.meta.url), "utf8")).replaceAll("__VERSION__", pkg.version);
-                        return `export default ${JSON.stringify({ page: { type: "text/html", body: html }, "/settings/assets/app.mjs": { type: "text/javascript", body: output.app }, "/settings/assets/navigation.mjs": { type: "text/javascript", body: output.navigation } })};`;
+                        return `export default ${JSON.stringify({ page: { type: "text/html", body: html }, "/settings/assets/index.mjs": { type: "text/javascript", body: output.index }, "/settings/assets/app.mjs": { type: "text/javascript", body: output.index }, "/settings/assets/navigation.mjs": { type: "text/javascript", body: output.navigation } })};`;
                     } finally {
                         await Promise.all(bundles.map(([, bundle]) => bundle.close()));
                     }
@@ -46,13 +46,13 @@ function resources() {
  * @type {import("rollup").RollupOptions[]}
  */
 export default [
-    { input: "src/browser/index.mjs", output: { file: "dist/preference-panes.mjs", format: "es" } },
+    { input: "src/browser/mount.mjs", output: { file: "dist/preference-panes.mjs", format: "es" } },
     { input: "src/browser/Navigation.mjs", output: { file: "dist/module/navigation.mjs", format: "es" } },
     { input: "src/api.mjs", output: { file: "dist/api.js", format: "iife" } },
     { input: "src/web.mjs", output: { file: "dist/web.js", format: "iife" } },
     {
-        input: "src/browser/app.mjs",
-        output: { file: "dist/module/app.mjs", format: "es" },
+        input: "src/browser/index.mjs",
+        output: { file: "dist/module/index.mjs", format: "es" },
         plugins: [
             {
                 name: "page-shell",

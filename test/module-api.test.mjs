@@ -106,5 +106,5 @@ test("module API persists browser-validated JSON values without interpreting con
 
 test("backend API passes through pages and static resources", async () => {
     const { run } = fixture();
-    for (const path of ["/settings/Module", "/settings/assets/app.mjs", "/configs/Module"]) assert.equal(await run("GET", path), undefined);
+    for (const path of ["/settings/Module", "/settings/assets/index.mjs", "/configs/Module"]) assert.equal(await run("GET", path), undefined);
 });

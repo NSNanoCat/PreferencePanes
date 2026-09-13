@@ -42,10 +42,12 @@ export interface ModuleSnapshot {
     values: Record<string, SettingsScalar | SettingsScalar[] | null>;
 }
 /**
- * 只调用模块 API 的页面客户端。
- * Page client that only calls the module API.
+ * 管理单模块页面的 API 请求、值快照和会话终止。
+ * Manage API requests, value snapshots, and session termination for one module page.
  */
-export interface PreferencesClient {
+export class PreferencesClient {
+    /** 创建页面客户端 / Create the page client. */
+    constructor(options: PreferencesClientOptions);
     /** 获取页面快照，不发请求 / Get a page snapshot without a request. */
     snapshot(): ModuleSnapshot;
     /** 读取 Settings 子树 / Read the Settings subtree. */
@@ -63,10 +65,3 @@ export interface PreferencesClient {
     /** 删除单个字段覆盖值 / Delete one field override. */
     remove(key: string): Promise<void>;
 }
-/**
- * 创建只调用模块 API 的页面客户端。
- * Create a page client that only calls the module API.
- * @param options API 模型与运行环境 / API model and runtime.
- * @returns 页面客户端 / Page client.
- */
-export function createPreferencesClient(options: PreferencesClientOptions): PreferencesClient;

@@ -11,10 +11,10 @@ import { normalizeBoxJs } from "./browser/boxjs.mjs";
 export async function build(boxjs, css = "") {
     if (typeof css !== "string") throw new TypeError("CSS must be a string");
     const module = normalizeBoxJs(boxjs).module;
-    const [html, app] = await Promise.all([readFile(new URL("../dist/module/index.html", import.meta.url), "utf8"), readFile(new URL("../dist/module/app.mjs", import.meta.url), "utf8")]);
+    const [html, index] = await Promise.all([readFile(new URL("../dist/module/index.html", import.meta.url), "utf8"), readFile(new URL("../dist/module/index.mjs", import.meta.url), "utf8")]);
     return {
         [`settings/${module}/index.html`]: html,
-        "settings/assets/app.mjs": app,
+        "settings/assets/index.mjs": index,
         [`settings/assets/${module}.css`]: css,
     };
 }

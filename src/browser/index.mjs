@@ -1,90 +1,105 @@
-import { normalizeBoxJs, normalizeStoredValue, validValue } from "./boxjs.mjs";
-import { element, resourceURL } from "./components.mjs";
-import { mountPanel } from "./panel.mjs";
+import { pageInputs } from "../lib/page-inputs.mjs";
+import { statusView } from "./components.mjs";
+import { PreferencesView } from "./mount.mjs";
 import { installDefaultStyles } from "./styles.mjs";
 
 /**
- * 挂载模块设置页；默认样式由包提供，可选 CSS 仅作用于当前模块。
- * Mount a module page with package defaults and optional module-scoped CSS.
- * @param {import("../index.js").ModuleModel} model API 返回的模块模型 / Module model returned by the API.
- * @param {string} [css] 可选 CSS 正文 / Optional CSS text.
- * @returns {import("./index.js").MountedPreferences} 模块生命周期句柄 / Module lifecycle handle.
+ * 管理模块文档的页面输入、初始请求、重载和错误状态。
+ * Manage page inputs, initial requests, reloads, and error states for a module document.
  */
-export function mount(model, css = "") {
-    if (typeof css !== "string") throw new TypeError("CSS must be a string");
-    const definition = normalizeBoxJs(model.boxjs, model.module);
-    const values = { ...model.values };
-    for (const field of definition.fields) {
-        if (values[field.key] === undefined) continue;
-        values[field.key] = normalizeStoredValue(field, values[field.key]);
-        if (!validValue(field, values[field.key])) throw new TypeError(`Invalid stored value: ${field.key}`);
-    }
-    for (const field of definition.fields) if (values[field.key] === undefined && Object.hasOwn(field, "defaultValue")) values[field.key] = structuredClone(field.defaultValue);
-    const rendered = { ...model, definition, values };
-    const metadata = definition.metadata ?? {};
-    const image = metadata.icon || metadata.icons?.[1] || metadata.icons?.[0];
-    if (image) resourceURL(image);
-    if (metadata.repo) resourceURL(metadata.repo);
-    const existing = document.querySelector("#preferences");
-    const root = existing ?? element("main", "");
-    if (!existing) {
-        root.id = "preferences";
-        document.body.append(root);
-    }
-    const { element: base, owned: ownsBase } = installDefaultStyles(document);
-    const custom = element("style", "");
-    custom.textContent = css;
-    document.head.append(custom);
-    const previousTitle = document.title;
-    const previousTheme = document.documentElement.dataset.theme;
-    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
-    const previousKeyboard = document.documentElement.style.getPropertyValue("--pp-keyboard-height");
-    const host = window.frameElement?.ownerDocument.documentElement;
+export class ModulePage {
+    #document;
+    #window;
+    #root;
+    #view;
+
     /**
-     * 跟随嵌入宿主的通用环境状态，不识别业务 App 或解析其 UA。
-     * Follow generic host appearance without detecting a business app or parsing its user agent.
-     * @returns {void} 已同步主题与键盘避让 / Theme and keyboard clearance synchronized.
+     * 创建模块页面控制器并安装基础样式。
+     * Create the module page controller and install base styles.
+     * @param {Document} document 模块文档 / Module document.
      */
-    const syncAppearance = () => {
-        const theme = host?.dataset.theme ?? previousTheme ?? (systemTheme.matches ? "dark" : "light");
-        document.documentElement.dataset.theme = theme;
-        if (host) document.documentElement.style.setProperty("--pp-keyboard-height", host.style.getPropertyValue("--pp-keyboard-height"));
-    };
-    let observer;
-    syncAppearance();
-    systemTheme.addEventListener("change", syncAppearance);
-    if (host) {
-        observer = new MutationObserver(syncAppearance);
-        observer.observe(host, { attributes: true, attributeFilter: ["data-theme", "style"] });
+    constructor(document) {
+        this.#document = document;
+        this.#window = document.defaultView;
+        this.#root = document.querySelector("#preferences");
+        installDefaultStyles(document);
+        this.#window.addEventListener("pageshow", this.#show);
     }
-    document.title = metadata.name ?? definition.module;
-    let panel;
-    const view = {
-        /**
-         * 释放模块视图、样式与会话，不操作项目入口页。
-         * Release the module view, styles and session without operating a project landing page.
-         * @returns {void} 无返回值 / No return value.
-         */
-        destroy() {
-            observer?.disconnect();
-            systemTheme.removeEventListener("change", syncAppearance);
-            panel?.destroy();
-            if (ownsBase) base.remove();
-            custom.remove();
-            if (existing) root.replaceChildren();
-            else root.remove();
-            document.title = previousTitle;
-            if (previousTheme === undefined) delete document.documentElement.dataset.theme;
-            else document.documentElement.dataset.theme = previousTheme;
-            document.documentElement.style.setProperty("--pp-keyboard-height", previousKeyboard);
-        },
-    };
-    try {
-        root.replaceChildren();
-        panel = mountPanel(root, rendered);
-        return view;
-    } catch (error) {
-        view.destroy();
-        throw error;
+
+    /**
+     * 从 URL 或代理传递的 Header 导入 JSON/CSS，支持独立文档与 srcdoc。
+     * Import JSON/CSS from the URL or proxy-carried headers in standalone and srcdoc documents.
+     * @returns {Promise<void>} 启动完成 / Startup completion.
+     */
+    async start() {
+        try {
+            this.#view?.destroy();
+            this.#view = undefined;
+            this.#root.replaceChildren(statusView("读取设置…"));
+            const inputs = this.#readInputs();
+            const apiURL = new URL(`/api/${encodeURIComponent(inputs.module)}`, inputs.url).href;
+            const styleURL = this.#resourceURL(inputs.css, inputs.url);
+            const [style, modelResponse] = await Promise.all([styleURL ? fetch(styleURL, { cache: "no-store", credentials: "omit" }) : null, fetch(apiURL, { cache: "no-store", credentials: "omit", headers: { Accept: "application/json", "X-PreferencePanes-JSON": inputs.json } })]);
+            if ((style && style.status !== 200) || modelResponse.status !== 200) throw new Error(`HTTP ${modelResponse.status !== 200 ? modelResponse.status : style.status}`);
+            this.#view = new PreferencesView(await modelResponse.json(), style ? await style.text() : "");
+        } catch (error) {
+            this.#root.replaceChildren(statusView(`加载失败：${error.message}`, () => this.start()));
+        }
     }
+
+    /**
+     * 释放页面视图和页面级监听器。
+     * Release the page view and page-level listener.
+     * @returns {void} 无返回值 / No return value.
+     */
+    destroy() {
+        this.#window.removeEventListener("pageshow", this.#show);
+        this.#view?.destroy();
+        this.#view = undefined;
+    }
+
+    /**
+     * 读取嵌入参数、文档元数据或当前 URL 输入。
+     * Read embedded parameters, document metadata, or current URL inputs.
+     * @returns {ReturnType<typeof pageInputs>} 页面输入 / Page inputs.
+     */
+    #readInputs() {
+        const context = this.#document.querySelector('meta[name="preference-panes-inputs"]');
+        const embedded = this.#window.frameElement?.dataset.preferencePanes;
+        switch (true) {
+            case embedded !== undefined:
+                this.#document.documentElement.dataset.preferencePanesEmbedded = "";
+                return JSON.parse(embedded);
+            case context !== null:
+                return JSON.parse(decodeURIComponent(context.content));
+            default:
+                return pageInputs(new URL(this.#window.location.href));
+        }
+    }
+
+    /**
+     * 将可选页面资源限制为 HTTP(S) 地址。
+     * Restrict an optional page resource to an HTTP(S) URL.
+     * @param {string | undefined} source 资源地址 / Resource location.
+     * @param {string} baseURL 页面基准地址 / Page base URL.
+     * @returns {string | null} 绝对资源地址 / Absolute resource URL.
+     */
+    #resourceURL(source, baseURL) {
+        if (!source) return null;
+        const url = new URL(source, baseURL);
+        if (!["http:", "https:"].includes(url.protocol)) throw new TypeError("Resources must use HTTP(S) URLs");
+        return url.href;
+    }
+
+    /**
+     * 从前进后退缓存恢复时重新加载模块。
+     * Reload the module when restored from the back-forward cache.
+     * @param {PageTransitionEvent} event 页面显示事件 / Page show event.
+     * @returns {void} 无返回值 / No return value.
+     */
+    #show = event => {
+        if (event.persisted) this.start();
+    };
 }
+
+new ModulePage(document).start();

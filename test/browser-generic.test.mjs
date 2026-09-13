@@ -13,7 +13,7 @@ test("browser renderer has no client-specific SDK or stylesheet dependency", asy
 });
 
 test("built renderer contains generic defaults without remote stylesheets", async () => {
-    for (const path of ["../dist/preference-panes.mjs", "../dist/module/app.mjs", "../dist/api.js", "../dist/web.js"]) {
+    for (const path of ["../dist/preference-panes.mjs", "../dist/module/index.mjs", "../dist/api.js", "../dist/web.js"]) {
         const source = await readFile(new URL(path, import.meta.url), "utf8");
         assert.doesNotMatch(source, /bilibili|bili_dark|hdslb|b-style|js-bridge/i, path);
         assert.doesNotMatch(source, /<link[^>]+stylesheet|s1\.hdslb\.com/i, path);
@@ -30,7 +30,7 @@ test("module renderer omits the search toolbar row", async () => {
 test("loading and retry states share the centered status component", async () => {
     const components = await readFile(new URL("../src/browser/components.mjs", import.meta.url), "utf8");
     const panel = await readFile(new URL("../src/browser/panel.mjs", import.meta.url), "utf8");
-    const app = await readFile(new URL("../src/browser/app.mjs", import.meta.url), "utf8");
+    const app = await readFile(new URL("../src/browser/index.mjs", import.meta.url), "utf8");
     const styles = await readFile(new URL("../src/browser/panel.css", import.meta.url), "utf8");
     assert.match(components, /export function statusView/);
     assert.match(panel, /statusView\("读取设置…"\)/);
@@ -51,4 +51,20 @@ test("proxy and browser sources keep storage, validation and navigation responsi
     assert.doesNotMatch(web, /Storage|@nsnanocat\/util"|transport|\/api\//);
     assert.doesNotMatch(navigation, /BoxJS|Storage|api\/(?:get|set|delete)/);
     assert.throws(() => mount({ module: "Module", boxjs: config, values: { "Module.Settings.count": "not-a-number" }, configURL: "/configs/Module" }), /Invalid stored value: Module\.Settings\.count/);
+});
+
+test("browser lifecycle is owned by explicit classes", async () => {
+    const page = await readFile(new URL("../src/browser/index.mjs", import.meta.url), "utf8");
+    const view = await readFile(new URL("../src/browser/mount.mjs", import.meta.url), "utf8");
+    const panel = await readFile(new URL("../src/browser/panel.mjs", import.meta.url), "utf8");
+    const client = await readFile(new URL("../src/browser/client.mjs", import.meta.url), "utf8");
+    const browser = await import("../dist/preference-panes.mjs");
+    assert.match(page, /export class ModulePage/);
+    assert.match(page, /new PreferencesView/);
+    assert.match(view, /export class PreferencesView/);
+    assert.match(view, /new PreferencesPanel/);
+    assert.match(panel, /export class PreferencesPanel/);
+    assert.match(panel, /new PreferencesClient/);
+    assert.match(client, /export class PreferencesClient/);
+    assert.equal(typeof browser.PreferencesView, "function");
 });

@@ -6,7 +6,7 @@
 
 浏览器不直接请求 `/configs/{module}`，也不拼接 `@root.path`。浏览器只调用模块 API，收到原始 BoxJS 与已存值后，在 Web 侧完成控件规范化、展示属性校验、已存值校验和页面渲染。`api.js` 不解释控件类型、选项、默认值或 CSS，不包含 HTML、浏览器 JavaScript 或 Web DOM。
 
-PreferencePanes 的 `web.js` 只返回模块 HTML、`app.mjs` 和 `navigation.mjs`，不访问 BoxJS 上游或持久化存储。HTML 负责加载前端脚本，后端 URL 路由仍由 `api.js` 处理。
+PreferencePanes 的 `web.js` 只返回模块 HTML、`index.mjs` 和 `navigation.mjs`，不访问 BoxJS 上游或持久化存储。HTML 负责加载前端脚本，后端 URL 路由仍由 `api.js` 处理。
 
 `Navigation` 只管理页内历史、前进后退和切换动画；`ModuleFrame` 只管理模块 iframe；`ModuleStatus` 只调用模块 API 并显示探测结果。客户端 Bridge、项目主页和原生导航仍由调用方负责。
 
@@ -15,7 +15,7 @@ PreferencePanes 的 `web.js` 只返回模块 HTML、`app.mjs` 和 `navigation.mj
 | HTTP 方法 | 路径 | 负责产物 | 用途 |
 | --- | --- | --- | --- |
 | GET | `/settings/{module}` | `web.js` | 通用模块 HTML |
-| GET | `/settings/assets/app.mjs` | `web.js` | 模块 API 调用与渲染入口 |
+| GET | `/settings/assets/index.mjs` | `web.js` | 模块 API 调用与渲染入口 |
 | GET | `/settings/assets/navigation.mjs` | `web.js` | Navigation、ModuleFrame、ModuleStatus |
 | HEAD | `/api/{module}` | `api.js` | 探测 BoxJS 上游并透传状态、版本 |
 | GET | `/api/{module}` | `api.js` | 取得 BoxJS 并读取当前字段值 |
@@ -91,7 +91,7 @@ X-PreferencePanes-JSON: /configs/Enhanced
 
 ## 页面渲染
 
-`web.js` 返回的 `app.mjs` 并发读取可选 CSS 与 `GET /api/{module}`，然后把 API 模型交给浏览器 `mount()`。`mount()` 从 `boxjs` 生成控件定义，校验展示元数据、控件类型、选项、默认值和 `values`，再绘制页面。无效模型只在页面显示加载失败，不会由 API 生成或修补控件。
+`web.js` 返回的 `index.mjs` 并发读取可选 CSS 与 `GET /api/{module}`，然后把 API 模型交给浏览器 `mount()`。`mount()` 从 `boxjs` 生成控件定义，校验展示元数据、控件类型、选项、默认值和 `values`，再绘制页面。无效模型只在页面显示加载失败，不会由 API 生成或修补控件。
 
 修改控件时，浏览器先按渲染定义校验值，再把字段路径和值提交给模块 API。HTTP 200 后只更新当前页面快照；失败恢复控件。查看设置和缓存按需调用 `get`，清空缓存和重置调用 `delete`，均不直接接触持久化实现。
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { normalizeBoxJs } from "../src/browser/boxjs.mjs";
-import { createPreferencesClient } from "../src/browser/client.mjs";
+import { PreferencesClient } from "../src/browser/client.mjs";
 import { config } from "./fixtures/module.mjs";
 
 const definition = normalizeBoxJs(config, "Module");
@@ -9,7 +9,7 @@ const model = { module: "Module", boxjs: config, values: { "Module.Settings.Home
 
 test("browser client consumes an API model and sends no BoxJS request", async () => {
     const calls = [];
-    const client = createPreferencesClient({
+    const client = new PreferencesClient({
         model,
         definition,
         fetch: async (...args) => {
@@ -26,7 +26,7 @@ test("browser client consumes an API model and sends no BoxJS request", async ()
 
 test("settings and caches are read through module API actions", async () => {
     const calls = [];
-    const client = createPreferencesClient({
+    const client = new PreferencesClient({
         model,
         definition,
         fetch: async (url, options) => {
@@ -48,7 +48,7 @@ test("settings and caches are read through module API actions", async () => {
 
 test("successful mutations update the page cache without rereading", async () => {
     const notifications = [];
-    const client = createPreferencesClient({ model, definition, notify: event => notifications.push(event), fetch: async () => new Response(JSON.stringify({}), { status: 200 }) });
+    const client = new PreferencesClient({ model, definition, notify: event => notifications.push(event), fetch: async () => new Response(JSON.stringify({}), { status: 200 }) });
     await client.set("Module.Settings.Home.mode", "a");
     await client.remove("Module.Settings.items");
     await client.clearCaches();
@@ -62,7 +62,7 @@ test("successful mutations update the page cache without rereading", async () =>
 
 test("API errors notify and preserve the cached model", async () => {
     const notifications = [];
-    const client = createPreferencesClient({ model, definition, notify: event => notifications.push(event), fetch: async () => new Response(null, { status: 500 }) });
+    const client = new PreferencesClient({ model, definition, notify: event => notifications.push(event), fetch: async () => new Response(null, { status: 500 }) });
     const before = client.snapshot();
     await assert.rejects(client.set("Module.Settings.count", 2), /HTTP 500/);
     assert.deepEqual(client.snapshot(), before);
@@ -71,7 +71,7 @@ test("API errors notify and preserve the cached model", async () => {
 
 test("a timed out request does not abort later API actions", async () => {
     let calls = 0;
-    const client = createPreferencesClient({
+    const client = new PreferencesClient({
         model,
         definition,
         timeout: 5,

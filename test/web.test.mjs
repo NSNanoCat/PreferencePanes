@@ -28,11 +28,12 @@ for (const quantumult of [false, true])
             json: "/header.json",
             css: "/theme.css",
         });
-        for (const asset of ["app.mjs", "navigation.mjs"]) {
+        for (const asset of ["index.mjs", "navigation.mjs"]) {
             const result = await run(`/settings/assets/${asset}`);
             assert.equal(status(result), 200);
             assert.match(result.body, /PreferencePanes|preference-panes/);
         }
+        assert.equal((await run("/settings/assets/app.mjs")).body, (await run("/settings/assets/index.mjs")).body);
         assert.equal(status(await run("/settings/Module", "POST")), 405);
         for (const path of ["/api/Module", "/configs/Module", "/settings/assets/host.mjs"]) {
             const result = await run(path);

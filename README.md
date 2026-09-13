@@ -12,7 +12,7 @@ PreferencePanes 分别提供具体模块的设置前端和本地持久化 API。
 
 宿主也可监听 `notice` 事件，通过 `preventDefault()` 接管 `{kind, message}` 提示；被接管时模块不创建网页 Toast、不启用提示计时器。独立使用的通用面板仍提供默认通知。
 
-业务模块分别映射同一 Release 的两个产物：`api.js` 只匹配 `/api/{module}` 及其动作，`web.js` 只匹配 `/settings/{module}`、`/settings/assets/app.mjs` 和 `/settings/assets/navigation.mjs`。两者都不包含业务配置，也不需要额外安装独立设置插件。
+业务模块分别映射同一 Release 的两个产物：`api.js` 只匹配 `/api/{module}` 及其动作，`web.js` 只匹配 `/settings/{module}`、`/settings/assets/index.mjs` 和 `/settings/assets/navigation.mjs`。发布资源仍把 1.0.0 使用的 `/settings/assets/app.mjs` 映射到同一份 `index.mjs` 正文，兼容尚未更新的已安装模块，但不存在第二个页面入口实现。两者都不包含业务配置，也不需要额外安装独立设置插件。
 
 网页只调用模块 API：`HEAD /api/{module}` 探测模块，`GET /api/{module}` 取得原始 BoxJS 与当前已存值，`POST /api/{module}/get|set|delete` 执行持久化操作。`api.js` 负责取得 BoxJS、确认字段 ID 并把完整 `@root.path` 直接交给 util `Storage`；网页不直接请求配置 Mock，也不提交存储根。
 
@@ -32,17 +32,19 @@ await fetch("/api/Enhanced/set", {
 ## 页面与输入
 
 ```js
-import { mount } from "@nsnanocat/preference-panes/browser";
+import { PreferencesView } from "@nsnanocat/preference-panes/browser";
 const model = await fetch("/api/Module", {
     headers: { "X-PreferencePanes-JSON": "/configs/Module" },
 }).then(response => response.json());
-const page = mount(model, ".pp-panel { --pp-accent: #16866a; }");
+const page = new PreferencesView(model, ".pp-panel { --pp-accent: #16866a; }");
 page.destroy();
 ```
 
+浏览器生命周期依次由 `ModulePage`、`PreferencesView`、`PreferencesPanel` 和 `PreferencesClient` 管理：页面入口读取输入并请求初始模型，视图负责 BoxJS 解析、校验、样式与主题，面板负责控件和导航，客户端只负责 API 请求与页面值快照。`mount(model, css?)` 仍作为创建 `PreferencesView` 的便捷入口。
+
 API 支持字段数组、单 app 和 apps 订阅，只扫描 `@Root.Module.Settings.key` 形式的字段 ID。浏览器从 API 返回的同一份 BoxJS 解析控件、名称、图标和默认值；省略 CSS 使用内置样式。
 
-`/settings/{module}` 由独立 `web.js` 返回模块文档。页面可通过 json/css 查询参数或 X-PreferencePanes-JSON/CSS Header 指定资源 URL；默认 JSON 是 /configs/{module}，CSS 默认空。Header 分别优先。`web.js` 不访问网络或存储，浏览器执行其中的 `app.mjs` 后才调用 `api.js`。
+`/settings/{module}` 由独立 `web.js` 返回模块文档。页面可通过 json/css 查询参数或 X-PreferencePanes-JSON/CSS Header 指定资源 URL；默认 JSON 是 /configs/{module}，CSS 默认空。Header 分别优先。`web.js` 不访问网络或存储，浏览器执行其中的 `index.mjs` 后才调用 `api.js`。
 
 ```js
 import { ModuleFrame, Navigation } from "@nsnanocat/preference-panes/navigation";
@@ -67,7 +69,7 @@ ModuleFrame 在 iframe 元素上保存原请求上下文，HTML 原样加载，�
 
 ## 构建与验证
 
-`npm run build` 生成无业务配置的 `dist/api.js`、`dist/web.js` 和公共前端模块；Release 工作流分别上传后端 API 与前端响应脚本。`build(boxjs, css?)` 仅输出 `settings/{module}/index.html`、公共 `settings/assets/app.mjs` 和可选模块 CSS，不复制配置、导航组件或重复 HTML。
+`npm run build` 生成无业务配置的 `dist/api.js`、`dist/web.js` 和公共前端模块；Release 工作流分别上传后端 API 与前端响应脚本。`build(boxjs, css?)` 仅输出 `settings/{module}/index.html`、公共 `settings/assets/index.mjs` 和可选模块 CSS，不复制配置、导航组件或重复 HTML。
 
 `npm run preview` 提供文件导入测试台，上传 JSON/CSS 后在隔离 iframe 预览；测试存储只在内存中。`npm run check` 检查代码、类型、行为；`npm run apifox:generate` 和 `npm run apifox:check` 维护原生接口文档。
 

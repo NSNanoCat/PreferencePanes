@@ -12,7 +12,7 @@ const otherFiles = await build(other);
 
 test("public browser is module-only and contains no project menu or installer", async () => {
     assert.deepEqual(Object.keys(await import("../src/index.mjs")), ["build"]);
-    assert.deepEqual(Object.keys(await import("../dist/preference-panes.mjs")), ["mount"]);
+    assert.deepEqual(Object.keys(await import("../dist/preference-panes.mjs")), ["PreferencesView", "mount"]);
     assert.deepEqual(Object.keys(await import("@nsnanocat/preference-panes/navigation")), ["ActionMenu", "ModuleFrame", "ModuleStatus", "Navigation", "probeModule"]);
     const { ActionMenu } = await import("@nsnanocat/preference-panes/navigation");
     assert.equal(typeof ActionMenu.prototype.open, "function");
@@ -33,7 +33,7 @@ test("each build creates only one module and never overwrites a project landing 
     assert.equal(files["settings/assets/Module.css"], ".pp-panel { color: red; }");
     assert.equal(otherFiles["settings/assets/Other.css"], "");
     assert.equal(files["settings/Other/index.html"], undefined);
-    assert.equal(files["settings/assets/app.mjs"], otherFiles["settings/assets/app.mjs"]);
+    assert.equal(files["settings/assets/index.mjs"], otherFiles["settings/assets/index.mjs"]);
     assert.equal(files["settings/assets/Module.html"], undefined);
     assert.equal(files["settings/assets/navigation.mjs"], undefined);
     await assert.rejects(build({ apps: [document, other] }), /exactly one module/);
@@ -86,7 +86,7 @@ for (const quantumult of [false, true])
             else assert.equal(result, undefined);
         }
         assert.equal(reads, 0);
-        for (const path of ["/settings/Module", "/settings/assets/app.mjs", "/settings/assets/navigation.mjs", "/settings/assets/host.mjs"]) {
+        for (const path of ["/settings/Module", "/settings/assets/index.mjs", "/settings/assets/navigation.mjs", "/settings/assets/host.mjs"]) {
             const result = await run(path);
             if (quantumult) assert.deepEqual(JSON.parse(JSON.stringify(result)), {});
             else assert.equal(result, undefined);
