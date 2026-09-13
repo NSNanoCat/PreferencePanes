@@ -113,3 +113,7 @@ test("raw BoxJS path segments and browser-style encoded input retain their disti
     const field = normalizeBoxJs([{ ...config[0], id: "@Example.Module.Settings.valid_key-1" }], "Module").fields[0];
     assert.equal(field.key, "Module.Settings.valid_key-1");
 });
+
+test("storage action names are reserved from module configuration paths", () => {
+    for (const module of ["get", "set", "delete"]) assert.throws(() => normalizeBoxJs([{ id: `@Example.${module}.Settings.flag`, name: "Flag", type: "boolean", val: true }]), /Reserved API module name/);
+});

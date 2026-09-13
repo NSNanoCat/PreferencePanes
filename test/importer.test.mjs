@@ -22,16 +22,23 @@ test("import testbench starts empty and generates only the uploaded module", { t
         assert.match(page, /id="generate".*disabled/);
         assert.match(page, /iframe.*hidden/);
         assert.doesNotMatch(page, /pp-home|data-module|安装模块/);
-        assert.equal((await fetch(`${base}configs/Module`)).status, 404);
+        assert.equal((await fetch(`${base}api/Module`)).status, 404);
         const boxjs = [{ id: "@Root.Module.flag", name: "Flag", type: "boolean", val: true }];
         const result = await fetch(`${base}preview`, { method: "POST", body: JSON.stringify({ boxjs }) });
         assert.equal(result.status, 200);
         assert.deepEqual(await result.json(), { url: "/settings/Module", module: "Module" });
-        assert.deepEqual(await (await fetch(`${base}configs/Module`)).json(), boxjs);
+        const configuration = await fetch(`${base}api/Module`);
+        assert.equal(configuration.headers.get("X-PreferencePanes-Version"), "preview");
+        assert.deepEqual(await configuration.json(), boxjs);
+        const probe = await fetch(`${base}api/Module`, { method: "HEAD" });
+        assert.equal(probe.status, 200);
+        assert.equal(probe.headers.get("X-PreferencePanes-Version"), "preview");
+        assert.equal(await probe.text(), "");
         assert.equal((await fetch(`${base}settings/assets/Module.css`)).status, 404);
-        assert.equal((await fetch(`${base}configs/Other`)).status, 404);
-        assert.equal((await fetch(`${base}preview`, { method: "POST", body: "{" })).status, 400);
+        assert.equal((await fetch(`${base}api/Other`)).status, 404);
         assert.equal((await fetch(`${base}configs/Module`)).status, 404);
+        assert.equal((await fetch(`${base}preview`, { method: "POST", body: "{" })).status, 400);
+        assert.equal((await fetch(`${base}api/Module`)).status, 404);
     } finally {
         if (child.exitCode === null && child.signalCode === null) {
             const exited = once(child, "exit");

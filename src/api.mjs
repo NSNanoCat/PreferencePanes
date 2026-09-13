@@ -1,5 +1,4 @@
 import { URL } from "@nsnanocat/url";
-import { fetch as transport } from "@nsnanocat/util";
 import { $app } from "@nsnanocat/util/lib/app.mjs";
 import { done } from "@nsnanocat/util/lib/done.mjs";
 import { Lodash as _ } from "@nsnanocat/util/polyfill/Lodash.mjs";
@@ -7,8 +6,8 @@ import { Storage } from "@nsnanocat/util/polyfill/Storage";
 import { validatePathParts } from "./lib/settings-path.mjs";
 
 /**
- * PreferencePanes 后端 API，只转发模块配置并提供通用持久化操作。
- * PreferencePanes backend API only relaying module configurations and providing generic persistence operations.
+ * PreferencePanes 后端 API，只提供通用持久化操作。
+ * PreferencePanes backend API providing generic persistence operations only.
  */
 class API {
     /**
@@ -30,42 +29,16 @@ class API {
     }
 
     /**
-     * 处理模块配置 API 与固定存储动作，不接管页面或静态资源。
-     * Handle module configuration APIs and fixed storage actions without intercepting pages or static assets.
+     * 处理固定存储动作，不接管模块配置、页面或静态资源。
+     * Handle fixed storage actions without intercepting module configurations, pages, or static assets.
      * @param {import("./index.js").SettingsRequest} request 代理请求 / Proxy request.
      * @returns {Promise<import("./index.js").SettingsResponse | undefined>} API 响应或未接管 / API response or pass-through.
      */
     async handle(request) {
         const url = new URL(request.url);
-        const action = /^\/api\/(get|set|delete)\/?$/.exec(url.pathname)?.[1];
+        const action = /^\/api\/(get|set|delete)$/.exec(url.pathname)?.[1];
         if (action) return this.#store(request, action);
-        const module = /^\/api\/([a-zA-Z0-9_-]+)\/?$/.exec(url.pathname)?.[1];
-        if (!module) return;
-        if (!["HEAD", "GET"].includes(request.method)) return this.#response(request, 405, { error: "Use GET or HEAD for module configuration" });
-        return this.#configuration(request, `${url.origin}/configs/${module}`);
-    }
-
-    /**
-     * 从同源业务配置响应模块探测或原始 BoxJS JSON。
-     * Respond to a module probe or raw BoxJS JSON from the same-origin business configuration.
-     * @param {import("./index.js").SettingsRequest} request 代理请求 / Proxy request.
-     * @param {string} configuration 同源配置地址 / Same-origin configuration URL.
-     * @returns {Promise<import("./index.js").SettingsResponse>} 配置响应 / Configuration response.
-     */
-    async #configuration(request, configuration) {
-        let result;
-        try {
-            result = await transport({ url: configuration, method: request.method, timeout: 5000, headers: { Accept: "application/json" } });
-        } catch (error) {
-            return this.#response(request, 502, { error: error.message });
-        }
-        const version = this.#header(result.headers, "x-preferencepanes-version");
-        const contentType = this.#header(result.headers, "content-type") ?? "application/json; charset=utf-8";
-        return {
-            status: result.statusCode ?? result.status,
-            headers: { "Content-Type": contentType, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...(version ? { "X-PreferencePanes-Version": version } : {}) },
-            body: request.method === "HEAD" ? "" : typeof result.body === "string" ? result.body : new TextDecoder().decode(result.body),
-        };
+        return;
     }
 
     /**
@@ -133,11 +106,6 @@ class API {
             headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" },
             body: request.method === "HEAD" ? "" : JSON.stringify(body),
         };
-    }
-
-    #header(headers, name) {
-        const entry = Object.entries(headers ?? {}).find(([key]) => key.toLowerCase() === name);
-        return entry?.[1] === undefined ? undefined : String(entry[1]).trim();
     }
 }
 

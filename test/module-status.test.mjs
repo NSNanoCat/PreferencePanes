@@ -21,8 +21,8 @@ test("status row uses HEAD and displays module versions or not installed", async
     assert.equal(element.textContent, "未安装");
     response = new Response(null, { status: 200 });
     await status.check("https://example.org/api/Module");
-    assert.equal(element.textContent, "版本未知");
-    assert.equal(status.state.status, "installed");
+    assert.equal(element.textContent, "未安装");
+    assert.equal(status.state.status, "missing");
     status.destroy();
 });
 
