@@ -27,7 +27,7 @@ await fetch("/api/Enhanced/set", {
 });
 ```
 
-模块 API 返回的 `boxjs` 保持上游原样，`values` 只含实际已存值，不补默认值或解释控件类型。Web 侧 `mount()` 独占控件、选项、默认值、展示元数据和已存值校验，再生成页面。写入成功后只更新当前页面快照，不追加读取。旧 `/api/get|set|delete` form 接口和 `/api/module/{module}` 草稿路径均移除。
+模块 API 返回的 `boxjs` 保持上游原样，`values` 只含实际已存值，不补默认值或解释控件类型。Web 侧 `PreferencesView` 独占控件、选项、默认值、展示元数据和已存值校验，再生成页面；公开 `mount()` 只负责创建该 class。写入成功后只更新当前页面快照，不追加读取。旧 `/api/get|set|delete` form 接口和 `/api/module/{module}` 草稿路径均移除。
 
 ## 页面与输入
 
