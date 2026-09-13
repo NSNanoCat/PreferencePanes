@@ -16,7 +16,7 @@
 - 不改变业务模块的 BoxJS 字段、存储键和默认值。
 - 不引入鉴权、中间件、兼容旧 `/api/get|set|delete` 的回退或新的配置层。
 - 不修改 Biliverse 客户端 Bridge、页面视觉样式和模块业务脚本。
-- 本次只创建本地 `dev` 提交，不推送、不发布。
+- 步骤 1-11 只创建本地 `dev` 提交；后续用户已明确要求完成页面 class 收口并提交发布，按下述追加计划执行。
 
 ## 执行顺序
 
@@ -83,6 +83,48 @@
     - 搜索旧 API 路径以及由 `api.js` 返回 `/settings/**` 的残留。
     - 在本文件记录各步骤提交哈希和最终验证结果。
     - 计划提交：`docs(plan): 完成 API 前后端分离记录`。
+
+## 页面生命周期 class 与发布追加计划
+
+12. [ ] **计划基线（PreferencePanes）**
+    - 记录四层浏览器生命周期 class、发布兼容边界、版本和多仓库发布顺序。
+    - 验证：本步骤只提交计划文件。
+
+13. [ ] **浏览器生命周期 class（PreferencePanes）**
+    - `ModulePage` 管理页面输入、初始 API 请求、BFCache 重载和错误状态。
+    - `PreferencesView` 管理 BoxJS 解析与校验、样式、主题和面板生命周期。
+    - `PreferencesPanel` 管理控件、导航、操作队列和通知。
+    - `PreferencesClient` 只管理 API 请求、页面值快照和会话终止。
+    - `index.mjs` 直接实例化 `ModulePage`，各层直接实例化下一层；公开导出 `PreferencesView`，保留 `mount()` 便捷入口。
+    - 所有新增 class 与公开方法使用中英双语说明和 JSDoc。
+    - 验证：构建、Biome、TypeScript、完整测试和 Apifox 一致性检查。
+    - 计划提交：`refactor(browser): 用类管理页面生命周期`。
+
+14. [ ] **1.0 页面入口兼容（PreferencePanes）**
+    - 新页面和新模板只使用 `/settings/assets/index.mjs`。
+    - `web.js` 将 1.0.0 已发布的 `/settings/assets/app.mjs` 映射到同一份 `index.mjs` 正文，不保留第二个源文件或实现。
+    - 验证：两个 URL 返回完全相同正文，且 API/前端路由隔离测试继续通过。
+    - 计划提交：`fix(web): 保留 1.0 页面入口映射`。
+
+15. [ ] **文档与 1.1.0 发布准备（PreferencePanes）**
+    - README 记录 class 职责链、推荐实例化方式和公开入口兼容边界。
+    - 更新 package 版本和发布历史，不改变 Apifox API 契约。
+    - 验证：候选包构建、类型、测试、Apifox 和归档内容检查。
+    - 计划提交：`chore(release): 准备 1.1.0 发布`。
+
+16. [ ] **依赖仓库 dev 推送**
+    - 推送 Biliverse.github.io、Enhanced、Global、Redirect、ADBlock 的 `index.mjs` 模板提交，以及 Biliverse/API 的接口文档提交。
+    - 不创建业务模块正式版本；只发布已验证的 `dev` 分支改动。
+    - 验证：各本地 `dev` 与 `origin/dev` 一致。
+
+17. [ ] **PreferencePanes 1.1.0 正式发布**
+    - 推送 PreferencePanes `dev`，合并到 `main`，创建并推送注释标签 `v1.1.0`。
+    - 等待 npm、GitHub Packages 与 Release Assets 工作流完成。
+    - 验证：GitHub Release 含 `api.js`、`web.js`，npm 可读取 1.1.0，`main`、`dev` 和标签指向预期提交。
+
+18. [ ] **发布记录收口**
+    - 回填步骤 12-17 的提交、推送和发布验证结果。
+    - 计划提交：`docs(plan): 记录 1.1.0 发布结果`。
 
 ## 上下文压缩后的恢复步骤
 
