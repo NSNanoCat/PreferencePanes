@@ -112,17 +112,18 @@
     - 验证：候选包构建、类型、测试、Apifox 和归档内容检查。
     - 计划提交：`chore(release): 准备 1.1.0 发布`。
 
-16. [ ] **依赖仓库 dev 推送**
-    - 推送 Biliverse.github.io、Enhanced、Global、Redirect、ADBlock 的 `index.mjs` 模板提交，以及 Biliverse/API 的接口文档提交。
+16. [x] **依赖仓库 dev 推送**
+    - 推送 Biliverse.github.io、Enhanced、Global、Redirect、ADBlock 的 `index.mjs` 模板提交。
+    - Biliverse/API 本地 `dev` 含无关未推送祖先，因此从 `origin/main` 临时分支只 cherry-pick 本次接口文档并发布到远端 `dev`。
     - 不创建业务模块正式版本；只发布已验证的 `dev` 分支改动。
-    - 验证：各本地 `dev` 与 `origin/dev` 一致。
+    - 验证：五个运行时仓库的本地 `dev` 与 `origin/dev` 一致；API 远端 `dev` 只含本次两文件文档改动。
 
-17. [ ] **PreferencePanes 1.1.0 正式发布**
+17. [x] **PreferencePanes 1.1.0 正式发布**
     - 推送 PreferencePanes `dev`，合并到 `main`，创建并推送注释标签 `v1.1.0`。
     - 等待 npm、GitHub Packages 与 Release Assets 工作流完成。
     - 验证：GitHub Release 含 `api.js`、`web.js`，npm 可读取 1.1.0，`main`、`dev` 和标签指向预期提交。
 
-18. [ ] **发布记录收口**
+18. [x] **发布记录收口**
     - 回填步骤 12-17 的提交、推送和发布验证结果。
     - 计划提交：`docs(plan): 记录 1.1.0 发布结果`。
 
@@ -154,4 +155,7 @@
 | class 发布计划 | PreferencePanes | `9648cfa` | 记录四层浏览器生命周期、兼容边界和发布顺序 |
 | 浏览器生命周期 class | PreferencePanes | `053f801` | 四层 class 调用链、公开 `PreferencesView`、双语 JSDoc、构建、类型、47 项测试及 Apifox 校验通过 |
 | 1.0 页面入口兼容 | PreferencePanes | `fe978ef` | `app.mjs` 与 `index.mjs` 返回同一正文，不存在第二个源文件或实现 |
-| 1.1.0 发布准备 | PreferencePanes | 本步骤提交 | README、版本和发布历史同步；候选包验证后提交 |
+| 1.1.0 发布准备 | PreferencePanes | `634bddb` | README、版本和发布历史同步；构建、类型、47 项测试、Apifox 和 32 文件候选包通过 |
+| 依赖仓库 dev 发布 | Biliverse.github.io、Enhanced、Global、Redirect、ADBlock、API | `88b38de`, `323d8a1`, `5c2b552`, `9c3bf40`, `982662f`, `f0691d4` | 五个运行时仓库快进推送；API 从 `origin/main` 只发布两文件文档提交，未携带本地无关祖先 |
+| 1.1.0 正式发布 | PreferencePanes | `e780ca5`, `v1.1.0` | npm、GitHub Packages、Release Assets 三个工作流成功；Release 含 `api.js` 与 `web.js`；npm 1.1.0 为 32 文件，SHA-1 `6969c8a90c7880a57995ceecdc1abe9d733d6a5a`；发布版新旧入口均为 200 且正文相同 |
+| 发布记录收口 | PreferencePanes | 本步骤提交 | 回填提交、推送、registry、Release 资产和线上入口验证结果 |
