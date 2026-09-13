@@ -41,31 +41,21 @@ class API {
         const match = /^\/api\/([a-zA-Z0-9_-]+)(?:\/(get|set|delete))?\/?$/.exec(url.pathname);
         if (!match) return;
         const [, module, action] = match;
-        const configURL = this.#configURL(request, url, module);
+        const configuration = `${url.origin}/configs/${module}`;
         switch (true) {
             case !action && request.method === "HEAD":
-                return this.#probe(request, configURL);
-            case !action && request.method === "GET":
-                return this.#model(request, module, configURL);
+                return this.#probe(request, configuration);
             case Boolean(action) && request.method === "POST":
-                return this.#action(request, module, action, configURL);
+                return this.#action(request, module, action, configuration);
             default:
-                return this.#response(request, 405, { error: "Use GET or HEAD for module reads, POST for module actions" });
+                return this.#response(request, 405, { error: "Use HEAD for module probes and POST for module actions" });
         }
     }
 
-    #configURL(request, url, module) {
-        const headers = Object.fromEntries(Object.entries(request.headers ?? {}).map(([key, value]) => [key.toLowerCase(), value]));
-        const source = headers["x-preferencepanes-json"] ?? `/configs/${module}`;
-        if (/^https?:\/\//i.test(source)) return source;
-        if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(source)) throw Object.assign(new TypeError("BoxJS resources must use HTTP(S) URLs"), { status: 400 });
-        return `${url.origin}/${source.replace(/^\/+/, "")}`;
-    }
-
-    async #probe(request, configURL) {
+    async #probe(request, configuration) {
         let result;
         try {
-            result = await transport({ url: configURL, method: "HEAD", timeout: 5000, headers: { Accept: "application/json" } });
+            result = await transport({ url: configuration, method: "HEAD", timeout: 5000, headers: { Accept: "application/json" } });
         } catch (error) {
             return this.#response(request, 502, { error: error.message });
         }
@@ -73,19 +63,9 @@ class API {
         return this.#response(request, result.statusCode ?? result.status, undefined, version ? { "X-PreferencePanes-Version": version } : {});
     }
 
-    async #model(request, module, configURL) {
-        const loaded = await this.#load(module, configURL);
-        const values = {};
-        for (const entry of loaded.entries) {
-            const value = Storage.getItem(entry.id, MISSING);
-            if (value !== MISSING) values[entry.id.slice(loaded.storageKey.length + 2)] = value;
-        }
-        return this.#response(request, 200, { module, boxjs: loaded.boxjs, values, configURL }, loaded.version ? { "X-PreferencePanes-Version": loaded.version } : {});
-    }
-
-    async #action(request, module, action, configURL) {
+    async #action(request, module, action, configuration) {
         const payload = this.#jsonBody(request);
-        const target = await this.#load(module, configURL);
+        const target = await this.#load(module, configuration);
         switch (action) {
             case "get": {
                 const value = Storage.getItem(payload?.scope ? this.#scopePath(target, payload.scope) : this.#storagePath(target, payload?.key), MISSING);
@@ -103,10 +83,10 @@ class API {
         }
     }
 
-    async #load(module, configURL) {
+    async #load(module, configuration) {
         let result;
         try {
-            result = await transport({ url: configURL, method: "GET", timeout: 5000, headers: { Accept: "application/json" } });
+            result = await transport({ url: configuration, method: "GET", timeout: 5000, headers: { Accept: "application/json" } });
         } catch (error) {
             throw Object.assign(new Error(`Configuration request failed: ${error.message}`), { status: 502 });
         }
@@ -137,7 +117,7 @@ class API {
                 }
             }
             if (!entries.length) throw new TypeError(`No BoxJS settings for module: ${module}`);
-            return { boxjs, entries, module, storageKey, version: this.#header(result.headers, "x-preferencepanes-version") };
+            return { entries, module, storageKey, version: this.#header(result.headers, "x-preferencepanes-version") };
         } catch (error) {
             throw Object.assign(new Error(`Invalid BoxJS: ${error.message}`), { status: 422 });
         }
