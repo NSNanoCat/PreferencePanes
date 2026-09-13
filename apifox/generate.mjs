@@ -40,22 +40,11 @@ const actionSchemas = {
         additionalProperties: false,
     },
 };
-const modelSchema = {
-    type: "object",
-    properties: {
-        module: { type: "string" },
-        boxjs: { description: "API 从上游取得的原始 BoxJS JSON" },
-        values: { type: "object", description: "只包含实际已保存的字段值", additionalProperties: {} },
-        configURL: { type: "string", description: "后续动作继续使用的 BoxJS 来源" },
-    },
-    required: ["module", "boxjs", "values", "configURL"],
-};
 const declarations = [
     { id: "pp-page-get", method: "get", path: "/settings/{module}", name: "打开模块设置页面", group: "模块设置页面", page: true },
     { id: "pp-index-get", method: "get", path: "/settings/assets/index.mjs", name: "加载模块设置入口", group: "通用页面资源", asset: true },
     { id: "pp-navigation-get", method: "get", path: "/settings/assets/navigation.mjs", name: "加载通用页面导航组件", group: "通用页面资源", asset: true },
     { id: "pp-module-head", method: "head", path: "/api/{module}", name: "探测模块可用性与版本", group: "模块 API", api: true, probe: true },
-    { id: "pp-module-get", method: "get", path: "/api/{module}", name: "取得 BoxJS 与当前值", group: "模块 API", api: true, model: true },
     { id: "pp-module-action-get", method: "post", path: "/api/{module}/get", name: "读取模块字段或子树", group: "模块 API", api: true, action: "get" },
     { id: "pp-module-action-set", method: "post", path: "/api/{module}/set", name: "写入模块字段", group: "模块 API", api: true, action: "set" },
     { id: "pp-module-action-delete", method: "post", path: "/api/{module}/delete", name: "删除模块字段或子树", group: "模块 API", api: true, action: "delete" },
@@ -63,18 +52,16 @@ const declarations = [
     { id: "pp-config-get", method: "get", path: "/configs/{module}", name: "提供版本对应的 BoxJS", group: "BoxJS 上游", upstream: true },
 ];
 const apis = declarations.map(entry => {
-    const codes = entry.action ? [200, 400, 404, 405, 415, 422, 500, 502] : entry.model ? [200, 404, 405, 422, 502] : entry.probe ? [200, 404, 405, 502] : [200, 404];
+    const codes = entry.action ? [200, 400, 404, 405, 415, 422, 500, 502] : entry.probe ? [200, 404, 405, 502] : [200, 404];
     const description = entry.action
         ? "网页提交字段路径或模块 scope；API 重新取得 BoxJS，映射实际 @root.path 并执行存储。控件值语义由 Web 校验。"
-        : entry.model
-          ? "API 取得原始 BoxJS 并读取已存字段值；不生成控件定义、不补默认值。"
-          : entry.probe
-            ? "网页只探测该 API；代理脚本向 BoxJS 上游发送 HEAD，并透传状态与版本头。"
-            : entry.upstream
-              ? "该资源由业务模块提供，只供后端 api.js 获取；网页不直接调用。"
-              : entry.asset
-                ? "该资源由 PreferencePanes web.js 返回；web.js 不访问网络或持久化。"
-                : "通用模块页面由 web.js 返回，只调用独立 api.js，并在 Web 侧完成规范化、校验和渲染。";
+        : entry.probe
+          ? "网页只探测该 API；代理脚本向 BoxJS 上游发送 HEAD，并透传状态与版本头。"
+          : entry.upstream
+            ? "该资源由业务模块提供，只供后端 api.js 获取；网页不直接调用。"
+            : entry.asset
+              ? "该资源由 PreferencePanes web.js 返回；web.js 不访问网络或持久化。"
+              : "通用模块页面由 web.js 返回，直接读取同源 BoxJS，并在 Web 侧完成规范化、校验和渲染。";
     return {
         id: entry.id,
         name: entry.name,
@@ -91,8 +78,8 @@ const apis = declarations.map(entry => {
         sourceUrl: "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/Specification.md",
         parameters: {
             path: entry.path.includes("{module}") ? [parameter("module", "BoxJS 的模块段，动态填入", true)] : [],
-            query: entry.page ? [parameter("json", "JSON 资源地址，默认 /configs/{module}"), parameter("css", "可选 CSS 地址，省略使用内置默认样式")] : [],
-            header: entry.page ? [parameter("X-PreferencePanes-JSON", "BoxJS 来源，优先于 json 查询参数"), parameter("X-PreferencePanes-CSS", "CSS 地址，优先于 css 查询参数")] : entry.api ? [parameter("X-PreferencePanes-JSON", "API 要获取的 BoxJS 来源；默认 /configs/{module}")] : [],
+            query: [],
+            header: [],
             cookie: [],
         },
         requestBody: entry.action
@@ -107,9 +94,9 @@ const apis = declarations.map(entry => {
             id: `${entry.id}-${code}`,
             code,
             name: code === 200 ? "成功" : "失败",
-            headers: entry.upstream || entry.probe || entry.model ? [parameter("X-PreferencePanes-Version", "与配置和业务脚本同次构建的版本", true)] : [],
+            headers: entry.upstream || entry.probe ? [parameter("X-PreferencePanes-Version", "与配置和业务脚本同次构建的版本", true)] : [],
             contentType: entry.method === "head" ? "noContent" : entry.page ? "html" : entry.asset ? "text" : "json",
-            jsonSchema: code === 200 && entry.model ? modelSchema : code === 200 ? {} : { type: "object", properties: { error: { type: "string" } } },
+            jsonSchema: code === 200 ? {} : { type: "object", properties: { error: { type: "string" } } },
             description: code === 200 ? "操作成功；具体正文见接口职责。" : "方法、正文、BoxJS 上游、字段路径或存储错误；没有 401/403 鉴权响应。",
         })),
         responseExamples: [],
