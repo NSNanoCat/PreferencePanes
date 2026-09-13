@@ -1,6 +1,6 @@
 # PreferencePanes 发布流程与历史记录
 
-下一版本将后端 API 与设置前端拆成同版本的 `api.js` 和 `web.js`：前者只处理 `/api/{module}`，后者只返回 `/settings/**` 页面资源。业务模板必须同时更新两类规则后才能使用该版本。
+1.0.0 将后端 API 与设置前端拆分为同版本的 `api.js` 和 `web.js`；后端只处理 `/api/{module}` 及读写动作，前端只提供 `/settings/**` 页面资源。BoxJS 控件解析归属浏览器，后端只按字段 ID 直接调用 util `Storage`。
 
 0.9.16 将公共模块探测 API 改为原样返回 HEAD 的 Response；可用性使用 response.status，模块版本使用 X-PreferencePanes-Version 响应头，不再暴露自定义 httpStatus 响应字段。
 
