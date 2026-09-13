@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { BoxJS } from "./BoxJS.mjs";
+import { normalizeBoxJs } from "./browser/boxjs.mjs";
 
 /**
  * 仅生成模块前端文件，不复制配置或生成绑定业务的读写脚本。
@@ -10,8 +10,7 @@ import { BoxJS } from "./BoxJS.mjs";
  */
 export async function build(boxjs, css = "") {
     if (typeof css !== "string") throw new TypeError("CSS must be a string");
-    const catalog = new BoxJS(boxjs);
-    const module = catalog.module.module;
+    const module = normalizeBoxJs(boxjs).module;
     const [html, app] = await Promise.all([readFile(new URL("../dist/module/index.html", import.meta.url), "utf8"), readFile(new URL("../dist/module/app.mjs", import.meta.url), "utf8")]);
     return {
         [`settings/${module}/index.html`]: html,

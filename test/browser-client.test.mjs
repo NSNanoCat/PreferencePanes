@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { normalizeBoxJs } from "../src/browser/boxjs.mjs";
 import { createPreferencesClient } from "../src/browser/client.mjs";
-import { normalizeBoxJs } from "../src/lib/boxjs.mjs";
 import { config } from "./fixtures/module.mjs";
 
 const definition = normalizeBoxJs(config, "Module");

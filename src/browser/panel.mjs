@@ -1,5 +1,5 @@
-import { validValue } from "../lib/boxjs.mjs";
 import { ActionMenu } from "./ActionMenu.mjs";
+import { validValue } from "./boxjs.mjs";
 import { createPreferencesClient } from "./client.mjs";
 import { fieldControl, element as node, requestConfirmation, resourceURL, settingRow, statusView } from "./components.mjs";
 import { Navigation } from "./Navigation.mjs";

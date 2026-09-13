@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BoxJS } from "../src/BoxJS.mjs";
-import { normalizeBoxJs } from "../src/lib/boxjs.mjs";
+import { normalizeBoxJs } from "../src/browser/boxjs.mjs";
 import { config } from "./fixtures/module.mjs";
 
 test("BoxJS array, app and subscription normalize IDs without project constants", () => {
@@ -9,12 +8,33 @@ test("BoxJS array, app and subscription normalize IDs without project constants"
     assert.equal(a.storageKey, "Example");
     assert.deepEqual(a.settingsPath, ["Module", "Settings"]);
     assert.deepEqual(normalizeBoxJs({ settings: config }, "Module"), a);
-    assert.deepEqual(normalizeBoxJs(new BoxJS(config), "Module"), a);
+    assert.deepEqual(normalizeBoxJs(config), a);
     assert.deepEqual(normalizeBoxJs({ apps: [{ settings: config }, { settings: [{ ...config[0], id: "@Other.Second.Settings.on" }] }] }, "Module"), a);
     assert.equal(a.fields[4].defaultValue, 1);
     assert.throws(() => normalizeBoxJs([{ ...config[0], type: "unsupported" }], "Module"), /Unsupported/);
     assert.throws(() => normalizeBoxJs([...config, config[0]], "Module"), /overlapping/);
     assert.throws(() => normalizeBoxJs([...config, { ...config[0], id: "@Other.Module.Settings.x" }], "Module"), /one storage root/);
+});
+
+test("frontend BoxJS parser rejects invalid documents and ambiguous modules", () => {
+    for (const input of [undefined, "https://example.org/config.json", { origin: "https://example.org", storageKey: "Root", module: "Module" }, { apps: [{ module: "Module", name: "Old menu" }] }]) assert.throws(() => normalizeBoxJs(input));
+    assert.throws(
+        () =>
+            normalizeBoxJs([
+                { id: "@One.Module.Settings.a", name: "A", type: "text" },
+                { id: "@Two.Module.Settings.b", name: "B", type: "text" },
+            ]),
+        /one storage root/,
+    );
+    assert.throws(() => normalizeBoxJs([]), /exactly one module/);
+    assert.throws(() => normalizeBoxJs([{ id: "@@One.Module.Settings.a", name: "A", type: "text" }]), /literal storage root/);
+    assert.throws(
+        () =>
+            normalizeBoxJs({
+                apps: [{ settings: config }, { settings: [{ id: "@Other.Second.Settings.on", name: "On", type: "boolean", val: true }] }],
+            }),
+        /exactly one module/,
+    );
 });
 
 test("BoxJS metadata belongs to the app owning matching field IDs", () => {

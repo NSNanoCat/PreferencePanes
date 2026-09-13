@@ -32,7 +32,7 @@
    - 验证：模块 API、平台 Storage、构建隔离测试及完整 `npm run check`。
    - 计划提交：`refactor(api): 收敛独立后端入口`。
 
-3. [ ] **前端 BoxJS 解析（PreferencePanes）**
+3. [x] **前端 BoxJS 解析（PreferencePanes）**
    - 将公共 `src/BoxJS.mjs` 与 `src/lib/boxjs.mjs` 收敛为浏览器侧 BoxJS 解析模块。
    - 后端不得导入前端解析器；构建器只读取生成前端路径所需的单模块名称。
    - 验证：BoxJS、浏览器渲染、构建和类型测试。
@@ -97,8 +97,8 @@
 | 步骤 | 仓库 | 提交 | 验证 |
 | --- | --- | --- | --- |
 | 计划基线 | PreferencePanes | `9c8165b` | 计划文件单独提交 |
-| 单一后端 API | PreferencePanes | 本步骤提交 | 构建、类型、Biome、45 项测试及 API 构建隔离通过 |
-| 前端 BoxJS 解析 | PreferencePanes | 待填写 | 待填写 |
+| 单一后端 API | PreferencePanes | `803bd7d` | 构建、类型、Biome、45 项测试及 API 构建隔离通过 |
+| 前端 BoxJS 解析 | PreferencePanes | 本步骤提交 | 构建、类型、Biome、44 项测试及前后端导入隔离通过 |
 | 独立前端交付 | PreferencePanes | 待填写 | 待填写 |
 | 契约与文档 | PreferencePanes | 待填写 | 待填写 |
 | 网站调用与预览 | Biliverse.github.io | 待填写 | 待填写 |

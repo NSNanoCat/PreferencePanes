@@ -1,23 +1,46 @@
-import { BoxJS } from "../BoxJS.mjs";
-import { validatePathParts } from "./settings-path.mjs";
+import { validatePathParts } from "../lib/settings-path.mjs";
 
 /**
- * 将 BoxJS 数组、app 或订阅转换为模块字段，保留原文件为唯一字段来源。
- * Normalize a BoxJS array, app or subscription using the source JSON as the field authority.
- * @param {unknown | BoxJS} config BoxJS JSON 或已解析目录 / BoxJS document or parsed catalog.
- * @param {string} module API 第一段模块名 / First API path segment.
- * @returns {import("../index.js").ModuleDefinition} 存储根和字段 / Storage root and fields.
- * @throws {TypeError} 配置结构、字段路径、默认值或展示属性无效 / Invalid configuration, field path, default or presentation attribute.
+ * 将 BoxJS 数组、app 或订阅转换为浏览器字段定义。
+ * Normalize a BoxJS array, app or subscription into browser field definitions.
+ * @param {unknown} config 原始 BoxJS JSON / Raw BoxJS JSON.
+ * @param {string} [module] API 模块路径段；省略时要求输入只有一个模块 / API module path segment; omission requires exactly one module.
+ * @returns {import("../index.js").ModuleDefinition} 浏览器字段定义 / Browser field definition.
  */
 export function normalizeBoxJs(config, module) {
-    validatePathParts([module]);
-    const catalog = config instanceof BoxJS ? config : new BoxJS(config);
-    const target = catalog.modules.get(module);
+    if (!config || typeof config !== "object") throw new TypeError("Expected BoxJS JSON");
+    const document = JSON.parse(JSON.stringify(config));
+    const apps = Array.isArray(document) ? [{ settings: document }] : (document.apps ?? [document]);
+    if (!Array.isArray(apps)) throw new TypeError("Expected BoxJS apps array");
+    const modules = new Map();
+    for (const app of apps) {
+        if (!app || !Array.isArray(app.settings)) throw new TypeError("Expected BoxJS settings array");
+        for (const entry of app.settings) {
+            if (typeof entry.id !== "string") throw new TypeError("BoxJS settings require string IDs");
+            if (!entry.id.startsWith("@")) {
+                if (Array.isArray(document)) throw new TypeError("BoxJS settings require @root.path IDs");
+                continue;
+            }
+            const [storageKey, ...parts] = entry.id.slice(1).split(".");
+            if (!storageKey || storageKey.startsWith("@") || parts.length < 2) throw new TypeError("A BoxJS setting must be below a literal storage root and module");
+            validatePathParts(parts);
+            const name = parts[0];
+            let target = modules.get(name);
+            if (!target) {
+                target = { module: name, storageKey, entries: [], owners: new Set() };
+                modules.set(name, target);
+            }
+            if (target.storageKey !== storageKey) throw new TypeError(`A module must use one storage root: ${name}`);
+            target.entries.push(entry);
+            target.owners.add(app);
+        }
+    }
+    if (module === undefined && modules.size !== 1) throw new TypeError("Import BoxJS JSON for exactly one module");
+    const target = module === undefined ? modules.values().next().value : modules.get(module);
     if (!target) throw new TypeError(`No BoxJS settings for module: ${module}`);
-    const { entries, storageKey } = target;
-    const metadata = normalizeMetadata(target.metadata);
+    const metadata = normalizeMetadata(target.owners.size === 1 ? presentation([...target.owners][0]) : {});
     const fields = [];
-    for (const entry of entries) {
+    for (const entry of target.entries) {
         const parts = entry.id.slice(1).split(".").slice(1);
         const type = { boolean: "boolean", checkboxes: "array", selects: "select", text: "string", textarea: "string", number: "number" }[entry.type];
         if (!type) throw new TypeError(`Unsupported BoxJS control: ${entry.type}`);
@@ -47,16 +70,31 @@ export function normalizeBoxJs(config, module) {
         if (Object.hasOwn(field, "defaultValue") && !validValue(field, field.defaultValue)) throw new TypeError(`Invalid BoxJS val: ${entry.id}`);
         fields.push(field);
     }
-    if (!fields.length) throw new TypeError(`No BoxJS settings for module: ${module}`);
+    if (!fields.length) throw new TypeError(`No BoxJS settings for module: ${target.module}`);
     const common = fields[0].key.split(".").slice(0, -1);
     for (const field of fields) while (!field.key.startsWith(`${common.join(".")}.`)) common.pop();
     return {
-        module,
-        storageKey,
+        module: target.module,
+        storageKey: target.storageKey,
         fields,
         settingsPath: common,
         ...(Object.keys(metadata).length ? { metadata } : {}),
     };
+}
+
+/**
+ * 保留字段所属 app 的原始展示信息。
+ * Retain raw presentation metadata from the app owning the fields.
+ * @param {object} source BoxJS app / BoxJS app.
+ * @returns {Record<string, unknown>} 原始展示信息 / Raw presentation metadata.
+ */
+function presentation(source) {
+    const result = {};
+    for (const key of ["id", "name", "author", "repo", "script", "icon", "description", "desc", "icons", "descs"]) {
+        if (source[key] === undefined) continue;
+        result[key] = source[key];
+    }
+    return result;
 }
 
 /**

@@ -1,5 +1,4 @@
-import { BoxJS } from "../BoxJS.mjs";
-import { normalizeBoxJs, normalizeStoredValue, validValue } from "../lib/boxjs.mjs";
+import { normalizeBoxJs, normalizeStoredValue, validValue } from "./boxjs.mjs";
 import { element, resourceURL } from "./components.mjs";
 import { mountPanel } from "./panel.mjs";
 import { installDefaultStyles } from "./styles.mjs";
@@ -13,7 +12,7 @@ import { installDefaultStyles } from "./styles.mjs";
  */
 export function mount(model, css = "") {
     if (typeof css !== "string") throw new TypeError("CSS must be a string");
-    const definition = normalizeBoxJs(new BoxJS(model.boxjs), model.module);
+    const definition = normalizeBoxJs(model.boxjs, model.module);
     const values = { ...model.values };
     for (const field of definition.fields) {
         if (values[field.key] === undefined) continue;
