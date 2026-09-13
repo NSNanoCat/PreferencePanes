@@ -42,7 +42,7 @@ test("each build creates only one module and never overwrites a project landing 
 });
 
 for (const quantumult of [false, true])
-    test(`${quantumult ? "Quantumult X" : "Surge"}: module script leaves the landing page, other modules and configuration requests alone`, async () => {
+    test(`${quantumult ? "Quantumult X" : "Surge"}: backend API leaves pages, assets and configuration requests alone`, async () => {
         const store = new Map();
         let reads = 0;
         const api = await readFile(new URL("../dist/api.js", import.meta.url), "utf8");
@@ -86,15 +86,11 @@ for (const quantumult of [false, true])
             else assert.equal(result, undefined);
         }
         assert.equal(reads, 0);
-        assert.match((await run("/settings/Module")).body, /<!doctype html>/i);
-        for (const asset of ["app.mjs", "navigation.mjs"]) {
-            const result = await run(`/settings/assets/${asset}`);
-            assert.equal(status(result), 200);
-            assert.match(result.body, /PreferencePanes|preference-panes/);
+        for (const path of ["/settings/Module", "/settings/assets/app.mjs", "/settings/assets/navigation.mjs", "/settings/assets/host.mjs"]) {
+            const result = await run(path);
+            if (quantumult) assert.deepEqual(JSON.parse(JSON.stringify(result)), {});
+            else assert.equal(result, undefined);
         }
-        const host = await run("/settings/assets/host.mjs");
-        if (quantumult) assert.deepEqual(JSON.parse(JSON.stringify(host)), {});
-        else assert.equal(host, undefined);
         const jsonHeaders = { "Content-Type": "application/json", "X-PreferencePanes-JSON": "/configs/Module" };
         assert.equal(status(await run("/api/Module", "HEAD", undefined, jsonHeaders)), 200);
         assert.equal(status(await run("/api/Module/set", "POST", JSON.stringify({ key: "Module.Settings.Home.enabled", value: { raw: true } }), jsonHeaders)), 200);

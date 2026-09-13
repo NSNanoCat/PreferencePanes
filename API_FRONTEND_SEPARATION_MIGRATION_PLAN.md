@@ -20,11 +20,11 @@
 
 ## 执行顺序
 
-1. [ ] **计划基线（PreferencePanes）**
+1. [x] **计划基线（PreferencePanes）**
    - 提交本文件。
    - 验证：工作树除本文件外无变化；提交遵守 Conventional Commits。
 
-2. [ ] **单一后端 API（PreferencePanes）**
+2. [x] **单一后端 API（PreferencePanes）**
    - 用 `src/api.mjs` 取代 `src/proxy/handler.mjs` 和 `src/ModuleApi.mjs`。
    - 将响应构造、代理宿主完成响应和字段 ID 查找收进同一后端文件。
    - 删除 `src/Store.mjs`、`src/lib/response.mjs`、`src/proxy/response.mjs`，直接使用 util `Storage` 深路径 API。
@@ -96,8 +96,8 @@
 
 | 步骤 | 仓库 | 提交 | 验证 |
 | --- | --- | --- | --- |
-| 计划基线 | PreferencePanes | 待填写 | 待填写 |
-| 单一后端 API | PreferencePanes | 待填写 | 待填写 |
+| 计划基线 | PreferencePanes | `9c8165b` | 计划文件单独提交 |
+| 单一后端 API | PreferencePanes | 本步骤提交 | 构建、类型、Biome、45 项测试及 API 构建隔离通过 |
 | 前端 BoxJS 解析 | PreferencePanes | 待填写 | 待填写 |
 | 独立前端交付 | PreferencePanes | 待填写 | 待填写 |
 | 契约与文档 | PreferencePanes | 待填写 | 待填写 |

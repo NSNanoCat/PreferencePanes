@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import vm from "node:vm";
 import { pageInputs } from "../src/lib/page-inputs.mjs";
 
 test("the exported Apifox collection contains all three route families and editable page inputs", async () => {
@@ -33,32 +32,4 @@ test("resource headers override query values independently and preserve module d
     assert.equal(defaults.css, "");
     assert.throws(() => pageInputs(new URL("https://example.org/settings/")), /concrete module/);
     assert.throws(() => pageInputs(url, { "X-PreferencePanes-JSON": "" }), /required/);
-});
-
-test("page responses carry header inputs without fetching resources or touching persistence", async () => {
-    const api = await readFile(new URL("../dist/api.js", import.meta.url), "utf8");
-    const malicious = '/theme.css?q="</head><script>alert(1)</script>';
-    const response = await new Promise(resolve =>
-        vm.runInNewContext(api, {
-            $environment: { "surge-version": "test" },
-            $script: { startTime: Date.now() / 1000 },
-            $request: {
-                url: "https://example.org/settings/Module?json=/query.json",
-                method: "GET",
-                headers: { "X-PreferencePanes-JSON": "/header.json", "X-PreferencePanes-CSS": malicious },
-            },
-            $done: result => resolve(result.response),
-            console: { log() {}, error() {} },
-        }),
-    );
-    assert.equal(response.status, 200);
-    assert.equal(response.headers["Cache-Control"], "no-store");
-    const data = response.body.match(/name="preference-panes-inputs" content="([^"]+)"/)[1];
-    assert.deepEqual(JSON.parse(decodeURIComponent(data)), {
-        url: "https://example.org/settings/Module?json=/query.json",
-        module: "Module",
-        json: "/header.json",
-        css: malicious,
-    });
-    assert.ok(!response.body.includes("<script>alert"));
 });

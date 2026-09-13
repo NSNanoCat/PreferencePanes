@@ -48,7 +48,7 @@ function resources() {
 export default [
     { input: "src/browser/index.mjs", output: { file: "dist/preference-panes.mjs", format: "es" } },
     { input: "src/browser/Navigation.mjs", output: { file: "dist/module/navigation.mjs", format: "es" } },
-    { input: "src/proxy/handler.mjs", output: { file: "dist/api.js", format: "iife" } },
+    { input: "src/api.mjs", output: { file: "dist/api.js", format: "iife" } },
     {
         input: "src/browser/app.mjs",
         output: { file: "dist/module/app.mjs", format: "es" },

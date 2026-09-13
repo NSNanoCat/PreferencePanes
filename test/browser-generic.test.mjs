@@ -43,10 +43,10 @@ test("loading and retry states share the centered status component", async () =>
 });
 
 test("proxy and browser sources keep storage, validation and navigation responsibilities separate", async () => {
-    const api = await readFile(new URL("../src/ModuleApi.mjs", import.meta.url), "utf8");
+    const api = await readFile(new URL("../src/api.mjs", import.meta.url), "utf8");
     const navigation = await readFile(new URL("../src/browser/Navigation.mjs", import.meta.url), "utf8");
     const { mount } = await import("../dist/preference-panes.mjs");
-    assert.doesNotMatch(api, /normalizeBoxJs|normalizeStoredValue|validValue|mountPanel|document\./);
+    assert.doesNotMatch(api, /normalizeBoxJs|normalizeStoredValue|validValue|mountPanel|document\.|module\.html|#assets/);
     assert.doesNotMatch(navigation, /BoxJS|Storage|api\/(?:get|set|delete)/);
     assert.throws(() => mount({ module: "Module", boxjs: config, values: { "Module.Settings.count": "not-a-number" }, configURL: "/configs/Module" }), /Invalid stored value: Module\.Settings\.count/);
 });
