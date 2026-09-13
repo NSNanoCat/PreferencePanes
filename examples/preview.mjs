@@ -55,8 +55,8 @@ const server = http.createServer(async (request, reply) => {
             reply.end(request.method === "HEAD" ? "" : asset[1]);
             return;
         }
-        if (configuration && url.pathname === `/configs/${moduleName}` && ["HEAD", "GET"].includes(request.method)) {
-            reply.writeHead(200, { "Content-Type": "application/json" });
+        if (configuration && url.pathname === `/api/${moduleName}` && ["HEAD", "GET"].includes(request.method)) {
+            reply.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-PreferencePanes-Version": "preview" });
             reply.end(request.method === "HEAD" ? "" : JSON.stringify(configuration));
             return;
         }
@@ -77,21 +77,9 @@ const server = http.createServer(async (request, reply) => {
                         return true;
                     },
                 },
-                $httpClient: {
-                    head(options, callback) {
-                        const exists = configuration && options.url.endsWith(`/configs/${moduleName}`);
-                        callback(null, { status: exists ? 200 : 404, headers: exists ? { "X-PreferencePanes-Version": "preview" } : {} }, "");
-                    },
-                    get(options, callback) {
-                        const exists = configuration && options.url.endsWith(`/configs/${moduleName}`);
-                        callback(null, { status: exists ? 200 : 404, headers: exists ? { "X-PreferencePanes-Version": "preview" } : {} }, exists ? JSON.stringify(configuration) : "");
-                    },
-                },
                 $request: { url: url.href, method: request.method, headers: request.headers, body },
                 $done: result => resolve(result.response),
                 console,
-                setTimeout,
-                clearTimeout,
             }),
         );
         reply.writeHead(response?.status ?? 404, response?.headers);

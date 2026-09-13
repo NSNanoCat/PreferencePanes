@@ -25,6 +25,7 @@ export function normalizeBoxJs(config, module) {
             if (!storageKey || storageKey.startsWith("@") || parts.length < 2) throw new TypeError("A BoxJS setting must be below a literal storage root and module");
             validatePathParts(parts);
             const name = parts[0];
+            if (["get", "set", "delete"].includes(name)) throw new TypeError(`Reserved API module name: ${name}`);
             let target = modules.get(name);
             if (!target) {
                 target = { module: name, storageKey, entries: [], owners: new Set() };

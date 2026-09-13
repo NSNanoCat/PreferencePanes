@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
-import { config } from "./fixtures/module.mjs";
 
 test("public browser exposes only the generic BoxJS mount contract", async () => {
     assert.deepEqual(Object.keys(await import("../src/index.mjs")), []);
@@ -51,26 +50,11 @@ for (const host of hosts)
                     return true;
                 };
                 vm.runInNewContext(api, {
-                    ...(host.quantumult
-                        ? {
-                              $task: { fetch: resource => Promise.resolve({ statusCode: resource.url.endsWith("/configs/Module") ? 200 : 404, headers: { "X-PreferencePanes-Version": "preview" }, body: resource.url.endsWith("/configs/Module") ? JSON.stringify(config) : "" }) },
-                              $prefs: { valueForKey: read, setValueForKey: write },
-                          }
-                        : { ...host.globals, $persistentStore: { read, write } }),
+                    ...(host.quantumult ? { $task: {}, $prefs: { valueForKey: read, setValueForKey: write } } : { ...host.globals, $persistentStore: { read, write } }),
                     $request: { url: `https://example.org${path}`, method, body, headers },
                     $script: { startTime: Date.now() / 1000 },
                     $done: result => resolve(host.quantumult ? result : result.response),
-                    $httpClient: {
-                        head(options, callback) {
-                            callback(null, { status: options.url.endsWith("/configs/Module") ? 200 : 404, headers: { "X-PreferencePanes-Version": "preview" } }, "");
-                        },
-                        get(options, callback) {
-                            callback(null, { status: options.url.endsWith("/configs/Module") ? 200 : 404, headers: { "X-PreferencePanes-Version": "preview" } }, options.url.endsWith("/configs/Module") ? JSON.stringify(config) : "");
-                        },
-                    },
                     console: { log() {}, error() {} },
-                    setTimeout,
-                    clearTimeout,
                 });
             });
         const status = value => (host.quantumult ? Number(value.status.split(" ")[1]) : value.status);
@@ -80,13 +64,22 @@ for (const host of hosts)
             else assert.equal(result, undefined);
         }
         assert.equal(reads, 0);
-        assert.equal(status(await run("/api/Module", "HEAD")), 200);
-        assert.equal(status(await run("/api/Module", "GET")), 200);
+        for (const [method, path] of [
+            ["HEAD", "/api/Module"],
+            ["GET", "/api/Module"],
+            ["POST", "/api/Module/get"],
+            ["POST", "/api/get/"],
+        ]) {
+            const result = await run(path, method);
+            if (host.quantumult) assert.deepEqual(JSON.parse(JSON.stringify(result)), {});
+            else assert.equal(result, undefined);
+        }
         const formHeaders = { "Content-Type": "application/x-www-form-urlencoded" };
         assert.equal(status(await run("/api/set", "POST", new URLSearchParams([["@Example.Module.Settings.Home.enabled", JSON.stringify({ raw: true })]]).toString(), formHeaders)), 200);
         assert.equal(status(await run("/api/delete", "POST", new URLSearchParams([["@Example.Module", ""]]).toString(), formHeaders)), 200);
-        const removedAction = await run("/api/Module/set", "POST");
-        if (host.quantumult) assert.deepEqual(JSON.parse(JSON.stringify(removedAction)), {});
-        else assert.equal(removedAction, undefined);
-        assert.equal(status(await run("/api/Other", "HEAD")), 404);
     });
+
+test("built backend contains no module configuration transport", async () => {
+    const api = await readFile(new URL("../dist/api.js", import.meta.url), "utf8");
+    assert.doesNotMatch(api, /\$httpClient|\$task\.fetch|\/configs\/|X-PreferencePanes-Version|TextDecoder|timeout:\s*5000/);
+});

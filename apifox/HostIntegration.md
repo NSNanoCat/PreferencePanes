@@ -4,7 +4,7 @@ PreferencePanes 不提供项目主页，也不绑定客户端 SDK。宿主负责
 
 ## 项目主页
 
-`ModuleStatus` 只向模块 API 发送 HEAD。代理 API 再探测同源 `/configs/{module}` 并透传状态与 `X-PreferencePanes-Version`。
+`ModuleStatus` 只向模块 API 发送 HEAD。业务模块模板直接返回状态与 `X-PreferencePanes-Version`；只有状态为 200 且版本头非空时才判定已安装。
 
 ```html
 <button id="module" disabled>
@@ -47,6 +47,6 @@ nativeMoreButton.onclick = () => menu.open();
 - `confirm` 事件可由宿主 `preventDefault()` 后通过 `detail.resolve(boolean)` 或 `reject(error)` 完成；未接管时使用浏览器确认。
 - `notice` 事件包含 `{kind, message}`。宿主接管后负责提示；模块不再创建重复 Toast。
 - 保存成功只更新当前页面快照；重新进入模块时重新读取 BoxJS 和 Settings。
-- 通用前端与后端规则由一个宿主模块分别提供；业务模块只安装自己的配置规则。
+- 通用前端与固定存储 API 规则由一个宿主模块分别提供；业务模块只安装自己的 `/api/{module}` BoxJS Mock。
 
 客户端 Bridge 属于项目页面。项目 HTML 引入官方 SDK 后，由自己的页面脚本直接调用，再将 `ModuleFrame` 事件映射到原生界面。不要把具体客户端的 Bridge、User-Agent、主题值或原生菜单协议加入 PreferencePanes。

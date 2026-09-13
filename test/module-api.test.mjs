@@ -2,21 +2,13 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
-import { config } from "./fixtures/module.mjs";
 
 const source = await readFile(new URL("../dist/api.js", import.meta.url), "utf8");
 
-function fixture(configuration = JSON.stringify(config)) {
+function fixture() {
     const storage = new Map([["Example", JSON.stringify({ Module: { Settings: { Home: { enabled: false, mode: "b" }, items: ["a"] }, Caches: { cached: true } }, Other: { enabled: true } })]]);
-    const calls = [];
-    const state = { error: undefined };
     const run = (method, path, body, headers = {}) =>
         new Promise(resolve => {
-            const reply = (options, callback, content) => {
-                calls.push(options);
-                if (state.error) return callback(state.error);
-                callback(null, { status: options.url.endsWith("/configs/Module") ? 200 : 404, headers: { "Content-Type": "application/json", "X-PreferencePanes-Version": "0.9.17" } }, content);
-            };
             vm.runInNewContext(source, {
                 $environment: { "surge-version": "test" },
                 $persistentStore: {
@@ -29,60 +21,20 @@ function fixture(configuration = JSON.stringify(config)) {
                 $request: { url: `https://example.test${path}`, method, body, headers },
                 $script: { startTime: Date.now() / 1000 },
                 $done: result => resolve(result.response),
-                $httpClient: {
-                    head: (options, callback) => reply(options, callback, ""),
-                    get: (options, callback) => reply(options, callback, options.url.endsWith("/configs/Module") ? configuration : ""),
-                },
                 console: { log() {}, error() {} },
-                setTimeout,
-                clearTimeout,
-                TextDecoder,
             });
         });
     const form = (action, key = "@Example.Module.Settings.Home.enabled", value = "") => run("POST", `/api/${action}`, new URLSearchParams([[key, value]]).toString(), { "Content-Type": "application/x-www-form-urlencoded" });
-    return { calls, form, run, state, storage };
+    return { form, run, storage };
 }
 
-test("module HEAD probes the BoxJS source through the backend API", async () => {
-    const { calls, run } = fixture();
-    const result = await run("HEAD", "/api/Module");
-    assert.equal(result.status, 200);
-    assert.equal(result.body, "");
-    assert.equal(result.headers["X-PreferencePanes-Version"], "0.9.17");
-    assert.equal(calls[0].url, "https://example.test/configs/Module");
-    assert.equal(calls[0].method, "HEAD");
-});
-
-test("module GET relays raw BoxJS without parsing or reading storage", async () => {
-    const raw = '{"apps":"intentionally invalid BoxJS"}';
-    const { calls, run, storage } = fixture(raw);
-    const before = storage.get("Example");
-    const result = await run("GET", "/api/Module");
-    assert.equal(result.status, 200);
-    assert.equal(result.body, raw);
-    assert.equal(result.headers["Content-Type"], "application/json");
-    assert.equal(result.headers["X-PreferencePanes-Version"], "0.9.17");
-    assert.equal(calls[0].url, "https://example.test/configs/Module");
-    assert.equal(calls[0].method, "GET");
-    assert.equal(storage.get("Example"), before);
-});
-
-test("module API uses the same-origin configuration and reports transport failure", async () => {
-    const { calls, run, state } = fixture();
-    await run("GET", "/api/Module", undefined, { "X-PreferencePanes-JSON": "https://cdn.example.test/Module.json" });
-    assert.equal(calls[0].url, "https://example.test/configs/Module");
-    state.error = new Error("offline");
-    assert.equal((await run("GET", "/api/Module")).status, 502);
-});
-
 test("fixed form actions use complete paths without downloading BoxJS", async () => {
-    const { calls, form, storage } = fixture();
+    const { form, storage } = fixture();
     assert.equal((await form("set", "@Example.Module.Settings.Home.enabled", "true")).status, 200);
     assert.equal(JSON.parse((await form("get")).body), true);
     assert.equal((await form("delete", "@Example.Module.Caches")).status, 200);
     assert.equal((await form("delete", "@Example.Module")).status, 200);
     assert.equal((await form("get")).status, 404);
-    assert.equal(calls.length, 0);
     assert.deepEqual(JSON.parse(storage.get("Example")), { Other: { enabled: true } });
 });
 
@@ -106,7 +58,17 @@ test("invalid form requests fail before storage access", async () => {
 });
 
 test("removed module action paths and non-API resources pass through", async () => {
-    const { calls, run } = fixture();
-    for (const path of ["/api/Module/get", "/api/Module/set", "/api/Module/delete", "/settings/Module", "/settings/assets/index.mjs", "/configs/Module"]) assert.equal(await run("GET", path), undefined);
-    assert.equal(calls.length, 0);
+    const { run } = fixture();
+    for (const [method, path] of [
+        ["HEAD", "/api/Module"],
+        ["GET", "/api/Module"],
+        ["POST", "/api/Module/get"],
+        ["POST", "/api/Module/set"],
+        ["POST", "/api/Module/delete"],
+        ["GET", "/settings/Module"],
+        ["GET", "/settings/assets/index.mjs"],
+        ["GET", "/configs/Module"],
+        ["POST", "/api/get/"],
+    ])
+        assert.equal(await run(method, path), undefined, `${method} ${path}`);
 });

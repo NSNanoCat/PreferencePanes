@@ -2,11 +2,11 @@
 
 ## 职责
 
-业务模块按版本提供 `/configs/{module}` 的 BoxJS JSON，并与业务脚本使用同一个 `X-PreferencePanes-Version`。该路径只属于业务模块与后端之间的配置来源，不是网页接口。
+业务模块按版本将自己的 BoxJS JSON 直接 Mock 到 `/api/{module}`，并与业务脚本使用同一个 `X-PreferencePanes-Version`。模块 API 不经过 PreferencePanes 后端，也不存在 `/configs/{module}` 上游路径。
 
-PreferencePanes 的 `api.js` 负责两件事：通过 `/api/{module}` 探测或原样转发对应 BoxJS，以及通过固定 `/api/get|set|delete` 操作本地存储。它不解析 BoxJS，不建立字段目录，不解释控件、选项、默认值或展示元数据。
+PreferencePanes 的 `api.js` 只通过固定 `/api/get|set|delete` 操作本地存储。它不请求网络、不解析 BoxJS、不建立字段目录，也不解释控件、选项、默认值或展示元数据。
 
-PreferencePanes 的 `web.js` 只返回通用模块 HTML、`index.mjs` 和 `navigation.mjs`。浏览器通过 API 取得 BoxJS，并负责规范化、界面生成、字段和值校验。
+PreferencePanes 的 `web.js` 只返回通用模块 HTML、`index.mjs` 和 `navigation.mjs`。浏览器通过模块 API 取得 BoxJS，并负责规范化、界面生成、字段和值校验。
 
 ## 接口
 
@@ -15,22 +15,19 @@ PreferencePanes 的 `web.js` 只返回通用模块 HTML、`index.mjs` 和 `navig
 | GET | `/settings/{module}` | `web.js` | 通用模块 HTML |
 | GET | `/settings/assets/index.mjs` | `web.js` | 读取 BoxJS 并挂载设置页 |
 | GET | `/settings/assets/navigation.mjs` | `web.js` | 通用宿主组件 |
-| HEAD | `/api/{module}` | `api.js` | 探测配置并透传版本 |
-| GET | `/api/{module}` | `api.js` | 原样返回 BoxJS JSON |
+| HEAD | `/api/{module}` | 业务模块模板 | 探测模块与版本 |
+| GET | `/api/{module}` | 业务模块模板 | 原样返回 BoxJS JSON |
 | POST | `/api/get` | `api.js` | 读取完整存储路径 |
 | POST | `/api/set` | `api.js` | 写入完整存储路径 |
 | POST | `/api/delete` | `api.js` | 删除完整存储路径或子树 |
-| HEAD、GET | `/configs/{module}` | 业务模块 | 为后端提供版本化 BoxJS |
 
-`/api/{module}/get|set|delete`、`/api/module/{module}` 和未规定路径不属于公开契约，也不提供兼容处理。
+`/configs/{module}`、`/api/{module}/get|set|delete`、`/api/module/{module}` 和未规定路径不属于公开契约，也不提供兼容处理。`get`、`set`、`delete` 是保留路径段，不得作为模块名。
 
 ## 模块配置
 
-`HEAD /api/{module}` 和 `GET /api/{module}` 固定访问同源 `/configs/{module}`，不接受自定义来源或私有请求头。
+业务模板对精确 `/api/{module}` 提供 HEAD 和 GET；允许 query，不接受尾随斜杠。HEAD 返回 200、空正文、`Content-Type: application/json`、`Cache-Control: no-store` 和非空 `X-PreferencePanes-Version`。GET 返回相同状态与 Header，并原样返回对应版本的 BoxJS JSON。
 
-HEAD 使用上游状态码并透传 `X-PreferencePanes-Version`，不返回正文。GET 原样返回上游 BoxJS 正文、媒体类型、状态码和版本头；后端不调用 `JSON.parse`，因此 BoxJS 语法与语义错误由浏览器处理。网络失败返回 `502`。
-
-模块页面从 URL 取得模块名，GET `/api/{module}` 后在浏览器中解析 BoxJS。配置必须包含请求模块的字段，并且输入最终只能描述一个可挂载模块。
+模块页面从 URL 取得模块名，GET `/api/{module}` 后在浏览器中解析 BoxJS。配置必须包含请求模块的字段，并且输入最终只能描述一个可挂载模块。配置语法、控件、字段和值错误均由浏览器拒绝。
 
 ## Form 存储
 
@@ -70,6 +67,6 @@ BoxJS 控件、选项、默认值、字段重叠、已存值和待写入值都�
 
 ## 安装与发布
 
-一个宿主只安装一次 `web.js` 和一次 `api.js`。`web.js` 覆盖全部合法 `/settings/**` 页面；`api.js` 覆盖全部 `/api/{module}` 及固定 `/api/get|set|delete`。
+一个宿主只安装一次 `web.js` 和一次 `api.js`。`web.js` 覆盖全部合法 `/settings/**` 页面；`api.js` 只覆盖固定 `/api/get|set|delete`。
 
-每个业务模块只提供自己的 `/configs/{module}`。Biliverse 中由 Enhanced 唯一安装通用前后端；Global、Redirect、ADBlock 只携带各自 BoxJS 响应规则。Release 分别发布 `api.js` 和 `web.js`，不合并前后端职责。
+每个业务模块提供自己的 `/api/{module}`。Biliverse 中由 Enhanced 唯一安装通用前端与固定存储 API；Global、Redirect、ADBlock 只携带各自 BoxJS API Mock。Release 分别发布 `api.js` 和 `web.js`，不合并前后端职责。

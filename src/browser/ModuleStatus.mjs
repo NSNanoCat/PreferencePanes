@@ -76,7 +76,7 @@ export class ModuleStatus extends EventTarget {
             const response = await probeModule(url, { ...options, signal: controller.signal });
             if (controller !== this.#controller) return response;
             const version = response.status === 200 ? response.headers.get("X-PreferencePanes-Version")?.trim() || null : null;
-            this.#render(response.status === 200 ? "installed" : "missing", version);
+            this.#render(version ? "installed" : "missing", version);
             return response;
         } catch (error) {
             if (controller !== this.#controller) return;

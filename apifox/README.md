@@ -13,6 +13,6 @@ npm run apifox:check
 
 原生格式按 Method 与 Path 匹配接口并覆盖；接口模式为 `methodAndPath`，文档和数据模型模式为 `name`。保持“删除未匹配资源”关闭。导入在本机客户端每 30 分钟执行，也可在绑定数据源页面立即导入；推送后应按分支回读确认，不能仅凭导入时间判断成功。
 
-当前模块 API 包含 `HEAD /api/{module}` 与原样 BoxJS 的 `GET /api/{module}`；持久化使用固定 `POST /api/get|set|delete` form 接口。生成文件不含 `/api/{module}/get|set|delete` 或 `/api/module/{module}` 路径。
+当前模块 API 包含业务模板直接提供的 `HEAD /api/{module}` 与原样 BoxJS 的 `GET /api/{module}`；持久化使用 PreferencePanes `api.js` 提供的固定 `POST /api/get|set|delete` form 接口。生成文件不含 `/configs/{module}`、`/api/{module}/get|set|delete` 或 `/api/module/{module}` 路径。
 
-接口集合同时记录三个责任域：唯一通用 `web.js` 提供 `/settings/**`，唯一通用 `api.js` 提供 `/api/**`，业务模板提供 `/configs/{module}`。Apifox 中共同展示不代表三个路径由同一个脚本处理。
+接口集合同时记录三个责任域：唯一通用 `web.js` 提供 `/settings/**`，唯一通用 `api.js` 提供固定存储接口，业务模板提供 `/api/{module}`。Apifox 中共同展示不代表这些路径由同一个脚本处理。

@@ -23,9 +23,6 @@ document.body.append(frame.element);
 await frame.load();
 frame.back();
 frame.destroy();
-// @ts-expect-error ModuleFrame no longer accepts private request headers.
-new ModuleFrame("/settings/Module", { headers: { "X-PreferencePanes-JSON": "/configs/Module" } });
-
 const navigation = new Navigation(document.body, document.createElement("main"), (_key, signal) => {
     void signal.aborted;
     return document.createElement("section");
