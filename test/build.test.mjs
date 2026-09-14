@@ -18,8 +18,9 @@ test("public browser exposes only the generic BoxJS mount contract", async () =>
     for (const file of ["preference-panes.request.js", "settings/home.css", "settings/assets/app.mjs"]) await assert.rejects(access(new URL(`../dist/${file}`, import.meta.url)), { code: "ENOENT" });
     for (const path of ["../dist/preference-panes.mjs", "../dist/module/index.mjs", "../dist/api.js", "../dist/web.js"]) {
         const source = await readFile(new URL(path, import.meta.url), "utf8");
-        assert.doesNotMatch(source, /ModuleModel|configURL|X-PreferencePanes-(?:JSON|CSS)|settings\/assets\/app\.mjs/);
+        assert.doesNotMatch(source, /ModuleModel|configURL|X-PreferencePanes-JSON|settings\/assets\/app\.mjs/);
     }
+    assert.match(await readFile(new URL("../dist/web.js", import.meta.url), "utf8"), /x-preferencepanes-css/i);
     const page = await readFile(new URL("../dist/module/index.mjs", import.meta.url), "utf8");
     assert.match(page, /\/api\//);
     assert.doesNotMatch(page, /\/configs\//);

@@ -30,7 +30,22 @@ for (const host of hosts)
         const page = await run("/settings/Module");
         assert.equal(status(page), 200);
         assert.match(page.body, /<!doctype html>/i);
+        assert.doesNotMatch(page.body, /data-preference-panes-stylesheet/);
         assert.doesNotMatch(page.body, /preference-panes-inputs|data-json|data-css/);
+
+        const queryStyles = await run("/settings/Module?css=%2Fsettings%2Ftheme.css%3Fmode%3Dlight%26source%3Dquery");
+        assert.match(queryStyles.body, /<link data-preference-panes-stylesheet rel="stylesheet" href="https:\/\/example\.org\/settings\/theme\.css\?mode=light&amp;source=query">/);
+
+        const headerStyles = await run("/settings/Module?css=/query.css", "GET", { "x-preferencepanes-css": "../header.css?source=header&theme=dark" });
+        assert.match(headerStyles.body, /href="https:\/\/example\.org\/header\.css\?source=header&amp;theme=dark"/);
+        assert.doesNotMatch(headerStyles.body, /query\.css/);
+
+        const disabledStyles = await run("/settings/Module?css=/query.css", "GET", { "X-PreferencePanes-CSS": "" });
+        assert.doesNotMatch(disabledStyles.body, /data-preference-panes-stylesheet/);
+
+        const invalidStyles = await run("/settings/Module?css=data:text/css,body%7Bcolor:red%7D");
+        assert.equal(status(invalidStyles), 500);
+        assert.deepEqual(JSON.parse(invalidStyles.body), { error: "CSS resource must use HTTP(S)" });
         for (const asset of ["index.mjs", "navigation.mjs"]) {
             const result = await run(`/settings/assets/${asset}`);
             assert.equal(status(result), 200);

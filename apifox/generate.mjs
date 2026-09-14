@@ -31,7 +31,7 @@ const apis = declarations.map(entry => {
             ? "网页通过该 API 读取原始 BoxJS；业务模块模板直接 Mock 同版 JSON 与版本头。"
             : entry.asset
               ? "该资源由 PreferencePanes web.js 返回；web.js 不访问网络或持久化。"
-              : "通用模块页面由 web.js 返回，通过 /api/{module} 读取 BoxJS，并在 Web 侧完成规范化、校验和渲染。";
+              : "通用模块页面由 web.js 返回，可直接注入项目 stylesheet；页面通过 /api/{module} 读取 BoxJS，并在 Web 侧完成规范化、校验和渲染。";
     return {
         id: entry.id,
         name: entry.name,
@@ -48,8 +48,8 @@ const apis = declarations.map(entry => {
         sourceUrl: "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/Specification.md",
         parameters: {
             path: entry.path.includes("{module}") ? [parameter("module", "BoxJS 的模块段，动态填入", true)] : [],
-            query: [],
-            header: [],
+            query: entry.page ? [parameter("css", "可选 stylesheet 地址；相对地址按模块页面 URL 解析，仅支持 HTTP(S)")] : [],
+            header: entry.page ? [parameter("X-PreferencePanes-CSS", "可选 stylesheet 地址；优先于 css 查询参数，空值可禁用查询参数")] : [],
             cookie: [],
         },
         requestBody: entry.store

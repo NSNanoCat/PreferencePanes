@@ -1,6 +1,6 @@
 /**
- * 模块文档容器：原始 HTML 不改写，只向 iframe 标记模块身份。
- * Module document container: preserve HTML verbatim and mark only the module identity on the iframe.
+ * 模块文档容器：发送 GET 请求并将原始 HTML 交给 iframe，只在元素上标记模块身份。
+ * Module document container: send a GET request, preserve HTML verbatim and mark only the module identity on the iframe.
  */
 export class ModuleFrame extends EventTarget {
     #url;
@@ -25,14 +25,14 @@ export class ModuleFrame extends EventTarget {
      * 建立 iframe；调用方挂载 element 后调用 load。
      * Create the iframe; callers mount element and then call load.
      * @param {string | URL} url 模块请求地址 / Module request URL.
-     * @param {{signal?: AbortSignal}} [options] 外部取消信号 / External cancellation signal.
+     * @param {{signal?: AbortSignal, headers?: HeadersInit}} [options] 请求选项 / Request options.
      */
     constructor(url, options = {}) {
         super();
         this.#url = new URL(url, document.baseURI);
         const match = /^\/settings\/([a-zA-Z0-9_-]+)\/?$/.exec(this.#url.pathname);
         if (!match) throw new TypeError("Open a concrete module URL");
-        this.#options = options;
+        this.#options = { signal: options.signal, headers: options.headers };
         this.element = document.createElement("iframe");
         this.element.title = `${match[1]} 设置`;
         this.element.dataset.preferencePanes = "true";
@@ -61,7 +61,7 @@ export class ModuleFrame extends EventTarget {
         if (this.#options.signal?.aborted) this.destroy();
         const timer = setTimeout(() => this.#controller.abort(), 10000);
         try {
-            const response = await fetch(this.#url, { cache: "no-store", credentials: "omit", signal: this.#controller.signal });
+            const response = await fetch(this.#url, { method: "GET", cache: "no-store", credentials: "omit", headers: this.#options.headers, signal: this.#controller.signal });
             if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
             const html = await response.text();
             this.#controller.signal.throwIfAborted();

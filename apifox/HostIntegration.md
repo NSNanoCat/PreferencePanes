@@ -1,6 +1,6 @@
 # 调用方集成：模块容器与页面导航
 
-PreferencePanes 不提供项目主页，也不绑定客户端 SDK。宿主负责模块列表、主题、原生导航、确认、提示与客户端 Bridge；通用设置页只接收 BoxJS JSON。
+PreferencePanes 不提供项目主页，也不绑定客户端 SDK。宿主负责模块列表、主题、原生导航、确认、提示、项目 stylesheet 与客户端 Bridge；通用设置页仍只把 BoxJS JSON 交给 `mount(boxjs)`。
 
 ## 项目主页
 
@@ -24,15 +24,18 @@ PreferencePanes 不提供项目主页，也不绑定客户端 SDK。宿主负责
 
 ## 模块页面
 
-`ModuleFrame` 只打开规范 `/settings/{module}` 页面并标记模块身份。页面通过同源 `/api/{module}` 读取 BoxJS；调用方不传 JSON、CSS 或私有 Header，页面也不直接访问 `/configs/**`。
+`ModuleFrame` 只打开规范 `/settings/{module}` 页面并标记模块身份。页面通过同源 `/api/{module}` 读取 BoxJS；调用方可用请求 Header 让 `web.js` 直接把项目 stylesheet 写入返回 HTML，但不传 JSON，页面也不直接访问 `/configs/**`。
 
 ```js
-const frame = new ModuleFrame(`/settings/${module}`, { signal });
+const frame = new ModuleFrame(`/settings/${module}`, {
+    signal,
+    headers: { "X-PreferencePanes-CSS": "https://example.org/theme.css" },
+});
 container.append(frame.element);
 await frame.load();
 ```
 
-`frame.state` 提供 `title`、`module`、`busy`、`canGoBack` 和 `actions`。宿主从状态生成导航，不访问 iframe 内部 DOM。
+`ModuleFrame` 的选项类型是 `{ signal?: AbortSignal; headers?: HeadersInit }`。它只发送 GET，将返回 HTML 原样交给 `srcdoc`，且不把 Header 或 CSS 地址复制到 iframe dataset。`frame.state` 提供 `title`、`module`、`busy`、`canGoBack` 和 `actions`。宿主从状态生成导航，不访问 iframe 内部 DOM。
 
 ## 导航与原生 WebView
 

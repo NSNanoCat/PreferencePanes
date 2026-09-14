@@ -11,12 +11,18 @@ test("browser renderer has no client-specific SDK or stylesheet dependency", asy
     }
 });
 
-test("built renderer contains generic defaults without remote stylesheets", async () => {
+test("built renderer contains no client-specific stylesheet", async () => {
     for (const path of ["../dist/preference-panes.mjs", "../dist/module/index.mjs", "../dist/api.js", "../dist/web.js"]) {
         const source = await readFile(new URL(path, import.meta.url), "utf8");
         assert.doesNotMatch(source, /bilibili|bili_dark|hdslb|b-style|js-bridge/i, path);
-        assert.doesNotMatch(source, /<link[^>]+stylesheet|s1\.hdslb\.com/i, path);
+        assert.doesNotMatch(source, /s1\.hdslb\.com/i, path);
     }
+});
+
+test("default styles are inserted before the optional project stylesheet", async () => {
+    const styles = await readFile(new URL("../src/browser/styles.mjs", import.meta.url), "utf8");
+    assert.match(styles, /link\[data-preference-panes-stylesheet\]/);
+    assert.match(styles, /insertBefore\(element, document\.head\.querySelector\(stylesheetSelector\)\)/);
 });
 
 test("module renderer omits the search toolbar row", async () => {
@@ -56,7 +62,8 @@ test("proxy and browser sources keep storage, validation and navigation responsi
     assert.doesNotMatch(api, /normalizeBoxJs|normalizeStoredValue|validValue|mountPanel|document\.|module\.html|#assets/);
     assert.doesNotMatch(web, /Storage|@nsnanocat\/util"|transport|\/api\//);
     assert.doesNotMatch(navigation, /BoxJS|Storage|api\/(?:get|set|delete)/);
-    assert.doesNotMatch(api + web, /X-PreferencePanes-(?:JSON|CSS)|configURL/);
+    assert.doesNotMatch(api + web, /X-PreferencePanes-JSON|configURL/);
+    assert.match(web, /x-preferencepanes-css/i);
 });
 
 test("browser lifecycle keeps page and view classes internal", async () => {
