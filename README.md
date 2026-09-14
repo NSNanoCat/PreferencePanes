@@ -95,6 +95,14 @@ npm pack --dry-run
 
 构建生成 `dist/api.js`、`dist/web.js`、`dist/preference-panes.mjs` 和 `dist/module/` 通用页面资源。包不再提供按模块生成 HTML/CSS 的公开 `build()`。
 
-`npm run preview` 启动 JSON 文件导入测试台，使用同一通用页面、同源配置和内存存储验证模块行为。
+### 内置演示
+
+```sh
+npm run preview
+```
+
+预览入口会自动加载 `examples/Module.boxjs.json`，覆盖 `boolean`、`selects`、`checkboxes`、`text`、`textarea`、`number` 和 `url` 全部受支持控件。页面使用正式构建的通用模块前端、同源 API 和独立内存存储，不维护演示专用渲染器。
+
+内置存储会提供已移除选项和格式错误值，用于直接核对字段级黄色警告及非阻断加载；URL 字段还会携带同路径旧存储值，验证只读链接始终使用 BoxJS `val`。测试台同时保留上传其它 BoxJS JSON 并生成隔离预览的能力。
 
 [接口规范](apifox/Specification.md) · [宿主集成](apifox/HostIntegration.md) · [Apifox JSON](apifox/preference-panes.apifox.json)

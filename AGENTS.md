@@ -56,3 +56,5 @@
 - JavaScript/TypeScript 测试优先沿用 `node --test` 与 `test/*.js` 的现有模式。
 - 新增或变更公开行为时，应同步补充或更新对应测试。
 - 对外 API、导入方式、导出结构或行为语义发生变化时，应同步更新 `README.md` 中的示例与说明。
+- `examples/Module.boxjs.json` 是设置前端的内置验收样例，必须覆盖全部受支持的 BoxJS 控件类型；新增、删除或修改控件语义时，必须同步更新该样例、预览测试与 README。
+- `npm run preview` 必须默认自动加载内置样例，同时保留导入外部 BoxJS JSON 的能力；涉及已存值兼容提示时，内置样例必须提供可见且非阻断的对应状态。

@@ -3,16 +3,33 @@ import http from "node:http";
 import vm from "node:vm";
 import { normalizeBoxJs } from "../src/browser/boxjs.mjs";
 
-// 测试台不生成项目入口。上传的两个文件只供模块预览，存储为独立内存。
-// The testbench is not a project landing page; uploads feed only module previews with isolated storage.
+// 测试台使用真实通用页面渲染内置或导入的 BoxJS，存储保持在独立内存中。
+// The testbench renders built-in or imported BoxJS through the real generic page with isolated storage.
 const importer = await readFile(new URL("./index.html", import.meta.url), "utf8");
 const script = await readFile(new URL("./importer.mjs", import.meta.url), "utf8");
+const example = JSON.parse(await readFile(new URL("./Module.boxjs.json", import.meta.url), "utf8"));
 const page = await readFile(new URL("../dist/module/index.html", import.meta.url), "utf8");
 const index = await readFile(new URL("../dist/module/index.mjs", import.meta.url), "utf8");
 const navigation = await readFile(new URL("../dist/module/navigation.mjs", import.meta.url), "utf8");
 let configuration;
 let moduleName;
 const store = new Map();
+
+/**
+ * 替换当前预览，并按需注入一份存储根。
+ * Replace the current preview and optionally seed one storage root.
+ * @param {unknown} boxjs BoxJS 配置 / BoxJS configuration.
+ * @param {unknown} [storedRoot] 存储根 / Stored root.
+ * @returns {{url: string, module: string}} 预览入口 / Preview entry.
+ */
+function configurePreview(boxjs, storedRoot) {
+    const definition = normalizeBoxJs(boxjs);
+    configuration = boxjs;
+    moduleName = definition.module;
+    if (storedRoot !== undefined) store.set(definition.storageKey, JSON.stringify(storedRoot));
+    return { url: `/settings/${moduleName}`, module: moduleName };
+}
+
 const server = http.createServer(async (request, reply) => {
     try {
         const url = new URL(request.url, `http://${request.headers.host}`);
@@ -28,16 +45,29 @@ const server = http.createServer(async (request, reply) => {
         }
         let body = "";
         for await (const chunk of request) body += chunk;
-        if (url.pathname === "/preview" && request.method === "POST") {
+        if (["/example", "/preview"].includes(url.pathname) && request.method === "POST") {
             configuration = undefined;
             moduleName = undefined;
             store.clear();
             try {
-                const input = JSON.parse(body);
-                configuration = input.boxjs;
-                moduleName = normalizeBoxJs(configuration).module;
+                const result =
+                    url.pathname === "/example"
+                        ? configurePreview(example, {
+                              Module: {
+                                  Settings: {
+                                      enabled: false,
+                                      mode: "legacy",
+                                      items: ["first", "removed"],
+                                      displayName: "内置示例",
+                                      notes: "这些值来自预览服务器的内存存储。",
+                                      retries: "not-a-number",
+                                      categories: ["legacy-url-value"],
+                                  },
+                              },
+                          })
+                        : configurePreview(JSON.parse(body).boxjs);
                 reply.writeHead(200, { "Content-Type": "application/json" });
-                reply.end(JSON.stringify({ url: `/settings/${moduleName}`, module: moduleName }));
+                reply.end(JSON.stringify(result));
             } catch (error) {
                 reply.writeHead(400, { "Content-Type": "application/json" });
                 reply.end(JSON.stringify({ error: error.message }));
