@@ -12,14 +12,12 @@ export class ModuleFrame extends EventTarget {
         this.#state = { ...event.detail, actions: event.detail.actions ?? [] };
         this.dispatchEvent(new Event("change"));
     };
-    #confirmation = event => {
-        const request = new CustomEvent("confirm", { cancelable: true, detail: event.detail });
-        if (!this.dispatchEvent(request)) event.preventDefault();
-    };
-    #notice = event => {
-        const notice = new CustomEvent("notice", { cancelable: true, detail: event.detail });
-        if (!this.dispatchEvent(notice)) event.preventDefault();
-    };
+    #forward(type, event) {
+        if (!this.dispatchEvent(new CustomEvent(type, { cancelable: true, detail: event.detail }))) event.preventDefault();
+    }
+    #confirmation = event => this.#forward("confirm", event);
+    #notice = event => this.#forward("notice", event);
+    #openURL = event => this.#forward("open-url", event);
 
     /**
      * 建立 iframe；调用方挂载 element 后调用 load。
@@ -40,6 +38,7 @@ export class ModuleFrame extends EventTarget {
         this.element.addEventListener("preferencepanes:change", this.#change);
         this.element.addEventListener("preferencepanes:confirm", this.#confirmation);
         this.element.addEventListener("preferencepanes:notice", this.#notice);
+        this.element.addEventListener("preferencepanes:open-url", this.#openURL);
         this.#state = { title: match[1], module: match[1], busy: false, canGoBack: true, actions: [] };
         options.signal?.addEventListener("abort", this.#abort, { once: true });
     }
@@ -102,5 +101,6 @@ export class ModuleFrame extends EventTarget {
         this.element.removeEventListener("preferencepanes:change", this.#change);
         this.element.removeEventListener("preferencepanes:confirm", this.#confirmation);
         this.element.removeEventListener("preferencepanes:notice", this.#notice);
+        this.element.removeEventListener("preferencepanes:open-url", this.#openURL);
     }
 }

@@ -1,5 +1,9 @@
 # PreferencePanes 发布流程
 
+## 1.2.2
+
+URL 设置项保留标准链接导航，并在嵌入 `ModuleFrame` 时提供可取消的 `open-url` 宿主事件，使传统 H5/WebView 与客户端原生导航适配器共用同一控件。
+
 ## 1.2.1
 
 BoxJS 设置项支持 `type: "url"` 作为只读 URL Scheme 跳转入口，例如 `bilibili://main/top_category`。

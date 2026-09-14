@@ -1,7 +1,7 @@
 import { ActionMenu } from "./ActionMenu.mjs";
 import { validValue } from "./boxjs.mjs";
 import { PreferencesClient } from "./client.mjs";
-import { fieldControl, element as node, requestConfirmation, resourceURL, settingRow, statusView } from "./components.mjs";
+import { fieldControl, element as node, requestConfirmation, requestURLNavigation, resourceURL, settingRow, statusView } from "./components.mjs";
 import { Navigation } from "./Navigation.mjs";
 
 /**
@@ -282,6 +282,9 @@ export class PreferencesPanel {
                         write = value => {
                             link.href = value;
                         };
+                        link.addEventListener("click", event => {
+                            if (requestURLNavigation(window, link.href)) event.preventDefault();
+                        });
                         row.append(link);
                         row.addEventListener("click", event => {
                             if (!link.contains(event.target)) link.click();
