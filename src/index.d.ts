@@ -43,7 +43,7 @@ interface FieldBase {
      * 原始 BoxJS 控件类型，与持久化值类型区分
      * Original BoxJS control kind, separate from the stored value type.
      */
-    control?: "boolean" | "checkboxes" | "selects" | "text" | "textarea" | "number";
+    control?: "boolean" | "checkboxes" | "selects" | "text" | "textarea" | "url" | "number";
     /**
      * 输入占位文字
      * Input placeholder.

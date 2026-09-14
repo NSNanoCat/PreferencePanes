@@ -275,6 +275,19 @@ export class PreferencesPanel {
                 let inputContainer = row;
                 let eventName = "change";
                 switch (true) {
+                    case field.control === "url": {
+                        const link = node("a", "pp-choice-link", "打开");
+                        link.setAttribute("aria-label", field.name);
+                        link.rel = "noopener noreferrer";
+                        write = value => {
+                            link.href = value;
+                        };
+                        row.append(link);
+                        row.addEventListener("click", event => {
+                            if (!link.contains(event.target)) link.click();
+                        });
+                        break;
+                    }
                     case Boolean(field.options) && field.type !== "array": {
                         const select = node("select", "");
                         select.setAttribute("aria-label", field.name);

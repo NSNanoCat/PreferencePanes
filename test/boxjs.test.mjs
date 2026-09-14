@@ -117,3 +117,14 @@ test("raw BoxJS path segments and browser-style encoded input retain their disti
 test("storage action names are reserved from module configuration paths", () => {
     for (const module of ["get", "set", "delete"]) assert.throws(() => normalizeBoxJs([{ id: `@Example.${module}.Settings.flag`, name: "Flag", type: "boolean", val: true }]), /Reserved API module name/);
 });
+
+test("URL settings normalize as read-only string links and reject executable schemes", () => {
+    const field = normalizeBoxJs([{ id: "@Example.Module.Settings.categories", name: "打开分类", type: "url", val: "bilibili://main/top_category" }], "Module").fields[0];
+    assert.equal(field.type, "string");
+    assert.equal(field.control, "url");
+    assert.equal(field.defaultValue, "bilibili://main/top_category");
+    assert.throws(() => normalizeBoxJs([{ id: "@Example.Module.Settings.categories", name: "打开分类", type: "url" }], "Module"), /require a val/);
+    for (const value of ["javascript:alert(1)", "data:text/html,unsafe", "vbscript:unsafe", "not a URL"]) {
+        assert.throws(() => normalizeBoxJs([{ id: "@Example.Module.Settings.categories", name: "打开分类", type: "url", val: value }], "Module"), /Invalid BoxJS val/);
+    }
+});

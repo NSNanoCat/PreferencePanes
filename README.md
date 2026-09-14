@@ -64,6 +64,8 @@ await fetch("/api/set", {
 
 页面初始化时只执行一次 `POST /api/get` 读取 Settings 子树。写入成功后仅更新当前页面快照；查看 Settings/Caches 时按需读取，清空和重置通过 `/api/delete` 完成。
 
+设置项支持 `type: "url"` 作为只读跳转入口。它的 `val` 必须是带 scheme 的地址，例如 `bilibili://main/top_category`；面板将其渲染为可点击链接，不会发起存储写入。
+
 ## 宿主集成
 
 ```js
