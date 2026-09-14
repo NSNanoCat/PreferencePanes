@@ -88,3 +88,17 @@ export function requestConfirmation(host, message) {
         resolve(host.confirm(message));
     });
 }
+
+/**
+ * 请求宿主打开 URL；未被接管时保留链接默认导航。
+ * Request host URL navigation while preserving the link default when unhandled.
+ * @param {Window} host 模块窗口 / Module window.
+ * @param {string} url 完整目标地址 / Absolute target URL.
+ * @returns {boolean} 宿主是否接管导航 / Whether the host accepted navigation ownership.
+ */
+export function requestURLNavigation(host, url) {
+    const frame = host.frameElement;
+    if (!frame) return false;
+    const event = new frame.ownerDocument.defaultView.CustomEvent("preferencepanes:open-url", { cancelable: true, detail: { url } });
+    return !frame.dispatchEvent(event);
+}

@@ -5,6 +5,8 @@
  * Prevent default on confirm events and settle host dialogs through detail.resolve/reject.
  * notice 事件可 preventDefault 后交由宿主显示，模块不再创建网页 Toast。
  * Prevent default on notice events to display them in the host without a module web Toast.
+ * open-url 事件可 preventDefault 后交由宿主打开 URL，模块不再执行链接默认导航。
+ * Prevent default on open-url events to open the URL in the host instead of navigating the module.
  */
 export class ModuleFrame extends EventTarget {
     /**
@@ -92,6 +94,18 @@ export interface Notice {
      * Formatted notice text.
      */
     message: string;
+}
+
+/**
+ * 宿主 URL 导航请求。
+ * Host URL navigation request.
+ */
+export interface OpenURLRequest {
+    /**
+     * 完整目标地址。
+     * Absolute target URL.
+     */
+    url: string;
 }
 
 /**

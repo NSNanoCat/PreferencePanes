@@ -1,6 +1,21 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { requestConfirmation } from "../src/browser/components.mjs";
+import { requestConfirmation, requestURLNavigation } from "../src/browser/components.mjs";
+
+test("URL navigation keeps browser defaults unless an embedded host accepts ownership", () => {
+    assert.equal(requestURLNavigation({ frameElement: undefined }, "https://example.org/path"), false);
+
+    const frame = Object.assign(new EventTarget(), { ownerDocument: { defaultView: { CustomEvent } } });
+    const host = { frameElement: frame };
+    const urls = [];
+    frame.addEventListener("preferencepanes:open-url", event => urls.push(event.detail.url));
+    assert.equal(requestURLNavigation(host, "https://example.org/path"), false);
+    assert.equal(requestURLNavigation(host, "bilibili://main/top_category"), false);
+
+    frame.addEventListener("preferencepanes:open-url", event => event.preventDefault());
+    assert.equal(requestURLNavigation(host, "bilibili://main/top_category"), true);
+    assert.deepEqual(urls, ["https://example.org/path", "bilibili://main/top_category", "bilibili://main/top_category"]);
+});
 
 test("native notice interception suppresses the module fallback and releases its listener", t => {
     globalThis.document = { baseURI: "https://example.org/", createElement: () => Object.assign(new EventTarget(), { dataset: {} }) };
@@ -18,6 +33,22 @@ test("native notice interception suppresses the module fallback and releases its
     assert.deepEqual(notice, detail);
     frame.destroy();
     assert.equal(frame.element.dispatchEvent(new CustomEvent("preferencepanes:notice", { cancelable: true, detail })), true);
+});
+
+test("host URL interception suppresses iframe navigation and releases its listener", t => {
+    globalThis.document = { baseURI: "https://example.org/", createElement: () => Object.assign(new EventTarget(), { dataset: {} }) };
+    t.after(() => {
+        globalThis.document = undefined;
+    });
+    const frame = new ModuleFrame("/settings/Example");
+    const detail = { url: "bilibili://main/top_category" };
+    frame.addEventListener("open-url", event => {
+        assert.deepEqual(event.detail, detail);
+        event.preventDefault();
+    });
+    assert.equal(frame.element.dispatchEvent(new CustomEvent("preferencepanes:open-url", { cancelable: true, detail })), false);
+    frame.destroy();
+    assert.equal(frame.element.dispatchEvent(new CustomEvent("preferencepanes:open-url", { cancelable: true, detail })), true);
 });
 
 import { ModuleFrame } from "../src/browser/ModuleFrame.mjs";

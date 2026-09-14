@@ -64,7 +64,7 @@ await fetch("/api/set", {
 
 页面初始化时只执行一次 `POST /api/get` 读取 Settings 子树。写入成功后仅更新当前页面快照；查看 Settings/Caches 时按需读取，清空和重置通过 `/api/delete` 完成。
 
-设置项支持 `type: "url"` 作为只读跳转入口。它的 `val` 必须是带 scheme 的地址，例如 `bilibili://main/top_category`；面板将其渲染为可点击链接，不会发起存储写入。
+设置项支持 `type: "url"` 作为只读跳转入口。它的 `val` 必须是带 scheme 的地址，例如 `bilibili://main/top_category`；面板将其渲染为可点击链接，不会发起存储写入。嵌入 `ModuleFrame` 时，宿主可拦截 `open-url` 事件（`detail.url`）并打开链接；未拦截或独立网页中保留链接的默认导航。
 
 ## 宿主集成
 
@@ -82,7 +82,7 @@ container.append(frame.element);
 await frame.load();
 ```
 
-`ModuleFrame` 接受 `{ signal?: AbortSignal; headers?: HeadersInit }`，使用这些选项发送一次 GET，并将返回 HTML 原样设置为 `iframe.srcdoc`。iframe dataset 只保存模块身份，不保存 CSS 地址。宿主通过 `change`、`confirm`、`notice` 事件同步标题、操作菜单、确认框和提示，不读取或改写 iframe 内部 DOM。项目主页、Bilibili JSBridge、原生导航和视觉样式仍由宿主负责。
+`ModuleFrame` 接受 `{ signal?: AbortSignal; headers?: HeadersInit }`，使用这些选项发送一次 GET，并将返回 HTML 原样设置为 `iframe.srcdoc`。iframe dataset 只保存模块身份，不保存 CSS 地址。宿主通过 `change`、`confirm`、`notice`、`open-url` 事件同步标题、操作菜单、确认框、提示和链接跳转，不读取或改写 iframe 内部 DOM。项目主页、Bilibili JSBridge、原生导航和视觉样式仍由宿主负责。
 
 ## 构建与验证
 
