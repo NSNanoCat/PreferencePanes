@@ -29,7 +29,7 @@ preferences.destroy();
 
 前端支持 BoxJS 字段数组、单个 app 和 apps 订阅，并要求输入恰好包含一个模块。模块名、存储根和 Settings 路径都从 `@Root.Module.Settings.key` 字段 ID 推导，不从 app 名称或调用参数补充。
 
-默认样式随包内置。嵌入页面只跟随宿主根元素的 `data-theme` 和 `--pp-keyboard-height`，不识别客户端 User-Agent，也不加载项目 CSS 或客户端 SDK。
+默认样式随包内置。动态模块 HTML 可通过 `css` 查询参数或优先级更高的 `X-PreferencePanes-CSS` Header 直接加载一个项目 stylesheet；未提供时只使用默认样式。项目 stylesheet 位于默认样式之后，可覆盖 `pp-*` 变量和组件规则。页面脚本不二次下载 CSS，也不识别客户端 User-Agent 或加载客户端 SDK。
 
 ## 页面与 API
 
@@ -39,7 +39,7 @@ preferences.destroy();
 - `GET /settings/assets/index.mjs`
 - `GET /settings/assets/navigation.mjs`
 
-模块页面从 URL 或 `ModuleFrame` 的模块标记取得模块名，通过同源 `/api/{module}` 读取原始 BoxJS，然后调用 `mount(boxjs)`。页面不接受 JSON/CSS 查询参数、私有请求头或兼容资源别名，也不直接访问 `/configs/**`。
+模块页面从 URL 或 `ModuleFrame` 的模块标记取得模块名，通过同源 `/api/{module}` 读取原始 BoxJS，然后调用 `mount(boxjs)`。`web.js` 只在生成 HTML 时解析可选 CSS 地址并写入 `<link data-preference-panes-stylesheet>`；CSS 地址必须解析为 HTTP(S)。页面不接受 JSON 输入或兼容资源别名，也不直接访问 `/configs/**`。
 
 业务模块模板直接处理：
 
@@ -72,12 +72,15 @@ import { ModuleFrame, ModuleStatus } from "@nsnanocat/preference-panes/navigatio
 const status = new ModuleStatus(statusElement);
 await status.check("/api/Module");
 
-const frame = new ModuleFrame("/settings/Module", { signal });
+const frame = new ModuleFrame("/settings/Module", {
+    signal,
+    headers: { "X-PreferencePanes-CSS": "https://example.org/theme.css" },
+});
 container.append(frame.element);
 await frame.load();
 ```
 
-`ModuleFrame` 只携带模块身份和取消信号。宿主通过 `change`、`confirm`、`notice` 事件同步标题、操作菜单、确认框和提示，不读取或改写 iframe 内部 DOM。项目主页、Bilibili JSBridge、原生导航和视觉样式仍由宿主负责。
+`ModuleFrame` 接受 `{ signal?: AbortSignal; headers?: HeadersInit }`，使用这些选项发送一次 GET，并将返回 HTML 原样设置为 `iframe.srcdoc`。iframe dataset 只保存模块身份，不保存 CSS 地址。宿主通过 `change`、`confirm`、`notice` 事件同步标题、操作菜单、确认框和提示，不读取或改写 iframe 内部 DOM。项目主页、Bilibili JSBridge、原生导航和视觉样式仍由宿主负责。
 
 ## 构建与验证
 

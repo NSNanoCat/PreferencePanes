@@ -18,7 +18,7 @@ const probe = await probeModule("/api/Module");
 void probe.status;
 status.destroy();
 
-const frame = new ModuleFrame("/settings/Module", { signal: new AbortController().signal });
+const frame = new ModuleFrame("/settings/Module", { signal: new AbortController().signal, headers: { "X-PreferencePanes-CSS": "/theme.css" } });
 document.body.append(frame.element);
 await frame.load();
 frame.back();

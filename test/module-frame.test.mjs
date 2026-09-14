@@ -39,20 +39,23 @@ test("host confirmation is asynchronous and detaches with its module frame", asy
     assert.equal(await requestConfirmation(host, "Standalone?"), true);
 });
 
-test("ModuleFrame preserves response HTML and exposes only the module identity", async t => {
+test("ModuleFrame sends GET headers, preserves response HTML and exposes only the module identity", async t => {
     globalThis.document = { baseURI: "https://example.org/settings/", createElement: () => Object.assign(new EventTarget(), { dataset: {} }) };
     t.after(() => {
         delete globalThis.document;
     });
     const html = '<!doctype html><main id="preferences"></main>';
     const fetch = t.mock.method(globalThis, "fetch", async () => new Response(html));
-    const frame = new ModuleFrame("/settings/Other");
+    const headers = { "X-PreferencePanes-CSS": "/theme.css" };
+    const frame = new ModuleFrame("/settings/Other", { headers });
     await frame.load();
     assert.equal(frame.element.srcdoc, html);
     assert.equal(frame.element.dataset.preferencePanes, "true");
     assert.equal(frame.element.dataset.preferencePanesModule, "Other");
+    assert.equal(frame.element.dataset.preferencePanesCss, undefined);
     assert.equal(fetch.mock.calls[0].arguments[0].href, "https://example.org/settings/Other");
-    assert.equal(fetch.mock.calls[0].arguments[1].headers, undefined);
+    assert.equal(fetch.mock.calls[0].arguments[1].method, "GET");
+    assert.equal(fetch.mock.calls[0].arguments[1].headers, headers);
     frame.destroy();
 });
 

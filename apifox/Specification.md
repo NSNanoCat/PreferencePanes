@@ -6,13 +6,13 @@
 
 PreferencePanes 的 `api.js` 只通过固定 `/api/get|set|delete` 操作本地存储。它不请求网络、不解析 BoxJS、不建立字段目录，也不解释控件、选项、默认值或展示元数据。
 
-PreferencePanes 的 `web.js` 只返回通用模块 HTML、`index.mjs` 和 `navigation.mjs`。浏览器通过模块 API 取得 BoxJS，并负责规范化、界面生成、字段和值校验。
+PreferencePanes 的 `web.js` 只返回通用模块 HTML、`index.mjs` 和 `navigation.mjs`。动态模块 HTML 可直接包含调用方指定的项目 stylesheet；浏览器通过模块 API 取得 BoxJS，并负责规范化、界面生成、字段和值校验。
 
 ## 接口
 
 | HTTP 方法 | 路径 | 负责产物 | 用途 |
 | --- | --- | --- | --- |
-| GET | `/settings/{module}` | `web.js` | 通用模块 HTML |
+| GET | `/settings/{module}` | `web.js` | 可选项目 stylesheet 的通用模块 HTML |
 | GET | `/settings/assets/index.mjs` | `web.js` | 读取 BoxJS 并挂载设置页 |
 | GET | `/settings/assets/navigation.mjs` | `web.js` | 通用宿主组件 |
 | HEAD | `/api/{module}` | 业务模块模板 | 探测模块与版本 |
@@ -28,6 +28,12 @@ PreferencePanes 的 `web.js` 只返回通用模块 HTML、`index.mjs` 和 `navig
 业务模板对精确 `/api/{module}` 提供 HEAD 和 GET；允许 query，不接受尾随斜杠。HEAD 返回 200、空正文、`Content-Type: application/json`、`Cache-Control: no-store` 和非空 `X-PreferencePanes-Version`。GET 返回相同状态与 Header，并原样返回对应版本的 BoxJS JSON。
 
 模块页面从 URL 取得模块名，GET `/api/{module}` 后在浏览器中解析 BoxJS。配置必须包含请求模块的字段，并且输入最终只能描述一个可挂载模块。配置语法、控件、字段和值错误均由浏览器拒绝。
+
+## 模块页面样式
+
+`GET /settings/{module}` 接受可选 `css` 查询参数和 `X-PreferencePanes-CSS` Header。Header 存在时优先于查询参数；空 Header 明确禁用查询参数。CSS 地址按模块页面请求 URL 解析，最终协议必须是 HTTP(S)，否则请求失败。
+
+`web.js` 将合法地址写入 `<link data-preference-panes-stylesheet rel="stylesheet" href="…">`。页面运行时先把包内默认样式插到该 link 之前，因此项目 stylesheet 具有更高的级联优先级。未提供 CSS 时不生成自定义 link。CSS 由浏览器原生加载，不写入 iframe dataset，也不由页面脚本再次请求。
 
 ## Form 存储
 

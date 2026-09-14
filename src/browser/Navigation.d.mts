@@ -1,6 +1,6 @@
 /**
- * 原始 HTML 的模块 iframe 容器；通过元素传递请求上下文。
- * Iframe container preserving module HTML and carrying context on the element.
+ * 原始 HTML 的模块 iframe 容器；请求选项不写入元素上下文。
+ * Iframe container preserving module HTML without writing request options to element context.
  * confirm 事件可 preventDefault 后通过 detail.resolve/reject 完成宿主确认。
  * Prevent default on confirm events and settle host dialogs through detail.resolve/reject.
  * notice 事件可 preventDefault 后交由宿主显示，模块不再创建网页 Toast。
@@ -11,9 +11,9 @@ export class ModuleFrame extends EventTarget {
      * 创建容器。
      * Create a container.
      * @param url 模块地址 / Module URL.
-     * @param options 外部取消选项 / External cancellation options.
+     * @param options GET 请求选项 / GET request options.
      */
-    constructor(url: string | URL, options?: { signal?: AbortSignal });
+    constructor(url: string | URL, options?: { signal?: AbortSignal; headers?: HeadersInit });
     /**
      * 宿主挂载节点。
      * Host-mounted element.

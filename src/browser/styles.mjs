@@ -1,6 +1,7 @@
 import defaults from "#styles";
 
 const selector = "style[data-preference-panes-defaults]";
+const stylesheetSelector = "link[data-preference-panes-stylesheet]";
 
 /**
  * 在文档中安装一次默认样式，并标记当前调用方是否拥有该节点。
@@ -14,6 +15,6 @@ export function installDefaultStyles(document) {
     const element = document.createElement("style");
     element.dataset.preferencePanesDefaults = "";
     element.textContent = defaults;
-    document.head.append(element);
+    document.head.insertBefore(element, document.head.querySelector(stylesheetSelector));
     return { element, owned: true };
 }
