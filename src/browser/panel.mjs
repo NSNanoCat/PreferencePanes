@@ -32,13 +32,9 @@ export class PreferencesPanel {
         const title = definition.metadata?.name ?? definition.module;
         const document = root.ownerDocument;
         const window = document.defaultView;
+        const frame = window.frameElement?.dataset.preferencePanes ? window.frameElement : undefined;
         const shell = node("div", "pp-panel");
         shell.dataset.module = definition.module;
-        const header = node("header", "pp-header");
-        const back = node("button", "pp-back", "‹");
-        back.setAttribute("aria-label", "返回");
-        back.type = "button";
-        const heading = node("h1", "pp-title", title);
         const handlers = new Map();
         const menuItems = [
             { id: "viewSettings", label: "查看设置" },
@@ -46,37 +42,51 @@ export class PreferencesPanel {
             { id: "clearCaches", label: "清空缓存", destructive: true },
             { id: "reset", label: "重置设置", destructive: true },
         ];
-        const menu = new ActionMenu(id => runAction(id));
-        const trailing = node("span", "pp-nav-spacer");
-        trailing.append(menu.element);
         const viewport = node("div", "pp-viewport");
+        let back, heading, menu;
+        if (frame) shell.append(viewport);
+        else {
+            const header = node("header", "pp-header");
+            back = node("button", "pp-back", "‹");
+            back.setAttribute("aria-label", "返回");
+            back.type = "button";
+            heading = node("h1", "pp-title", title);
+            menu = new ActionMenu(id => runAction(id));
+            const trailing = node("span", "pp-nav-spacer");
+            trailing.append(menu.element);
+            header.append(back, heading, trailing);
+            shell.append(header, viewport);
+        }
         let toast;
-        header.append(back, heading, trailing);
-        shell.append(header, viewport);
         root.append(shell);
         // 嵌入模式向宿主发布导航状态，宿主不读取或修改模块内部 DOM。
         // Embedded mode publishes navigation state without host reads or mutations of the module DOM.
         const publishNavigation = () => {
             const actions = handlers.size ? menuItems : [];
-            menu.update(actions, saving);
-            const frame = window.frameElement;
-            if (!frame?.dataset.preferencePanes) return;
-            frame.dispatchEvent(
-                new frame.ownerDocument.defaultView.CustomEvent("preferencepanes:change", {
-                    detail: { title: heading.textContent, module: definition.module, busy: saving, canGoBack: !back.disabled, actions },
-                }),
-            );
+            if (frame)
+                frame.dispatchEvent(
+                    new frame.ownerDocument.defaultView.CustomEvent("preferencepanes:change", {
+                        detail: { title: currentTitle, module: definition.module, busy: saving, canGoBack, actions },
+                    }),
+                );
+            else {
+                heading.textContent = currentTitle;
+                back.disabled = !canGoBack;
+                menu.update(actions, saving);
+            }
         };
         const onAction = event => {
             if (!saving && handlers.has(event.detail)) runAction(event.detail);
         };
-        window.frameElement?.addEventListener("preferencepanes:action", onAction);
+        frame?.addEventListener("preferencepanes:action", onAction);
         let timer,
             navigation,
             generation = 0,
             active = null,
             saving = false,
-            destroyed = false;
+            destroyed = false,
+            currentTitle = title,
+            canGoBack = window.history.length > 1;
         /**
          * 展示短暂通知，不刷新设置数据。
          * Display a transient notification without refreshing settings.
@@ -105,7 +115,6 @@ export class PreferencesPanel {
             }
             // 宿主接管时不创建网页 Toast，也不运行其计时器。
             // A host-owned notice creates no web Toast and starts no local timer.
-            const frame = window.frameElement;
             if (frame && !frame.dispatchEvent(new frame.ownerDocument.defaultView.CustomEvent("preferencepanes:notice", { cancelable: true, detail: { kind: event.kind, message } }))) return;
             if (!toast) {
                 toast = node("div", "pp-toast");
@@ -143,8 +152,8 @@ export class PreferencesPanel {
         async function open(module) {
             const version = ++generation;
             active = module;
-            back.disabled = window.history.length <= 1;
-            heading.textContent = module;
+            currentTitle = module;
+            canGoBack = window.history.length > 1;
             publishNavigation();
             viewport.replaceChildren(statusView("读取设置…"));
             try {
@@ -163,7 +172,7 @@ export class PreferencesPanel {
          */
         function controls() {
             const { definition, values } = client.snapshot();
-            heading.textContent = definition.metadata?.name || active;
+            currentTitle = definition.metadata?.name || active;
             const view = node("section", "pp-fields");
             /**
              * 挂载后执行的多行高度更新
@@ -183,8 +192,8 @@ export class PreferencesPanel {
              */
             const updateNavigation = () => {
                 const editor = editors.get(navigation.current);
-                heading.textContent = editor?.title ?? definition.metadata?.name ?? active;
-                back.disabled = saving || !navigation.canGoBack;
+                currentTitle = editor?.title ?? definition.metadata?.name ?? active;
+                canGoBack = !saving && navigation.canGoBack;
                 publishNavigation();
             };
             /**
@@ -198,7 +207,7 @@ export class PreferencesPanel {
             function perform(action, success, failure = () => {}) {
                 pendingWrites++;
                 saving = true;
-                back.disabled = true;
+                canGoBack = false;
                 publishNavigation();
                 queue = queue
                     .then(action)
@@ -214,7 +223,7 @@ export class PreferencesPanel {
                         pendingWrites--;
                         saving = pendingWrites > 0;
                         if (destroyed && !saving) client.leave();
-                        back.disabled = saving || !navigation.canGoBack;
+                        canGoBack = !saving && navigation.canGoBack;
                         publishNavigation();
                     });
                 return queue;
@@ -489,16 +498,17 @@ export class PreferencesPanel {
          * Loaded forms delegate back to navigation; loading views can return to the previous document.
          * @returns {void} 无返回值 / No return value.
          */
-        back.onclick = () => {
-            if (saving) return;
-            if (navigation) navigation.back();
-            else window.history.back();
-        };
+        if (back)
+            back.onclick = () => {
+                if (saving) return;
+                if (navigation) navigation.back();
+                else window.history.back();
+            };
         open(definition.module);
         return () => {
             destroyed = true;
-            menu.destroy();
-            window.frameElement?.removeEventListener("preferencepanes:action", onAction);
+            menu?.destroy();
+            frame?.removeEventListener("preferencepanes:action", onAction);
             navigation?.destroy();
             generation++;
             if (active && !saving) client.leave();
