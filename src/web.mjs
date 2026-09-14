@@ -4,15 +4,17 @@ import { done } from "@nsnanocat/util/lib/done.mjs";
 import assets from "#assets";
 
 /**
- * 按标准 URL 语义解析样式地址，并限制为 HTTP(S)。
- * Resolve a stylesheet reference with standard URL semantics and require HTTP(S).
- * @param {string} source 样式地址 / Stylesheet reference.
+ * 按标准 URL 语义解析页面资源地址，并限制为 HTTP(S)。
+ * Resolve a page resource reference with standard URL semantics and require HTTP(S).
+ * @param {string} source 资源地址 / Resource reference.
  * @param {URL} base 模块页面地址 / Module page URL.
- * @returns {URL} 绝对样式地址 / Absolute stylesheet URL.
+ * @param {string} kind 资源名称 / Resource name.
+ * @returns {URL} 绝对资源地址 / Absolute resource URL.
  */
-function stylesheetURL(source, base) {
+function resourceURL(source, base, kind) {
+    if (!source) throw new TypeError(`${kind} resource URL is required`);
     const scheme = /^([a-zA-Z][a-zA-Z\d+.-]*:)/.exec(source)?.[1].toLowerCase();
-    if (scheme && !["http:", "https:"].includes(scheme)) throw new TypeError("CSS resource must use HTTP(S)");
+    if (scheme && !["http:", "https:"].includes(scheme)) throw new TypeError(`${kind} resource must use HTTP(S)`);
     let resource;
     if (scheme) resource = new URL(source);
     else if (source.startsWith("//")) resource = new URL(`${base.protocol}${source}`);
@@ -29,8 +31,18 @@ function stylesheetURL(source, base) {
         const normalized = segments.join("/") || "/";
         resource = new URL(`${base.origin}${normalized}${query ?? (path ? "" : base.search)}${hash ?? ""}`);
     }
-    if (!["http:", "https:"].includes(resource.protocol.toLowerCase())) throw new TypeError("CSS resource must use HTTP(S)");
+    if (!["http:", "https:"].includes(resource.protocol.toLowerCase())) throw new TypeError(`${kind} resource must use HTTP(S)`);
     return resource;
+}
+
+/**
+ * 转义写入 HTML 属性的资源地址。
+ * Escape a resource URL for an HTML attribute.
+ * @param {URL} resource 资源地址 / Resource URL.
+ * @returns {string} HTML 属性值 / HTML attribute value.
+ */
+function attribute(resource) {
+    return resource.href.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
 }
 
 /**
@@ -46,15 +58,14 @@ function run() {
         if (/^\/settings\/[a-zA-Z0-9_-]+\/?$/.test(url.pathname)) {
             if (!["GET", "HEAD"].includes(request.method)) result = response(request, 405, { error: "Method not allowed" });
             else {
-                const header = Object.entries(request.headers ?? {}).find(([name]) => name.toLowerCase() === "x-preferencepanes-css");
-                const source = (header ? header[1] : url.searchParams.get("css"))?.trim();
+                const headers = Object.fromEntries(Object.entries(request.headers ?? {}).map(([name, value]) => [name.toLowerCase(), value]));
+                const module = url.pathname.split("/")[2];
+                const jsonSource = (Object.hasOwn(headers, "x-preferencepanes-json") ? headers["x-preferencepanes-json"] : (url.searchParams.get("json") ?? `/api/${module}`))?.trim();
+                const json = `<meta name="preference-panes-boxjs" content="${attribute(resourceURL(jsonSource, url, "BoxJS"))}">`;
+                const cssSource = (Object.hasOwn(headers, "x-preferencepanes-css") ? headers["x-preferencepanes-css"] : url.searchParams.get("css"))?.trim();
                 let stylesheet = "";
-                if (source) {
-                    const resource = stylesheetURL(source, url);
-                    const href = resource.href.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
-                    stylesheet = `<link data-preference-panes-stylesheet rel="stylesheet" href="${href}">`;
-                }
-                result = response(request, 200, assets.page.body.replace("<!--__PREFERENCE_PANES_STYLESHEET__-->", stylesheet), "text/html");
+                if (cssSource) stylesheet = `<link data-preference-panes-stylesheet rel="stylesheet" href="${attribute(resourceURL(cssSource, url, "CSS"))}">`;
+                result = response(request, 200, assets.page.body.replace("<!--__PREFERENCE_PANES_JSON__-->", json).replace("<!--__PREFERENCE_PANES_STYLESHEET__-->", stylesheet), "text/html");
             }
         } else {
             const asset = assets[url.pathname];

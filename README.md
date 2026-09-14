@@ -29,7 +29,7 @@ preferences.destroy();
 
 前端支持 BoxJS 字段数组、单个 app 和 apps 订阅，并要求输入恰好包含一个模块。模块名、存储根和 Settings 路径都从 `@Root.Module.Settings.key` 字段 ID 推导，不从 app 名称或调用参数补充。
 
-默认样式随包内置。动态模块 HTML 可通过 `css` 查询参数或优先级更高的 `X-PreferencePanes-CSS` Header 直接加载一个项目 stylesheet；未提供时只使用默认样式。项目 stylesheet 位于默认样式之后，可覆盖 `pp-*` 变量和组件规则。页面脚本不二次下载 CSS，也不识别客户端 User-Agent 或加载客户端 SDK。
+默认样式随包内置。动态模块 HTML 接受 `json`、`css` 查询参数及优先级更高的 `X-PreferencePanes-JSON`、`X-PreferencePanes-CSS` Header，两个输入值都是资源 URL。未指定 JSON 时默认读取 `/api/{module}`，未指定 CSS 时只使用默认样式。项目 stylesheet 位于默认样式之后，可覆盖 `pp-*` 变量和组件规则。页面脚本不识别客户端 User-Agent，也不加载客户端 SDK。
 
 ## 页面与 API
 
@@ -39,7 +39,7 @@ preferences.destroy();
 - `GET /settings/assets/index.mjs`
 - `GET /settings/assets/navigation.mjs`
 
-模块页面从 URL 或 `ModuleFrame` 的模块标记取得模块名，通过同源 `/api/{module}` 读取原始 BoxJS，然后调用 `mount(boxjs)`。`web.js` 只在生成 HTML 时解析可选 CSS 地址并写入 `<link data-preference-panes-stylesheet>`；CSS 地址必须解析为 HTTP(S)。页面不接受 JSON 输入或兼容资源别名，也不直接访问 `/configs/**`。
+模块页面从 URL 或 `ModuleFrame` 的模块标记取得模块名，读取 HTML 中声明的 BoxJS 资源，然后调用 `mount(boxjs)`。`web.js` 在生成 HTML 时解析 BoxJS 与可选 CSS 地址，分别写入 `<meta name="preference-panes-boxjs">` 和 `<link data-preference-panes-stylesheet>`；两个地址都必须解析为 HTTP(S)。静态页面没有资源声明时回退同源 `/api/{module}`，页面不直接访问 `/configs/**`。
 
 业务模块模板直接处理：
 
@@ -76,7 +76,10 @@ await status.check("/api/Module");
 
 const frame = new ModuleFrame("/settings/Module", {
     signal,
-    headers: { "X-PreferencePanes-CSS": "https://example.org/theme.css" },
+    headers: {
+        "X-PreferencePanes-JSON": "https://example.org/Module.boxjs.json",
+        "X-PreferencePanes-CSS": "https://example.org/theme.css",
+    },
 });
 container.append(frame.element);
 await frame.load();
@@ -101,7 +104,7 @@ npm pack --dry-run
 npm run preview
 ```
 
-预览入口会自动加载 `examples/Module.boxjs.json`，覆盖 `boolean`、`selects`、`checkboxes`、`text`、`textarea`、`number` 和 `url` 全部受支持控件。页面使用正式构建的通用模块前端、同源 API 和独立内存存储，不维护演示专用渲染器。
+预览入口会自动加载 `examples/Module.boxjs.json`，覆盖 `boolean`、`selects`、`checkboxes`、`text`、`textarea`、`number` 和 `url` 全部受支持控件。顶端 CSS 选择器默认使用包内置 CSS，也可切换 `examples/theme.css` 或导入本地 CSS 文件。页面通过正式构建的 `web.js` 以 `X-PreferencePanes-JSON` 和可选 `X-PreferencePanes-CSS` Header 注入资源地址，并使用固定存储 API 与独立内存存储，不维护演示专用渲染器。
 
 内置存储会提供已移除选项和格式错误值，用于直接核对字段级黄色警告及非阻断加载；URL 字段还会携带同路径旧存储值，验证只读链接始终使用 BoxJS `val`。测试台同时保留上传其它 BoxJS JSON 并生成隔离预览的能力。
 

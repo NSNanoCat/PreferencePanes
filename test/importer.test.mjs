@@ -19,15 +19,23 @@ test("preview testbench provides an all-control example and still accepts import
         });
         const page = await (await fetch(base)).text();
         assert.match(page, /type="file"/);
+        assert.match(page, /id="css-mode"/);
+        assert.match(page, /value="builtin" selected>内置 CSS/);
+        assert.match(page, /value="example">示例 CSS/);
+        assert.match(page, /value="import">导入 CSS/);
+        assert.match(page, /id="css" type="file"[^>]*disabled/);
         assert.match(page, /id="generate".*disabled/);
         assert.match(page, /id="example"/);
         assert.match(page, /iframe.*hidden/);
         assert.doesNotMatch(page, /pp-home|data-module|安装模块/);
         assert.equal((await fetch(`${base}api/Module`)).status, 404);
-        const builtIn = await fetch(`${base}example`, { method: "POST" });
+        const builtIn = await fetch(`${base}example`, { method: "POST", body: JSON.stringify({ cssMode: "builtin" }) });
         assert.equal(builtIn.status, 200);
         assert.deepEqual(await builtIn.json(), { url: "/settings/Module", module: "Module" });
-        const example = await (await fetch(`${base}api/Module`)).json();
+        const modulePage = await (await fetch(`${base}settings/Module`)).text();
+        assert.match(modulePage, new RegExp(`<meta name="preference-panes-boxjs" content="${base.replaceAll("/", "\\/")}preview\\/boxjs\\.json">`));
+        assert.doesNotMatch(modulePage, /data-preference-panes-stylesheet/);
+        const example = await (await fetch(`${base}preview/boxjs.json`)).json();
         assert.deepEqual(
             example.settings.map(setting => setting.type),
             ["boolean", "selects", "checkboxes", "text", "textarea", "number", "url"],
@@ -47,12 +55,20 @@ test("preview testbench provides an all-control example and still accepts import
             categories: ["legacy-url-value"],
         });
         const boxjs = [{ id: "@Root.Module.flag", name: "Flag", type: "boolean", val: true }];
-        const result = await fetch(`${base}preview`, { method: "POST", body: JSON.stringify({ boxjs }) });
+        const sampleStyle = await fetch(`${base}example`, { method: "POST", body: JSON.stringify({ cssMode: "example" }) });
+        assert.equal(sampleStyle.status, 200);
+        const styledPage = await (await fetch(`${base}settings/Module`)).text();
+        assert.match(styledPage, new RegExp(`data-preference-panes-stylesheet rel="stylesheet" href="${base.replaceAll("/", "\\/")}preview\\/style\\.css"`));
+        assert.match(await (await fetch(`${base}preview/style.css`)).text(), /--pp-accent: #16866a/);
+
+        const importedCSS = ".pp-title { color: rgb(180 20 40); }";
+        const result = await fetch(`${base}preview`, { method: "POST", body: JSON.stringify({ boxjs, cssMode: "import", css: importedCSS }) });
         assert.equal(result.status, 200);
         assert.deepEqual(await result.json(), { url: "/settings/Module", module: "Module" });
-        const configuration = await fetch(`${base}api/Module`);
+        const configuration = await fetch(`${base}preview/boxjs.json`);
         assert.equal(configuration.headers.get("X-PreferencePanes-Version"), "preview");
         assert.deepEqual(await configuration.json(), boxjs);
+        assert.equal(await (await fetch(`${base}preview/style.css`)).text(), importedCSS);
         assert.equal(
             (
                 await fetch(`${base}api/get`, {
@@ -63,15 +79,16 @@ test("preview testbench provides an all-control example and still accepts import
             ).status,
             404,
         );
-        const probe = await fetch(`${base}api/Module`, { method: "HEAD" });
+        const probe = await fetch(`${base}preview/boxjs.json`, { method: "HEAD" });
         assert.equal(probe.status, 200);
         assert.equal(probe.headers.get("X-PreferencePanes-Version"), "preview");
         assert.equal(await probe.text(), "");
-        assert.equal((await fetch(`${base}settings/assets/Module.css`)).status, 404);
+        assert.equal((await fetch(`${base}api/Module`)).status, 404);
         assert.equal((await fetch(`${base}api/Other`)).status, 404);
         assert.equal((await fetch(`${base}configs/Module`)).status, 404);
+        assert.equal((await fetch(`${base}preview`, { method: "POST", body: JSON.stringify({ boxjs, cssMode: "import" }) })).status, 400);
         assert.equal((await fetch(`${base}preview`, { method: "POST", body: "{" })).status, 400);
-        assert.equal((await fetch(`${base}api/Module`)).status, 404);
+        assert.equal((await fetch(`${base}preview/boxjs.json`)).status, 404);
     } finally {
         if (child.exitCode === null && child.signalCode === null) {
             const exited = once(child, "exit");

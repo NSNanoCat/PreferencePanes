@@ -6,13 +6,13 @@
 
 PreferencePanes 的 `api.js` 只通过固定 `/api/get|set|delete` 操作本地存储。它不请求网络、不解析 BoxJS、不建立字段目录，也不解释控件、选项、默认值或展示元数据。
 
-PreferencePanes 的 `web.js` 只返回通用模块 HTML、`index.mjs` 和 `navigation.mjs`。动态模块 HTML 可直接包含调用方指定的项目 stylesheet；浏览器通过模块 API 取得 BoxJS，并负责规范化、界面生成、字段和值校验。
+PreferencePanes 的 `web.js` 只返回通用模块 HTML、`index.mjs` 和 `navigation.mjs`。动态模块 HTML 可声明调用方指定的 BoxJS JSON 与项目 stylesheet 资源；浏览器取得 BoxJS 后负责规范化、界面生成、字段和值校验。
 
 ## 接口
 
 | HTTP 方法 | 路径 | 负责产物 | 用途 |
 | --- | --- | --- | --- |
-| GET | `/settings/{module}` | `web.js` | 可选项目 stylesheet 的通用模块 HTML |
+| GET | `/settings/{module}` | `web.js` | 可选 BoxJS 与项目 stylesheet 输入的通用模块 HTML |
 | GET | `/settings/assets/index.mjs` | `web.js` | 读取 BoxJS 并挂载设置页 |
 | GET | `/settings/assets/navigation.mjs` | `web.js` | 通用宿主组件 |
 | HEAD | `/api/{module}` | 业务模块模板 | 探测模块与版本 |
@@ -27,13 +27,13 @@ PreferencePanes 的 `web.js` 只返回通用模块 HTML、`index.mjs` 和 `navig
 
 业务模板对精确 `/api/{module}` 提供 HEAD 和 GET；允许 query，不接受尾随斜杠。HEAD 返回 200、空正文、`Content-Type: application/json`、`Cache-Control: no-store` 和非空 `X-PreferencePanes-Version`。GET 返回相同状态与 Header，并原样返回对应版本的 BoxJS JSON。
 
-模块页面从 URL 取得模块名，GET `/api/{module}` 后在浏览器中解析 BoxJS。配置必须包含请求模块的字段，并且输入最终只能描述一个可挂载模块。配置语法、控件、字段和值错误均由浏览器拒绝。
+模块页面从 URL 取得模块名，读取 HTML 声明的 BoxJS 资源后在浏览器中解析。未声明时默认 GET `/api/{module}`。配置必须包含请求模块的字段，并且输入最终只能描述一个可挂载模块。配置语法、控件、字段和值错误均由浏览器拒绝。
 
-## 模块页面样式
+## 模块页面资源
 
-`GET /settings/{module}` 接受可选 `css` 查询参数和 `X-PreferencePanes-CSS` Header。Header 存在时优先于查询参数；空 Header 明确禁用查询参数。CSS 地址按模块页面请求 URL 解析，最终协议必须是 HTTP(S)，否则请求失败。
+`GET /settings/{module}` 接受可选 `json`、`css` 查询参数和 `X-PreferencePanes-JSON`、`X-PreferencePanes-CSS` Header。每个 Header 都独立优先于对应查询参数。BoxJS 地址未指定时默认为 `/api/{module}`；空 BoxJS Header 无法形成资源地址并返回错误。CSS 地址未指定时不加载项目 stylesheet；空 CSS Header 明确禁用查询参数。
 
-`web.js` 将合法地址写入 `<link data-preference-panes-stylesheet rel="stylesheet" href="…">`。页面运行时先把包内默认样式插到该 link 之前，因此项目 stylesheet 具有更高的级联优先级。未提供 CSS 时不生成自定义 link。CSS 由浏览器原生加载，不写入 iframe dataset，也不由页面脚本再次请求。
+两个资源地址都按模块页面请求 URL 解析，最终协议必须是 HTTP(S)，否则请求失败。`web.js` 将合法 BoxJS 地址写入 `<meta name="preference-panes-boxjs" content="…">`，页面脚本只请求该地址；将合法 CSS 地址写入 `<link data-preference-panes-stylesheet rel="stylesheet" href="…">`，由浏览器原生加载。页面运行时先把包内默认样式插到该 link 之前，因此项目 stylesheet 具有更高的级联优先级。资源地址不写入 iframe dataset。
 
 ## Form 存储
 
@@ -75,7 +75,7 @@ BoxJS 控件、选项、默认值、字段重叠、已存值和待写入值都�
 
 `examples/Module.boxjs.json` 是通用设置前端的内置验收配置，必须覆盖 `boolean`、`selects`、`checkboxes`、`text`、`textarea`、`number` 和 `url` 全部受支持控件。控件类型或行为发生变化时，必须同步更新该配置与预览测试。
 
-`npm run preview` 启动本地测试台后必须自动加载内置配置，并继续允许导入外部 BoxJS JSON。两种入口都使用正式构建的通用模块页面、同源模块 API 与固定存储 API；演示不得复制或替代生产渲染流程。
+`npm run preview` 启动本地测试台后必须自动加载内置配置，并继续允许导入外部 BoxJS JSON。顶端 CSS 选择器默认使用包内置 CSS，并允许切换仓库示例 CSS 或导入本地 CSS。预览服务器必须通过正式构建的 `web.js` 以 JSON/CSS Header 注入资源地址，并使用固定存储 API；演示不得复制或替代生产渲染流程。
 
 内置预览使用独立内存存储注入当前配置未定义的选项、无法由控件表示的值，以及 URL 字段同路径的旧存储值。验收时应确认前两类问题只在对应字段下显示非阻断警告，页面其余控件仍可使用；URL 字段忽略旧存储值并继续使用 BoxJS `val`。
 

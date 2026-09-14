@@ -10,9 +10,10 @@
             header { padding: 16px 20px; background: white; border-bottom: 1px solid #ddd; }
             .heading { display: flex; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
             h1 { margin: 0; font-size: 20px; }
-            form { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+            .controls, form { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+            .controls { margin-bottom: 12px; }
             label { display: grid; gap: 4px; min-width: 0; }
-            input { max-width: 100%; }
+            input, select { max-width: 100%; font: inherit; }
             button { padding: 6px 14px; font: inherit; }
             #status { margin: 8px 0 0; }
             #error { color: #b3261e; }
@@ -25,6 +26,16 @@
             <div class="heading">
                 <h1>PreferencePanes 全类型示例</h1>
                 <button id="example" type="button">重载内置示例</button>
+            </div>
+            <div class="controls">
+                <label>CSS 样式
+                    <select id="css-mode">
+                        <option value="builtin" selected>内置 CSS</option>
+                        <option value="example">示例 CSS</option>
+                        <option value="import">导入 CSS</option>
+                    </select>
+                </label>
+                <label>CSS 文件<input id="css" type="file" accept=".css,text/css" disabled></label>
             </div>
             <form id="import">
                 <label>BoxJS JSON<input id="boxjs" type="file" accept=".json,application/json" required></label>
