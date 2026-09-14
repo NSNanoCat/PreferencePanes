@@ -55,6 +55,16 @@ test("loading and retry states share the centered status component", async () =>
     assert.doesNotMatch(panel, /pp-loading/);
 });
 
+test("stored value compatibility issues render as field-level warnings", async () => {
+    const panel = await readFile(new URL("../src/browser/panel.mjs", import.meta.url), "utf8");
+    const styles = await readFile(new URL("../src/browser/panel.css", import.meta.url), "utf8");
+    assert.match(panel, /当前配置未定义值：/);
+    assert.match(panel, /当前存储值格式不受支持：/);
+    assert.match(panel, /client\.snapshot\(\)\.warnings\[field\.key\]/);
+    assert.match(styles, /--pp-warning:/);
+    assert.match(styles, /\.pp-field-warning \{[\s\S]*color: var\(--pp-warning\);/);
+});
+
 test("proxy and browser sources keep storage, validation and navigation responsibilities separate", async () => {
     const api = await readFile(new URL("../src/api.mjs", import.meta.url), "utf8");
     const web = await readFile(new URL("../src/web.mjs", import.meta.url), "utf8");

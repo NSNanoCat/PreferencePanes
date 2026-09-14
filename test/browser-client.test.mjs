@@ -19,6 +19,7 @@ test("browser client reads Settings once, normalizes stored values and then muta
     assert.deepEqual(await client.open(), {
         definition,
         values: { "Module.Settings.Home.enabled": false, "Module.Settings.Home.mode": "b", "Module.Settings.items": ["a", "b"], "Module.Settings.note": "", "Module.Settings.count": 2 },
+        warnings: {},
     });
     await client.set("Module.Settings.Home.mode", "a");
     assert.deepEqual(
@@ -37,13 +38,45 @@ test("browser client reads Settings once, normalizes stored values and then muta
 
 test("missing Settings initializes the page from BoxJS defaults", async () => {
     const client = new PreferencesClient({ definition, fetch: async () => new Response(null, { status: 404 }) });
-    assert.deepEqual((await client.open()).values, {
+    const snapshot = await client.open();
+    assert.deepEqual(snapshot.values, {
         "Module.Settings.Home.enabled": true,
         "Module.Settings.Home.mode": "a",
         "Module.Settings.items": ["a"],
         "Module.Settings.note": "",
         "Module.Settings.count": 1,
     });
+    assert.deepEqual(snapshot.warnings, {});
+});
+
+test("read-only URL fields ignore legacy stored values at the same path", async () => {
+    const definition = normalizeBoxJs([{ id: "@BiliBili.Enhanced.Settings.Home.Tab", name: "打开分区", type: "url", val: "bilibili://main/top_category" }], "Enhanced");
+    const client = new PreferencesClient({
+        definition,
+        fetch: async () => new Response(JSON.stringify({ Tab: ["2036", "2037"] }), { status: 200 }),
+    });
+    const snapshot = await client.open();
+    assert.deepEqual(snapshot.values, {
+        "Enhanced.Settings.Home.Tab": "bilibili://main/top_category",
+    });
+    assert.deepEqual(snapshot.warnings, {});
+});
+
+test("stored options absent from the current definition remain visible as field warnings", async () => {
+    const client = new PreferencesClient({
+        definition,
+        fetch: async () => new Response(JSON.stringify({ ...settings, Home: { ...settings.Home, mode: "legacy" }, items: ["a", "legacy"] }), { status: 200 }),
+    });
+    const snapshot = await client.open();
+    assert.equal(snapshot.values["Module.Settings.Home.mode"], "legacy");
+    assert.deepEqual(snapshot.values["Module.Settings.items"], ["a", "legacy"]);
+    assert.deepEqual(snapshot.warnings, {
+        "Module.Settings.Home.mode": { kind: "undefined-options", values: ["legacy"] },
+        "Module.Settings.items": { kind: "undefined-options", values: ["legacy"] },
+    });
+    await client.set("Module.Settings.Home.mode", "a");
+    assert.equal(client.snapshot().warnings["Module.Settings.Home.mode"], undefined);
+    assert.deepEqual(client.snapshot().warnings["Module.Settings.items"], { kind: "undefined-options", values: ["legacy"] });
 });
 
 test("settings and caches are read through fixed form actions", async () => {
@@ -78,6 +111,8 @@ test("invalid fields and values are rejected before a storage request", async ()
     });
     await assert.rejects(client.set("Module.Settings.Unknown", true), /Invalid setting value/);
     await assert.rejects(client.set("Module.Settings.count", Number.NaN), /Invalid setting value/);
+    await assert.rejects(client.set("Module.Settings.Home.mode", "legacy"), /Invalid setting value/);
+    await assert.rejects(client.set("Module.Settings.items", ["a", "legacy"]), /Invalid setting value/);
     await assert.rejects(client.remove("Module.Settings.Unknown"), /Invalid setting value/);
     assert.equal(calls.length, 0);
 });
@@ -110,14 +145,20 @@ test("API errors notify and preserve the cached snapshot", async () => {
     assert.equal(notifications.at(-1).kind, "error");
 });
 
-test("invalid stored values fail initialization and can be retried", async () => {
+test("stored values with unsupported shapes use defaults and report field warnings", async () => {
     let calls = 0;
     const client = new PreferencesClient({
         definition,
         fetch: async () => new Response(JSON.stringify(++calls === 1 ? { ...settings, count: "not-a-number" } : settings), { status: 200 }),
     });
-    await assert.rejects(client.open(), /Invalid stored value: Module\.Settings\.count/);
-    assert.equal((await client.open()).values["Module.Settings.count"], 2);
+    const invalid = await client.open();
+    assert.equal(invalid.values["Module.Settings.count"], 1);
+    assert.deepEqual(invalid.warnings, {
+        "Module.Settings.count": { kind: "invalid-value", values: ["not-a-number"] },
+    });
+    const valid = await client.open();
+    assert.equal(valid.values["Module.Settings.count"], 2);
+    assert.deepEqual(valid.warnings, {});
 });
 
 test("a timed out request does not abort later API actions", async () => {

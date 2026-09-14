@@ -62,7 +62,7 @@ await fetch("/api/set", {
 });
 ```
 
-页面初始化时只执行一次 `POST /api/get` 读取 Settings 子树。写入成功后仅更新当前页面快照；查看 Settings/Caches 时按需读取，清空和重置通过 `/api/delete` 完成。
+页面初始化时只执行一次 `POST /api/get` 读取 Settings 子树。外部存储中的历史值不会阻断页面加载：当前选项表未定义的值会保留并在对应设置项下提示，无法由控件表示的值会回退到默认值并显示警告；用户的新写入仍执行严格校验。写入成功后仅更新当前页面快照；查看 Settings/Caches 时按需读取，清空和重置通过 `/api/delete` 完成。
 
 设置项支持 `type: "url"` 作为只读跳转入口。它的 `val` 必须是带 scheme 的地址，例如 `bilibili://main/top_category`；面板将其渲染为可点击链接，不会发起存储写入。嵌入 `ModuleFrame` 时，宿主可拦截 `open-url` 事件（`detail.url`）并打开链接；未拦截或独立网页中保留链接的默认导航。
 

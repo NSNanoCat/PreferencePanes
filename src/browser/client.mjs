@@ -1,4 +1,4 @@
-import { normalizeStoredValue, validValue } from "./boxjs.mjs";
+import { resolveStoredValue, validValue } from "./boxjs.mjs";
 
 /**
  * 管理单模块页面的 API 请求、值快照和会话终止。
@@ -12,6 +12,7 @@ export class PreferencesClient {
     #timeout;
     #session = new AbortController();
     #values = {};
+    #warnings = {};
     #saving = false;
 
     /**
@@ -38,17 +39,18 @@ export class PreferencesClient {
         if (typeof subtree === "string") subtree = JSON.parse(subtree);
         if (!subtree || typeof subtree !== "object" || Array.isArray(subtree)) throw new TypeError("Expected a settings subtree object");
         const values = {};
+        const warnings = {};
         for (const field of this.#definition.fields) {
             const stored = field.key
                 .split(".")
                 .slice(this.#definition.settingsPath.length)
                 .reduce((parent, part) => Object(parent)[part], subtree);
-            const value = normalizeStoredValue(field, stored === undefined ? field.defaultValue : stored);
-            if (value === undefined) continue;
-            if (!validValue(field, value)) throw new TypeError(`Invalid stored value: ${field.key}`);
-            values[field.key] = value;
+            const resolved = resolveStoredValue(field, stored);
+            if (Object.hasOwn(resolved, "value")) values[field.key] = resolved.value;
+            if (resolved.warning) warnings[field.key] = resolved.warning;
         }
         this.#values = values;
+        this.#warnings = warnings;
         return this.snapshot();
     }
 
@@ -58,7 +60,7 @@ export class PreferencesClient {
      * @returns {import("./client.mjs").ModuleSnapshot} 会话快照 / Session snapshot.
      */
     snapshot() {
-        return structuredClone({ definition: this.#definition, values: this.#values });
+        return structuredClone({ definition: this.#definition, values: this.#values, warnings: this.#warnings });
     }
 
     /**
@@ -182,15 +184,18 @@ export class PreferencesClient {
             switch (operation) {
                 case "write":
                     this.#values[key] = structuredClone(value);
+                    delete this.#warnings[key];
                     break;
                 case "delete": {
                     delete this.#values[key];
+                    delete this.#warnings[key];
                     if (Object.hasOwn(field, "defaultValue")) this.#values[key] = structuredClone(field.defaultValue);
                     break;
                 }
                 case "clearCaches":
                     break;
                 case "reset":
+                    this.#warnings = {};
                     for (const field of this.#definition.fields) {
                         delete this.#values[field.key];
                         if (Object.hasOwn(field, "defaultValue")) this.#values[field.key] = structuredClone(field.defaultValue);

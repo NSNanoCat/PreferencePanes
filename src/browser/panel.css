@@ -8,6 +8,7 @@
     --pp-border: #e3e5e7;
     --pp-muted: #797f87;
     --pp-accent: #1677ff;
+    --pp-warning: #9a6700;
     font:
         15px / 1.5 -apple-system,
         BlinkMacSystemFont,
@@ -32,6 +33,7 @@
     --pp-field: #2f3238;
     --pp-border: #2f3238;
     --pp-muted: #9499a0;
+    --pp-warning: #f0b849;
 }
 .pp-panel * {
     box-sizing: border-box;
@@ -174,6 +176,12 @@
     margin-top: 2px;
     color: var(--pp-muted);
     font-size: 12px;
+}
+.pp-field-warning {
+    margin-top: 4px;
+    color: var(--pp-warning);
+    font-size: 12px;
+    overflow-wrap: anywhere;
 }
 .pp-group {
     margin-top: 16px;
