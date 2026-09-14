@@ -1,5 +1,9 @@
 # PreferencePanes 发布流程
 
+## 1.1.4
+
+嵌入模块不再创建网页标题栏和操作菜单，导航栏由宿主统一提供；独立设置页继续保留 PreferencePanes 自有导航栏。
+
 ## 1.1.3
 
 1.1.3 删除无效的模块配置转发。业务模块直接将同版 BoxJS JSON Mock 到 `HEAD/GET /api/{module}` 并配置版本头；PreferencePanes `api.js` 只保留 `POST /api/get|set|delete` 的单字段 form 存储协议。

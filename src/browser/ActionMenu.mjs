@@ -1,6 +1,6 @@
 /**
- * 共用三点按钮和底部操作菜单；弹层挂载到文档根部，不受标题栏显示状态影响。
- * Shared overflow trigger and bottom action sheet; the layer is mounted at document level and remains independent of header visibility.
+ * 独立页面的三点按钮和底部操作菜单；嵌入页面由宿主提供对应界面。
+ * Overflow trigger and bottom action sheet for standalone pages; embedded pages use host-provided chrome.
  */
 export class ActionMenu {
     #button;

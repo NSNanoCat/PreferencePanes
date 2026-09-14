@@ -26,6 +26,14 @@ test("module renderer omits the search toolbar row", async () => {
     }
 });
 
+test("embedded modules delegate navigation chrome instead of hiding a duplicate header", async () => {
+    const panel = await readFile(new URL("../src/browser/panel.mjs", import.meta.url), "utf8");
+    const styles = await readFile(new URL("../src/browser/panel.css", import.meta.url), "utf8");
+    assert.match(panel, /const frame = window\.frameElement\?\.dataset\.preferencePanes/);
+    assert.match(panel, /if \(frame\) shell\.append\(viewport\);/);
+    assert.doesNotMatch(panel + styles, /preferencePanesEmbedded|data-preference-panes-embedded/);
+});
+
 test("loading and retry states share the centered status component", async () => {
     const components = await readFile(new URL("../src/browser/components.mjs", import.meta.url), "utf8");
     const panel = await readFile(new URL("../src/browser/panel.mjs", import.meta.url), "utf8");

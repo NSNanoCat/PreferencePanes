@@ -87,9 +87,6 @@
     min-height: 0;
     overflow: hidden;
 }
-:root[data-preference-panes-embedded] .pp-header {
-    display: none;
-}
 @supports (height: 100dvh) {
     .pp-panel {
         height: 100dvh;
