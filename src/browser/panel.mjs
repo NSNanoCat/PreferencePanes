@@ -5,6 +5,22 @@ import { fieldControl, element as node, requestConfirmation, requestURLNavigatio
 import { Navigation } from "./Navigation.mjs";
 
 /**
+ * 将字段级存储诊断转换为简短提示。
+ * Convert a field-level storage diagnostic into concise display text.
+ * @param {import("./client.mjs").StoredValueWarning} warning 存储警告 / Storage warning.
+ * @returns {string} 用户可见提示 / User-visible warning.
+ */
+function warningMessage(warning) {
+    const values = warning.values
+        .map(value => {
+            if (typeof value === "string") return value;
+            return JSON.stringify(value) ?? String(value);
+        })
+        .join("、");
+    return warning.kind === "undefined-options" ? `当前配置未定义值：${values}` : `当前存储值格式不受支持：${values}`;
+}
+
+/**
  * 管理模块表单、导航、操作队列和短暂通知。
  * Manage the module form, navigation, operation queue, and transient notifications.
  */
@@ -182,6 +198,7 @@ export class PreferencesPanel {
             const growingInputs = [];
             const editors = new Map();
             const summaries = [];
+            const warningRefreshers = [];
             const groups = new Map();
             let queue = Promise.resolve(),
                 pendingWrites = 0;
@@ -258,6 +275,15 @@ export class PreferencesPanel {
                 const label = node("div", "pp-label");
                 label.append(node("span", "pp-field-name", match?.[2] ?? field.name));
                 if (field.description) label.append(node("span", "pp-field-description", field.description));
+                const warning = node("span", "pp-field-warning");
+                const refreshWarning = () => {
+                    const issue = client.snapshot().warnings[field.key];
+                    warning.hidden = !issue;
+                    warning.textContent = issue ? warningMessage(issue) : "";
+                };
+                warningRefreshers.push(refreshWarning);
+                refreshWarning();
+                label.append(warning);
                 row.append(label);
                 const value = values[field.key];
                 /**
@@ -434,6 +460,7 @@ export class PreferencesPanel {
                         },
                         () => {
                             for (const refresh of summaries) refresh();
+                            for (const refresh of warningRefreshers) refresh();
                         },
                         restore,
                     );

@@ -164,16 +164,60 @@ function scalar(value) {
 }
 
 /**
- * 检查值类型、数组唯一性及声明的选项，不进行转换。
- * Check value type, array uniqueness and declared choices without coercion.
+ * 检查值类型与数组结构，不检查选项是否仍在当前配置中。
+ * Check value type and array structure without requiring current option membership.
  * @param {import("../index.js").SettingsField} field 前端归一化字段 / Normalized frontend field.
- * @param {unknown} value 待写入的 JSON 值 / JSON value to write.
- * @returns {boolean} 是否符合字段约束 / Whether the value satisfies field constraints.
+ * @param {unknown} value 待检查值 / Value to inspect.
+ * @returns {boolean} 是否可由控件表示 / Whether the control can represent the value.
  */
-export function validValue(field, value) {
+function validValueShape(field, value) {
     if (field.type === "array") {
         if (!Array.isArray(value) || value.some(item => !scalar(item)) || new Set(value).size !== value.length) return false;
     } else if (typeof value !== field.type || !scalar(value)) return false;
     if (field.control === "url" && (!/^[a-z][a-z\d+.-]*:/i.test(value) || /^(?:javascript|data|vbscript):/i.test(value))) return false;
-    return !field.options || (field.type === "array" ? value : [value]).every(item => field.options.some(option => option.key === item));
+    return true;
+}
+
+/**
+ * 返回当前配置未声明的选项值。
+ * Return option values absent from the current definition.
+ * @param {import("../index.js").SettingsField} field 前端归一化字段 / Normalized frontend field.
+ * @param {unknown} value 已确认结构有效的值 / Value with a valid shape.
+ * @returns {unknown[]} 未定义值 / Undefined values.
+ */
+function undefinedOptions(field, value) {
+    if (!field.options) return [];
+    return (field.type === "array" ? value : [value]).filter(item => !field.options.some(option => option.key === item));
+}
+
+/**
+ * 将外部存储值解析为可渲染值，并把兼容性问题作为字段级警告返回。
+ * Resolve external storage into a renderable value and return compatibility issues as field warnings.
+ * @param {import("../index.js").SettingsField} field 前端归一化字段 / Normalized frontend field.
+ * @param {unknown} stored 外部存储值 / External stored value.
+ * @returns {{value?: unknown, warning?: {kind: "invalid-value" | "undefined-options", values: unknown[]}}} 解析结果 / Resolution result.
+ */
+export function resolveStoredValue(field, stored) {
+    if (field.control === "url") return { value: field.defaultValue };
+    const value = normalizeStoredValue(field, stored === undefined ? field.defaultValue : stored);
+    if (value === undefined) return {};
+    if (!validValueShape(field, value)) {
+        return {
+            ...(Object.hasOwn(field, "defaultValue") ? { value: field.defaultValue } : {}),
+            warning: { kind: "invalid-value", values: [stored] },
+        };
+    }
+    const undefinedValues = undefinedOptions(field, value);
+    return { value, ...(undefinedValues.length ? { warning: { kind: "undefined-options", values: undefinedValues } } : {}) };
+}
+
+/**
+ * 严格检查写入值的类型、数组唯一性及声明选项。
+ * Strictly check a write value's type, array uniqueness, and declared options.
+ * @param {import("../index.js").SettingsField} field 前端归一化字段 / Normalized frontend field.
+ * @param {unknown} value 待写入的 JSON 值 / JSON value to write.
+ * @returns {boolean} 是否允许写入 / Whether the value may be written.
+ */
+export function validValue(field, value) {
+    return validValueShape(field, value) && undefinedOptions(field, value).length === 0;
 }
