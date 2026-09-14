@@ -30,8 +30,24 @@ for (const host of hosts)
         const page = await run("/settings/Module");
         assert.equal(status(page), 200);
         assert.match(page.body, /<!doctype html>/i);
+        assert.match(page.body, /<meta name="preference-panes-boxjs" content="https:\/\/example\.org\/api\/Module">/);
         assert.doesNotMatch(page.body, /data-preference-panes-stylesheet/);
         assert.doesNotMatch(page.body, /preference-panes-inputs|data-json|data-css/);
+
+        const queryJSON = await run("/settings/Module?json=%2Fconfigs%2FModule.json%3Fsource%3Dquery%26version%3D1");
+        assert.match(queryJSON.body, /content="https:\/\/example\.org\/configs\/Module\.json\?source=query&amp;version=1"/);
+
+        const headerJSON = await run("/settings/Module?json=/query.json", "GET", { "x-preferencepanes-json": "../header.json?source=header&version=2" });
+        assert.match(headerJSON.body, /content="https:\/\/example\.org\/header\.json\?source=header&amp;version=2"/);
+        assert.doesNotMatch(headerJSON.body, /query\.json/);
+
+        const emptyJSON = await run("/settings/Module?json=/query.json", "GET", { "X-PreferencePanes-JSON": "" });
+        assert.equal(status(emptyJSON), 500);
+        assert.deepEqual(JSON.parse(emptyJSON.body), { error: "BoxJS resource URL is required" });
+
+        const invalidJSON = await run("/settings/Module?json=data:application/json,%7B%7D");
+        assert.equal(status(invalidJSON), 500);
+        assert.deepEqual(JSON.parse(invalidJSON.body), { error: "BoxJS resource must use HTTP(S)" });
 
         const queryStyles = await run("/settings/Module?css=%2Fsettings%2Ftheme.css%3Fmode%3Dlight%26source%3Dquery");
         assert.match(queryStyles.body, /<link data-preference-panes-stylesheet rel="stylesheet" href="https:\/\/example\.org\/settings\/theme\.css\?mode=light&amp;source=query">/);

@@ -77,7 +77,7 @@ test("ModuleFrame sends GET headers, preserves response HTML and exposes only th
     });
     const html = '<!doctype html><main id="preferences"></main>';
     const fetch = t.mock.method(globalThis, "fetch", async () => new Response(html));
-    const headers = { "X-PreferencePanes-CSS": "/theme.css" };
+    const headers = { "X-PreferencePanes-JSON": "/configs/Other.json", "X-PreferencePanes-CSS": "/theme.css" };
     const frame = new ModuleFrame("/settings/Other", { headers });
     await frame.load();
     assert.equal(frame.element.srcdoc, html);

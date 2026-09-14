@@ -58,7 +58,7 @@ export default [
                 name: "page-shell",
                 async generateBundle() {
                     const html = await readFile(new URL("./src/browser/module.html", import.meta.url), "utf8");
-                    this.emitFile({ type: "asset", fileName: "index.html", source: html.replace("<!--__PREFERENCE_PANES_STYLESHEET__-->", "").replaceAll("__VERSION__", pkg.version) });
+                    this.emitFile({ type: "asset", fileName: "index.html", source: html.replace("<!--__PREFERENCE_PANES_JSON__-->", "").replace("<!--__PREFERENCE_PANES_STYLESHEET__-->", "").replaceAll("__VERSION__", pkg.version) });
                 },
             },
         ],

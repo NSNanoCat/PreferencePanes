@@ -25,8 +25,8 @@ class ModulePage {
     }
 
     /**
-     * 通过模块 API 读取 BoxJS JSON 并挂载通用前端。
-     * Read BoxJS JSON through the module API and mount the generic frontend.
+     * 读取页面声明的 BoxJS JSON 并挂载通用前端。
+     * Read the BoxJS JSON declared by the page and mount the generic frontend.
      * @returns {Promise<void>} 启动完成 / Startup completion.
      */
     async start() {
@@ -38,7 +38,8 @@ class ModulePage {
             const match = /^\/settings\/([a-zA-Z0-9_-]+)\/?$/.exec(this.#window.location.pathname);
             const module = embedded ?? match?.[1];
             if (!module) throw new TypeError("Open a concrete module URL");
-            const response = await fetch(`/api/${encodeURIComponent(module)}`, { cache: "no-store", credentials: "omit", headers: { Accept: "application/json" } });
+            const source = this.#window.document.querySelector('meta[name="preference-panes-boxjs"]')?.content || `/api/${encodeURIComponent(module)}`;
+            const response = await fetch(source, { cache: "no-store", credentials: "omit", headers: { Accept: "application/json" } });
             if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
             const boxjs = await response.json();
             normalizeBoxJs(boxjs, module);
