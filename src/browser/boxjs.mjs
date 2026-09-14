@@ -43,7 +43,7 @@ export function normalizeBoxJs(config, module) {
     const fields = [];
     for (const entry of target.entries) {
         const parts = entry.id.slice(1).split(".").slice(1);
-        const type = { boolean: "boolean", checkboxes: "array", selects: "select", text: "string", textarea: "string", number: "number" }[entry.type];
+        const type = { boolean: "boolean", checkboxes: "array", selects: "select", text: "string", textarea: "string", url: "string", number: "number" }[entry.type];
         if (!type) throw new TypeError(`Unsupported BoxJS control: ${entry.type}`);
         const field = {
             key: parts.join("."),
@@ -69,6 +69,7 @@ export function normalizeBoxJs(config, module) {
             throw new TypeError(`Invalid or overlapping BoxJS field: ${entry.id}`);
         if (field.options && (new Set(field.options.map(item => item.key)).size !== field.options.length || field.options.some(item => !scalar(item.key) || typeof item.label !== "string"))) throw new TypeError(`Invalid options: ${entry.id}`);
         if (Object.hasOwn(field, "defaultValue") && !validValue(field, field.defaultValue)) throw new TypeError(`Invalid BoxJS val: ${entry.id}`);
+        if (field.control === "url" && !Object.hasOwn(field, "defaultValue")) throw new TypeError(`URL BoxJS settings require a val: ${entry.id}`);
         fields.push(field);
     }
     if (!fields.length) throw new TypeError(`No BoxJS settings for module: ${target.module}`);
@@ -173,5 +174,6 @@ export function validValue(field, value) {
     if (field.type === "array") {
         if (!Array.isArray(value) || value.some(item => !scalar(item)) || new Set(value).size !== value.length) return false;
     } else if (typeof value !== field.type || !scalar(value)) return false;
+    if (field.control === "url" && (!/^[a-z][a-z\d+.-]*:/i.test(value) || /^(?:javascript|data|vbscript):/i.test(value))) return false;
     return !field.options || (field.type === "array" ? value : [value]).every(item => field.options.some(option => option.key === item));
 }

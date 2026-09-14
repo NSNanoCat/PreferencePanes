@@ -5,7 +5,7 @@ import { requestConfirmation } from "../src/browser/components.mjs";
 test("native notice interception suppresses the module fallback and releases its listener", t => {
     globalThis.document = { baseURI: "https://example.org/", createElement: () => Object.assign(new EventTarget(), { dataset: {} }) };
     t.after(() => {
-        delete globalThis.document;
+        globalThis.document = undefined;
     });
     const frame = new ModuleFrame("/settings/Example");
     let notice;
@@ -25,7 +25,7 @@ import { ModuleFrame } from "../src/browser/ModuleFrame.mjs";
 test("host confirmation is asynchronous and detaches with its module frame", async t => {
     globalThis.document = { baseURI: "https://example.org/", createElement: () => Object.assign(new EventTarget(), { dataset: {}, ownerDocument: { defaultView: { CustomEvent } } }) };
     t.after(() => {
-        delete globalThis.document;
+        globalThis.document = undefined;
     });
     const frame = new ModuleFrame("/settings/Example");
     frame.addEventListener("confirm", event => {
@@ -42,7 +42,7 @@ test("host confirmation is asynchronous and detaches with its module frame", asy
 test("ModuleFrame sends GET headers, preserves response HTML and exposes only the module identity", async t => {
     globalThis.document = { baseURI: "https://example.org/settings/", createElement: () => Object.assign(new EventTarget(), { dataset: {} }) };
     t.after(() => {
-        delete globalThis.document;
+        globalThis.document = undefined;
     });
     const html = '<!doctype html><main id="preferences"></main>';
     const fetch = t.mock.method(globalThis, "fetch", async () => new Response(html));
@@ -76,7 +76,7 @@ test("ModuleFrame cancels late HTML and releases navigation state subscriptions"
             }),
     };
     t.after(() => {
-        delete globalThis.document;
+        globalThis.document = undefined;
     });
     let finish;
     t.mock.method(
@@ -106,7 +106,7 @@ test("ModuleFrame cancels late HTML and releases navigation state subscriptions"
 test("ModuleFrame forwards only advertised idle actions", t => {
     globalThis.document = { baseURI: "https://example.org/", createElement: () => Object.assign(new EventTarget(), { dataset: {} }) };
     t.after(() => {
-        delete globalThis.document;
+        globalThis.document = undefined;
     });
     const frame = new ModuleFrame("/settings/Example");
     const calls = [];

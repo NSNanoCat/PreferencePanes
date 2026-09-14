@@ -1,5 +1,9 @@
 # PreferencePanes 发布流程
 
+## 1.2.1
+
+BoxJS 设置项支持 `type: "url"` 作为只读 URL Scheme 跳转入口，例如 `bilibili://main/top_category`。
+
 ## 1.2.0
 
 动态模块 HTML 支持通过 `css` 查询参数或 `X-PreferencePanes-CSS` Header 加载项目 stylesheet。Header 优先，空 Header 可禁用查询参数；`ModuleFrame` 只转发 GET Header 并原样挂载返回 HTML。
