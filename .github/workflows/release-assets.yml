@@ -12,9 +12,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: BellCubeDev/update-package-version-by-release-tag@v2
+        with: { version: "${{ github.ref_name }}", keep-v: "false", ignore-semver-check: "false" }
       - uses: actions/setup-node@v4
         with: { node-version: "24" }
       - run: npm ci --registry=https://registry.npmjs.org/ --@nsnanocat:registry=https://registry.npmjs.org/
+      - run: npx biome format --write package.json
       - run: npm run check && npm run apifox:check
       - name: Publish common API
         env:
