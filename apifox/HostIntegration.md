@@ -24,7 +24,7 @@ PreferencePanes 不提供项目主页，也不绑定客户端 SDK。宿主负责
 
 ## 模块页面
 
-`ModuleFrame` 只打开规范 `/settings/{module}` 页面并标记模块身份。调用方可用请求 Header 让 `web.js` 把 BoxJS 与项目 stylesheet 的资源地址写入返回 HTML；未提供 JSON Header 时页面默认读取同源 `/api/{module}`。页面不直接访问 `/configs/**`，除非调用方明确将该地址作为 JSON 资源输入。
+`ModuleFrame` 只打开映射到静态 `index.html` 的规范 `/settings/{module}` 页面并标记模块身份。调用方可用现有 Header 选项声明 BoxJS 与项目 stylesheet 资源；这些值经校验后写入 iframe dataset，不会作为网络 Header 发送。未提供 JSON 输入时页面默认读取同源 `/api/{module}`。页面不直接访问 `/configs/**`，除非调用方明确将该地址作为 JSON 资源输入。
 
 ```js
 const frame = new ModuleFrame(`/settings/${module}`, {
@@ -38,7 +38,7 @@ container.append(frame.element);
 await frame.load();
 ```
 
-`ModuleFrame` 的选项类型是 `{ signal?: AbortSignal; headers?: HeadersInit }`。它只发送 GET，将返回 HTML 原样交给 `srcdoc`，且不把 Header 或资源地址复制到 iframe dataset。`frame.state` 提供 `title`、`module`、`busy`、`canGoBack` 和 `actions`。宿主从状态生成导航，不访问 iframe 内部 DOM。
+`ModuleFrame` 的选项类型是 `{ signal?: AbortSignal; headers?: HeadersInit }`。它只发送不带自定义 Header 的 GET，将静态 HTML 原样交给 `srcdoc`，并把合法 HTTP(S) BoxJS/CSS 地址写入 iframe dataset。`frame.state` 提供 `title`、`module`、`busy`、`canGoBack` 和 `actions`。宿主从状态生成导航，不访问 iframe 内部 DOM。
 
 ## 导航与原生 WebView
 

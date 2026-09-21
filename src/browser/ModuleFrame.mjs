@@ -1,6 +1,6 @@
 /**
- * 模块文档容器：发送 GET 请求并将原始 HTML 交给 iframe，只在元素上标记模块身份。
- * Module document container: send a GET request, preserve HTML verbatim and mark only the module identity on the iframe.
+ * 模块文档容器：获取静态 HTML，并通过 iframe 数据属性传递页面资源输入。
+ * Module document container: fetch static HTML and pass page resource inputs through iframe data attributes.
  */
 export class ModuleFrame extends EventTarget {
     #url;
@@ -30,11 +30,27 @@ export class ModuleFrame extends EventTarget {
         this.#url = new URL(url, document.baseURI);
         const match = /^\/settings\/([a-zA-Z0-9_-]+)\/?$/.exec(this.#url.pathname);
         if (!match) throw new TypeError("Open a concrete module URL");
-        this.#options = { signal: options.signal, headers: options.headers };
+        this.#options = { signal: options.signal };
         this.element = document.createElement("iframe");
         this.element.title = `${match[1]} 设置`;
         this.element.dataset.preferencePanes = "true";
         this.element.dataset.preferencePanesModule = match[1];
+        this.element.dataset.preferencePanesBase = this.#url.href;
+        const headers = new Headers(options.headers);
+        for (const [header, property, kind] of [
+            ["X-PreferencePanes-JSON", "preferencePanesJson", "BoxJS"],
+            ["X-PreferencePanes-CSS", "preferencePanesStylesheet", "CSS"],
+        ]) {
+            if (!headers.has(header)) continue;
+            const source = headers.get(header)?.trim();
+            if (!source) {
+                if (kind === "BoxJS") throw new TypeError("BoxJS resource URL is required");
+                continue;
+            }
+            const resource = new URL(source, this.#url);
+            if (!["http:", "https:"].includes(resource.protocol)) throw new TypeError(`${kind} resource must use HTTP(S)`);
+            this.element.dataset[property] = resource.href;
+        }
         this.element.addEventListener("preferencepanes:change", this.#change);
         this.element.addEventListener("preferencepanes:confirm", this.#confirmation);
         this.element.addEventListener("preferencepanes:notice", this.#notice);
@@ -60,7 +76,7 @@ export class ModuleFrame extends EventTarget {
         if (this.#options.signal?.aborted) this.destroy();
         const timer = setTimeout(() => this.#controller.abort(), 10000);
         try {
-            const response = await fetch(this.#url, { method: "GET", cache: "no-store", credentials: "omit", headers: this.#options.headers, signal: this.#controller.signal });
+            const response = await fetch(this.#url, { method: "GET", cache: "no-store", credentials: "omit", signal: this.#controller.signal });
             if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
             const html = await response.text();
             this.#controller.signal.throwIfAborted();

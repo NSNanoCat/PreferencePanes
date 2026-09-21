@@ -4,35 +4,20 @@ import { rollup } from "rollup";
 import pkg from "./package.json" with { type: "json" };
 
 /**
- * 页面资源由包自身编译，代理和静态站点使用同一套产物。
- * Compile page resources inside the package for both proxy and static hosting.
+ * 页面样式由包自身编译，静态页面与浏览器包使用同一套产物。
+ * Compile page styles inside the package for both static pages and the browser package.
  * @returns {import("rollup").Plugin} 内部资源插件 / Internal resource plugin.
  */
 function resources() {
     return {
         name: "preference-resources",
         resolveId(id) {
-            if (id === "#styles" || id === "#assets") return id;
+            if (id === "#styles") return id;
         },
         async load(id) {
             switch (id) {
                 case "#styles":
                     return `export default ${JSON.stringify(await readFile(new URL("./src/browser/panel.css", import.meta.url), "utf8"))};`;
-                case "#assets": {
-                    const bundles = await Promise.all(
-                        [
-                            ["index", "src/browser/index.mjs"],
-                            ["navigation", "src/browser/Navigation.mjs"],
-                        ].map(async ([name, input]) => [name, await rollup({ input, plugins: [nodeResolve({ browser: true }), resources()] })]),
-                    );
-                    try {
-                        const output = Object.fromEntries(await Promise.all(bundles.map(async ([name, bundle]) => [name, (await bundle.generate({ format: "es" })).output[0].code])));
-                        const html = (await readFile(new URL("./src/browser/module.html", import.meta.url), "utf8")).replaceAll("__VERSION__", pkg.version);
-                        return `export default ${JSON.stringify({ page: { type: "text/html", body: html }, "/settings/assets/index.mjs": { type: "text/javascript", body: output.index }, "/settings/assets/navigation.mjs": { type: "text/javascript", body: output.navigation } })};`;
-                    } finally {
-                        await Promise.all(bundles.map(([, bundle]) => bundle.close()));
-                    }
-                }
                 default:
                     return null;
             }
@@ -41,15 +26,14 @@ function resources() {
 }
 
 /**
- * 前端不包含代理 polyfill；代理资源与脚本由包统一打包。
- * Keep proxy polyfills out of the browser and bundle all proxy resources inside the package.
+ * 前端不包含代理 polyfill；页面资源分别输出为可直接映射的静态文件。
+ * Keep proxy polyfills out of the browser and emit page resources as directly mapped static files.
  * @type {import("rollup").RollupOptions[]}
  */
 export default [
     { input: "src/browser/mount.mjs", output: { file: "dist/preference-panes.mjs", format: "es" } },
     { input: "src/browser/Navigation.mjs", output: { file: "dist/module/navigation.mjs", format: "es" } },
     { input: "src/api.mjs", output: { file: "dist/api.js", format: "iife" } },
-    { input: "src/web.mjs", output: { file: "dist/web.js", format: "iife" } },
     {
         input: "src/browser/index.mjs",
         output: { file: "dist/module/index.mjs", format: "es" },

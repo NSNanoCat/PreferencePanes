@@ -31,9 +31,10 @@ test("preview testbench provides an all-control example and still accepts import
         assert.equal((await fetch(`${base}api/Module`)).status, 404);
         const builtIn = await fetch(`${base}example`, { method: "POST", body: JSON.stringify({ cssMode: "builtin" }) });
         assert.equal(builtIn.status, 200);
-        assert.deepEqual(await builtIn.json(), { url: "/settings/Module", module: "Module" });
-        const modulePage = await (await fetch(`${base}settings/Module`)).text();
-        assert.match(modulePage, new RegExp(`<meta name="preference-panes-boxjs" content="${base.replaceAll("/", "\\/")}preview\\/boxjs\\.json">`));
+        const builtInResult = await builtIn.json();
+        assert.deepEqual(builtInResult, { url: "/settings/Module?json=%2Fpreview%2Fboxjs.json", module: "Module" });
+        const modulePage = await (await fetch(new URL(builtInResult.url, base))).text();
+        assert.match(modulePage, /settings\/assets\/index\.mjs/);
         assert.doesNotMatch(modulePage, /data-preference-panes-stylesheet/);
         const example = await (await fetch(`${base}preview/boxjs.json`)).json();
         assert.deepEqual(
@@ -57,14 +58,13 @@ test("preview testbench provides an all-control example and still accepts import
         const boxjs = [{ id: "@Root.Module.flag", name: "Flag", type: "boolean", val: true }];
         const sampleStyle = await fetch(`${base}example`, { method: "POST", body: JSON.stringify({ cssMode: "example" }) });
         assert.equal(sampleStyle.status, 200);
-        const styledPage = await (await fetch(`${base}settings/Module`)).text();
-        assert.match(styledPage, new RegExp(`data-preference-panes-stylesheet rel="stylesheet" href="${base.replaceAll("/", "\\/")}preview\\/style\\.css"`));
+        assert.deepEqual(await sampleStyle.json(), { url: "/settings/Module?json=%2Fpreview%2Fboxjs.json&css=%2Fpreview%2Fstyle.css", module: "Module" });
         assert.match(await (await fetch(`${base}preview/style.css`)).text(), /--pp-accent: #16866a/);
 
         const importedCSS = ".pp-title { color: rgb(180 20 40); }";
         const result = await fetch(`${base}preview`, { method: "POST", body: JSON.stringify({ boxjs, cssMode: "import", css: importedCSS }) });
         assert.equal(result.status, 200);
-        assert.deepEqual(await result.json(), { url: "/settings/Module", module: "Module" });
+        assert.deepEqual(await result.json(), { url: "/settings/Module?json=%2Fpreview%2Fboxjs.json&css=%2Fpreview%2Fstyle.css", module: "Module" });
         const configuration = await fetch(`${base}preview/boxjs.json`);
         assert.equal(configuration.headers.get("X-PreferencePanes-Version"), "preview");
         assert.deepEqual(await configuration.json(), boxjs);

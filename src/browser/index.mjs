@@ -38,7 +38,22 @@ class ModulePage {
             const match = /^\/settings\/([a-zA-Z0-9_-]+)\/?$/.exec(this.#window.location.pathname);
             const module = embedded ?? match?.[1];
             if (!module) throw new TypeError("Open a concrete module URL");
-            const source = this.#window.document.querySelector('meta[name="preference-panes-boxjs"]')?.content || `/api/${encodeURIComponent(module)}`;
+            const frame = this.#window.frameElement?.dataset;
+            const base = frame?.preferencePanesBase ?? this.#window.location.href;
+            this.#window.document.querySelector("link[data-preference-panes-stylesheet]")?.remove();
+            const stylesheetSource = frame?.preferencePanesStylesheet ?? new URLSearchParams(this.#window.location.search).get("css")?.trim();
+            if (stylesheetSource) {
+                const stylesheet = new URL(stylesheetSource, base);
+                if (!["http:", "https:"].includes(stylesheet.protocol)) throw new TypeError("CSS resource must use HTTP(S)");
+                const link = this.#window.document.createElement("link");
+                link.dataset.preferencePanesStylesheet = "true";
+                link.rel = "stylesheet";
+                link.href = stylesheet.href;
+                this.#window.document.head.append(link);
+            }
+            const jsonSource = frame?.preferencePanesJson ?? new URLSearchParams(this.#window.location.search).get("json")?.trim();
+            const source = new URL(jsonSource || `/api/${encodeURIComponent(module)}`, base);
+            if (!["http:", "https:"].includes(source.protocol)) throw new TypeError("BoxJS resource must use HTTP(S)");
             const response = await fetch(source, { cache: "no-store", credentials: "omit", headers: { Accept: "application/json" } });
             if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
             const boxjs = await response.json();

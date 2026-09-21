@@ -2,7 +2,7 @@
 
 PreferencePanes 提供一个由 BoxJS JSON 驱动的通用设置前端，以及一个独立的代理持久化 API。业务模块直接将自己的 BoxJS JSON Mock 到 `/api/{module}`；通用 `/settings/**` 前端和固定存储 API 分别只需要安装一次。
 
-在 Biliverse 中，Enhanced 是唯一安装 `web.js` 的模块。Global、Redirect、ADBlock 不携带 `web.js`，它们的设置页仍由同一份通用前端读取各自 BoxJS 后渲染。
+在 Biliverse 中，Enhanced 统一映射 PreferencePanes 发布的静态模块 HTML、页面入口和导航组件。Global、Redirect、ADBlock 不重复携带页面资源，它们的设置页仍由同一份通用前端读取各自 BoxJS 后渲染。
 
 ## 浏览器入口
 
@@ -29,17 +29,17 @@ preferences.destroy();
 
 前端支持 BoxJS 字段数组、单个 app 和 apps 订阅，并要求输入恰好包含一个模块。模块名、存储根和 Settings 路径都从 `@Root.Module.Settings.key` 字段 ID 推导，不从 app 名称或调用参数补充。
 
-默认样式随包内置。动态模块 HTML 接受 `json`、`css` 查询参数及优先级更高的 `X-PreferencePanes-JSON`、`X-PreferencePanes-CSS` Header，两个输入值都是资源 URL。未指定 JSON 时默认读取 `/api/{module}`，未指定 CSS 时只使用默认样式。项目 stylesheet 位于默认样式之后，可覆盖 `pp-*` 变量和组件规则。页面脚本不识别客户端 User-Agent，也不加载客户端 SDK。
+默认样式随包内置。静态模块页接受 `json`、`css` 查询参数；嵌入 `ModuleFrame` 时也可通过 `X-PreferencePanes-JSON`、`X-PreferencePanes-CSS` 选项传入两个资源 URL。未指定 JSON 时默认读取 `/api/{module}`，未指定 CSS 时只使用默认样式。项目 stylesheet 位于默认样式之后，可覆盖 `pp-*` 变量和组件规则。页面脚本不识别客户端 User-Agent，也不加载客户端 SDK。
 
 ## 页面与 API
 
-`web.js` 只返回三类通用资源：
+Release 分别提供三项可直接映射的页面资源：
 
 - `GET /settings/{module}`
 - `GET /settings/assets/index.mjs`
 - `GET /settings/assets/navigation.mjs`
 
-模块页面从 URL 或 `ModuleFrame` 的模块标记取得模块名，读取 HTML 中声明的 BoxJS 资源，然后调用 `mount(boxjs)`。`web.js` 在生成 HTML 时解析 BoxJS 与可选 CSS 地址，分别写入 `<meta name="preference-panes-boxjs">` 和 `<link data-preference-panes-stylesheet>`；两个地址都必须解析为 HTTP(S)。静态页面没有资源声明时回退同源 `/api/{module}`，页面不直接访问 `/configs/**`。
+模块 HTML、页面入口和导航组件分别对应 Release 的 `index.html`、`index.mjs`、`navigation.mjs`，不得再打包进代理响应脚本。模块页面从 URL 或 `ModuleFrame` 的模块标记取得模块名，读取 BoxJS 资源后调用 `mount(boxjs)`。BoxJS 与可选 CSS 地址必须解析为 HTTP(S)；未声明 BoxJS 时回退同源 `/api/{module}`，页面不直接访问 `/configs/**`。
 
 业务模块模板直接处理：
 
@@ -85,7 +85,7 @@ container.append(frame.element);
 await frame.load();
 ```
 
-`ModuleFrame` 接受 `{ signal?: AbortSignal; headers?: HeadersInit }`，使用这些选项发送一次 GET，并将返回 HTML 原样设置为 `iframe.srcdoc`。iframe dataset 只保存模块身份，不保存 CSS 地址。宿主通过 `change`、`confirm`、`notice`、`open-url` 事件同步标题、操作菜单、确认框、提示和链接跳转，不读取或改写 iframe 内部 DOM。项目主页、Bilibili JSBridge、原生导航和视觉样式仍由宿主负责。
+`ModuleFrame` 接受 `{ signal?: AbortSignal; headers?: HeadersInit }`。`X-PreferencePanes-JSON` 与 `X-PreferencePanes-CSS` 只用于校验并写入 iframe 数据属性，不作为网络请求 Header；静态 HTML 仍以普通 GET 获取并原样设置为 `iframe.srcdoc`。宿主通过 `change`、`confirm`、`notice`、`open-url` 事件同步标题、操作菜单、确认框、提示和链接跳转，不读取或改写 iframe 内部 DOM。项目主页、Bilibili JSBridge、原生导航和视觉样式仍由宿主负责。
 
 ## 构建与验证
 
@@ -96,7 +96,7 @@ npm run apifox:check
 npm pack --dry-run
 ```
 
-构建生成 `dist/api.js`、`dist/web.js`、`dist/preference-panes.mjs` 和 `dist/module/` 通用页面资源。包不再提供按模块生成 HTML/CSS 的公开 `build()`。
+构建生成 `dist/api.js`、`dist/preference-panes.mjs` 和 `dist/module/index.html`、`index.mjs`、`navigation.mjs`。包不提供 `web.js`，也不提供按模块生成 HTML/CSS 的公开 `build()`。
 
 ### 内置演示
 
@@ -104,7 +104,7 @@ npm pack --dry-run
 npm run preview
 ```
 
-预览入口会自动加载 `examples/Module.boxjs.json`，覆盖 `boolean`、`selects`、`checkboxes`、`text`、`textarea`、`number` 和 `url` 全部受支持控件。顶端 CSS 选择器默认使用包内置 CSS，也可切换 `examples/theme.css` 或导入本地 CSS 文件。页面通过正式构建的 `web.js` 以 `X-PreferencePanes-JSON` 和可选 `X-PreferencePanes-CSS` Header 注入资源地址，并使用固定存储 API 与独立内存存储，不维护演示专用渲染器。
+预览入口会自动加载 `examples/Module.boxjs.json`，覆盖 `boolean`、`selects`、`checkboxes`、`text`、`textarea`、`number` 和 `url` 全部受支持控件。顶端 CSS 选择器默认使用包内置 CSS，也可切换 `examples/theme.css` 或导入本地 CSS 文件。预览服务器直接提供正式构建的静态模块页和 JS 文件，通过 `json`、`css` 查询参数传入资源地址，并使用固定存储 API 与独立内存存储，不维护演示专用渲染器。
 
 内置存储会提供已移除选项和格式错误值，用于直接核对字段级黄色警告及非阻断加载；URL 字段还会携带同路径旧存储值，验证只读链接始终使用 BoxJS `val`。测试台同时保留上传其它 BoxJS JSON 并生成隔离预览的能力。
 

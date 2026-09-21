@@ -12,7 +12,7 @@ test("browser renderer has no client-specific SDK or stylesheet dependency", asy
 });
 
 test("built renderer contains no client-specific stylesheet", async () => {
-    for (const path of ["../dist/preference-panes.mjs", "../dist/module/index.mjs", "../dist/api.js", "../dist/web.js"]) {
+    for (const path of ["../dist/preference-panes.mjs", "../dist/module/index.mjs", "../dist/module/navigation.mjs", "../dist/api.js"]) {
         const source = await readFile(new URL(path, import.meta.url), "utf8");
         assert.doesNotMatch(source, /bilibili|bili_dark|hdslb|b-style|js-bridge/i, path);
         assert.doesNotMatch(source, /s1\.hdslb\.com/i, path);
@@ -67,14 +67,17 @@ test("stored value compatibility issues render as field-level warnings", async (
 
 test("proxy and browser sources keep storage, validation and navigation responsibilities separate", async () => {
     const api = await readFile(new URL("../src/api.mjs", import.meta.url), "utf8");
-    const web = await readFile(new URL("../src/web.mjs", import.meta.url), "utf8");
+    const frame = await readFile(new URL("../src/browser/ModuleFrame.mjs", import.meta.url), "utf8");
+    const page = await readFile(new URL("../src/browser/index.mjs", import.meta.url), "utf8");
     const navigation = await readFile(new URL("../src/browser/Navigation.mjs", import.meta.url), "utf8");
     assert.doesNotMatch(api, /normalizeBoxJs|normalizeStoredValue|validValue|mountPanel|document\.|module\.html|#assets/);
-    assert.doesNotMatch(web, /Storage|@nsnanocat\/util"|transport|fetch\s*\(/);
+    assert.doesNotMatch(frame, /Storage|@nsnanocat\/util"|transport/);
     assert.doesNotMatch(navigation, /BoxJS|Storage|api\/(?:get|set|delete)/);
     assert.doesNotMatch(api, /X-PreferencePanes-JSON|configURL/);
-    assert.match(web, /x-preferencepanes-json/i);
-    assert.match(web, /x-preferencepanes-css/i);
+    assert.match(frame, /x-preferencepanes-json/i);
+    assert.match(frame, /x-preferencepanes-css/i);
+    assert.match(page, /preferencePanesJson/);
+    assert.match(page, /preferencePanesStylesheet/);
 });
 
 test("browser lifecycle keeps page and view classes internal", async () => {
@@ -84,7 +87,8 @@ test("browser lifecycle keeps page and view classes internal", async () => {
     const client = await readFile(new URL("../src/browser/client.mjs", import.meta.url), "utf8");
     const browser = await import("../dist/preference-panes.mjs");
     assert.match(page, /class ModulePage/);
-    assert.match(page, /meta\[name="preference-panes-boxjs"\]/);
+    assert.match(page, /preferencePanesJson/);
+    assert.match(page, /preferencePanesStylesheet/);
     assert.match(page, /`\/api\/\$\{encodeURIComponent\(module\)\}`/);
     assert.match(page, /normalizeBoxJs\(boxjs, module\)/);
     assert.match(page, /mount\(boxjs\)/);

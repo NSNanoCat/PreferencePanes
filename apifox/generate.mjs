@@ -30,8 +30,8 @@ const apis = declarations.map(entry => {
           : entry.configuration
             ? "网页通过该 API 读取原始 BoxJS；业务模块模板直接 Mock 同版 JSON 与版本头。"
             : entry.asset
-              ? "该资源由 PreferencePanes web.js 返回；web.js 不访问网络或持久化。"
-              : "通用模块页面由 web.js 返回，可通过 URL 或 Header 声明 BoxJS 与项目 stylesheet 资源；Web 侧完成规范化、校验和渲染。";
+              ? "该资源由 PreferencePanes Release 独立发布，消费方按路径直接映射。"
+              : "通用模块页面直接映射 Release 的静态 index.html，可通过查询参数或 ModuleFrame 输入声明 BoxJS 与项目 stylesheet 资源；Web 侧完成规范化、校验和渲染。";
     return {
         id: entry.id,
         name: entry.name,
@@ -49,7 +49,7 @@ const apis = declarations.map(entry => {
         parameters: {
             path: entry.path.includes("{module}") ? [parameter("module", "BoxJS 的模块段，动态填入", true)] : [],
             query: entry.page ? [parameter("json", "可选 BoxJS JSON 地址；未指定时使用 /api/{module}，相对地址按模块页面 URL 解析，仅支持 HTTP(S)"), parameter("css", "可选 stylesheet 地址；相对地址按模块页面 URL 解析，仅支持 HTTP(S)")] : [],
-            header: entry.page ? [parameter("X-PreferencePanes-JSON", "可选 BoxJS JSON 地址；优先于 json 查询参数"), parameter("X-PreferencePanes-CSS", "可选 stylesheet 地址；优先于 css 查询参数，空值可禁用查询参数")] : [],
+            header: [],
             cookie: [],
         },
         requestBody: entry.store

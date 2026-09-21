@@ -70,7 +70,7 @@ test("host confirmation is asynchronous and detaches with its module frame", asy
     assert.equal(await requestConfirmation(host, "Standalone?"), true);
 });
 
-test("ModuleFrame sends GET headers, preserves response HTML and exposes only the module identity", async t => {
+test("ModuleFrame fetches static HTML and exposes normalized page inputs through the iframe", async t => {
     globalThis.document = { baseURI: "https://example.org/settings/", createElement: () => Object.assign(new EventTarget(), { dataset: {} }) };
     t.after(() => {
         globalThis.document = undefined;
@@ -83,11 +83,22 @@ test("ModuleFrame sends GET headers, preserves response HTML and exposes only th
     assert.equal(frame.element.srcdoc, html);
     assert.equal(frame.element.dataset.preferencePanes, "true");
     assert.equal(frame.element.dataset.preferencePanesModule, "Other");
-    assert.equal(frame.element.dataset.preferencePanesCss, undefined);
+    assert.equal(frame.element.dataset.preferencePanesBase, "https://example.org/settings/Other");
+    assert.equal(frame.element.dataset.preferencePanesJson, "https://example.org/configs/Other.json");
+    assert.equal(frame.element.dataset.preferencePanesStylesheet, "https://example.org/theme.css");
     assert.equal(fetch.mock.calls[0].arguments[0].href, "https://example.org/settings/Other");
     assert.equal(fetch.mock.calls[0].arguments[1].method, "GET");
-    assert.equal(fetch.mock.calls[0].arguments[1].headers, headers);
+    assert.equal(fetch.mock.calls[0].arguments[1].headers, undefined);
     frame.destroy();
+});
+
+test("ModuleFrame rejects non-HTTP page resource inputs", t => {
+    globalThis.document = { baseURI: "https://example.org/", createElement: () => Object.assign(new EventTarget(), { dataset: {} }) };
+    t.after(() => {
+        globalThis.document = undefined;
+    });
+    assert.throws(() => new ModuleFrame("/settings/Example", { headers: { "X-PreferencePanes-JSON": "data:application/json,%7B%7D" } }), /BoxJS resource must use HTTP\(S\)/);
+    assert.throws(() => new ModuleFrame("/settings/Example", { headers: { "X-PreferencePanes-CSS": "file:///theme.css" } }), /CSS resource must use HTTP\(S\)/);
 });
 
 test("ModuleFrame cancels late HTML and releases navigation state subscriptions", async t => {
