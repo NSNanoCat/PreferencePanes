@@ -71,8 +71,11 @@ test("host confirmation is asynchronous and detaches with its module frame", asy
 });
 
 test("ModuleFrame fetches static HTML and exposes normalized page inputs through the iframe", async t => {
+    const throwIfAborted = AbortSignal.prototype.throwIfAborted;
+    AbortSignal.prototype.throwIfAborted = undefined;
     globalThis.document = { baseURI: "https://example.org/settings/", createElement: () => Object.assign(new EventTarget(), { dataset: {} }) };
     t.after(() => {
+        AbortSignal.prototype.throwIfAborted = throwIfAborted;
         globalThis.document = undefined;
     });
     const html = '<!doctype html><main id="preferences"></main>';
@@ -102,6 +105,8 @@ test("ModuleFrame rejects non-HTTP page resource inputs", t => {
 });
 
 test("ModuleFrame cancels late HTML and releases navigation state subscriptions", async t => {
+    const throwIfAborted = AbortSignal.prototype.throwIfAborted;
+    AbortSignal.prototype.throwIfAborted = undefined;
     let back = 0;
     globalThis.document = {
         baseURI: "https://example.org/",
@@ -118,6 +123,7 @@ test("ModuleFrame cancels late HTML and releases navigation state subscriptions"
             }),
     };
     t.after(() => {
+        AbortSignal.prototype.throwIfAborted = throwIfAborted;
         globalThis.document = undefined;
     });
     let finish;

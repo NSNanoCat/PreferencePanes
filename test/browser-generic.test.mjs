@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const browserSources = ["../src/browser/index.mjs", "../src/browser/components.mjs", "../src/browser/panel.css", "../src/browser/panel.mjs", "../src/browser/styles.mjs"];
+const browserSources = ["../src/browser/index.mjs", "../src/browser/components.mjs", "../src/browser/styles.css", "../src/browser/panel.mjs", "../src/browser/styles.mjs"];
 
 test("browser renderer has no client-specific SDK or stylesheet dependency", async () => {
     for (const path of browserSources) {
@@ -26,7 +26,7 @@ test("default styles are inserted before the optional project stylesheet", async
 });
 
 test("module renderer omits the search toolbar row", async () => {
-    for (const path of ["../src/browser/panel.mjs", "../src/browser/panel.css"]) {
+    for (const path of ["../src/browser/panel.mjs", "../src/browser/styles.css"]) {
         const source = await readFile(new URL(path, import.meta.url), "utf8");
         assert.doesNotMatch(source, /pp-toolbar|pp-search|pp-module-logo|搜索设置项/, path);
     }
@@ -34,7 +34,7 @@ test("module renderer omits the search toolbar row", async () => {
 
 test("embedded modules delegate navigation chrome instead of hiding a duplicate header", async () => {
     const panel = await readFile(new URL("../src/browser/panel.mjs", import.meta.url), "utf8");
-    const styles = await readFile(new URL("../src/browser/panel.css", import.meta.url), "utf8");
+    const styles = await readFile(new URL("../src/browser/styles.css", import.meta.url), "utf8");
     assert.match(panel, /const frame = window\.frameElement\?\.dataset\.preferencePanes/);
     assert.match(panel, /if \(frame\) shell\.append\(viewport\);/);
     assert.doesNotMatch(panel + styles, /preferencePanesEmbedded|data-preference-panes-embedded/);
@@ -44,7 +44,7 @@ test("loading and retry states share the centered status component", async () =>
     const components = await readFile(new URL("../src/browser/components.mjs", import.meta.url), "utf8");
     const panel = await readFile(new URL("../src/browser/panel.mjs", import.meta.url), "utf8");
     const app = await readFile(new URL("../src/browser/index.mjs", import.meta.url), "utf8");
-    const styles = await readFile(new URL("../src/browser/panel.css", import.meta.url), "utf8");
+    const styles = await readFile(new URL("../src/browser/styles.css", import.meta.url), "utf8");
     assert.match(components, /export function statusView/);
     assert.match(panel, /statusView\("读取设置…"\)/);
     assert.match(app, /statusView\("读取设置…"\)/);
@@ -57,7 +57,7 @@ test("loading and retry states share the centered status component", async () =>
 
 test("stored value compatibility issues render as field-level warnings", async () => {
     const panel = await readFile(new URL("../src/browser/panel.mjs", import.meta.url), "utf8");
-    const styles = await readFile(new URL("../src/browser/panel.css", import.meta.url), "utf8");
+    const styles = await readFile(new URL("../src/browser/styles.css", import.meta.url), "utf8");
     assert.match(panel, /当前配置未定义值：/);
     assert.match(panel, /当前存储值格式不受支持：/);
     assert.match(panel, /client\.snapshot\(\)\.warnings\[field\.key\]/);

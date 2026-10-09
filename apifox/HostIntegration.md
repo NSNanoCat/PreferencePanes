@@ -1,6 +1,6 @@
 # 调用方集成：模块容器与页面导航
 
-PreferencePanes 不提供项目主页，也不绑定客户端 SDK。宿主负责模块列表、主题、原生导航、确认、提示、项目 stylesheet 与客户端 Bridge；通用设置页仍只把 BoxJS JSON 交给 `mount(boxjs)`。
+PreferencePanes 提供内置程序与默认 CSS 的 `home.html` 首页模板，不绑定客户端 SDK。HTML 原样复用，固定读取相对路径 `./home.json`，通过 HEAD 探测可选 `./theme.css` 和 `./bridge.mjs`；通用设置页仍只把 BoxJS JSON 交给 `mount(boxjs)`。
 
 ## 项目主页
 
@@ -55,4 +55,6 @@ nativeMoreButton.onclick = () => menu.open();
 - 保存成功只更新当前页面快照；重新进入模块时重新读取 BoxJS 和 Settings。
 - 通用前端与固定存储 API 规则由一个宿主模块分别提供；业务模块只安装自己的 `/api/{module}` BoxJS Mock。
 
-客户端 Bridge 属于项目页面。项目 HTML 引入官方 SDK 后，由自己的页面脚本直接调用，再将 `ModuleFrame` 事件映射到原生界面。不要把具体客户端的 Bridge、User-Agent、主题值或原生菜单协议加入 PreferencePanes。
+客户端 Bridge 属于项目页面，固定提供在 `./bridge.mjs`。可选 CSS 与 Bridge 的 HEAD 返回 404 时使用内置功能，返回 200 时才加载；其它状态、网络、加载、语法或初始化失败均显示错误。缺少 Bridge 时不加载 SDK，也不按 User-Agent 自动启用原生接入。Bridge 默认导出异步工厂，接收 `{menu, back}` 并返回 `{update, confirm, notice, openURL, destroy}`；类型从既有 `/browser` 导出。初始化 JSON、CSS、Bridge 后才创建首页与导航。工厂自行加载官方 SDK，不把客户端 Bridge、User-Agent、主题值或原生菜单协议加入 PreferencePanes。JSON 结构和两种章节布局见 README。构建信息只追加到生成 JSON 的 `footer`，不改写共用 HTML。
+
+首页链接可通过 JSON `target` 指定 `internal`、`_self` 或 `_blank`。内部 HTTP(S) 页面由通用导航嵌入，保留宿主标题栏与返回；其余方式调用 `openURL(url, target)`。显式新页请求失败时应显示错误并保留原页。模块设置项仍调用原有单参数 `openURL(url)`，不改变表单、存储或业务请求协议。

@@ -79,7 +79,7 @@ export class ModuleFrame extends EventTarget {
             const response = await fetch(this.#url, { method: "GET", cache: "no-store", credentials: "omit", signal: this.#controller.signal });
             if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
             const html = await response.text();
-            this.#controller.signal.throwIfAborted();
+            if (this.#controller.signal.aborted) throw new DOMException("The operation was aborted", "AbortError");
             this.element.srcdoc = html;
         } finally {
             clearTimeout(timer);

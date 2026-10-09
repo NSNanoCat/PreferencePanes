@@ -123,6 +123,10 @@ export interface SettingsResponse {
  * Fields, storage root and optional display metadata belonging to one module.
  */
 export interface ModuleDefinition {
+    /** 页面重置的完整设置路径，默认删除当前模块数据 / Complete setting paths reset by the page; defaults to deleting this module's data. */
+    resetPaths?: string[];
+    /** 同一存储根中的完整缓存路径，默认当前模块 Caches / Complete cache path in the same storage root, defaulting to this module's Caches. */
+    cachePath?: string;
     /**
      * 字段 ID 的模块段，不能由 app 名称推断
      * Module segment from field IDs, never inferred from app names.
@@ -246,6 +250,10 @@ export interface BoxJSSetting {
  * A BoxJS application.
  */
 export interface BoxJSApp extends BoxJSMetadata {
+    /** 共享模块存储时，限定本页面可重置的设置路径 / Limit reset paths when multiple pages share module storage. */
+    resetPaths?: string[];
+    /** 可选共享缓存路径，例如 @Root.Composite.Caches / Optional shared cache path, such as @Root.Composite.Caches. */
+    cachePath?: string;
     /**
      * 应用设置
      * Application settings.

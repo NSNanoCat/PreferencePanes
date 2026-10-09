@@ -33,13 +33,14 @@ preferences.destroy();
 
 ## 页面与 API
 
-Release 分别提供三项可直接映射的页面资源：
+Release 分别提供四项可直接映射的页面资源：
 
 - `GET /settings/{module}`
 - `GET /settings/assets/index.mjs`
 - `GET /settings/assets/navigation.mjs`
+- `GET /settings/`
 
-模块 HTML、页面入口和导航组件分别对应 Release 的 `index.html`、`index.mjs`、`navigation.mjs`，不得再打包进代理响应脚本。模块页面从 URL 或 `ModuleFrame` 的模块标记取得模块名，读取 BoxJS 资源后调用 `mount(boxjs)`。BoxJS 与可选 CSS 地址必须解析为 HTTP(S)；未声明 BoxJS 时回退同源 `/api/{module}`，页面不直接访问 `/configs/**`。
+模块 HTML、页面入口和导航组件分别对应 Release 的 `index.html`、`index.mjs`、`navigation.mjs`，不得打包进代理响应脚本。首页模板 `home.html` 将通用程序与默认 CSS 内联，网站原样复制或通过 Mock 映射。模块页面从 URL 或 `ModuleFrame` 的模块标记取得模块名，读取 BoxJS 资源后调用 `mount(boxjs)`。BoxJS 与可选 CSS 地址必须解析为 HTTP(S)；未声明 BoxJS 时回退同源 `/api/{module}`，页面不直接访问 `/configs/**`。
 
 业务模块模板直接处理：
 
@@ -66,6 +67,62 @@ await fetch("/api/set", {
 
 设置项支持 `type: "url"` 作为只读跳转入口。它的 `val` 必须是带 scheme 的地址，例如 `bilibili://main/top_category`；面板将其渲染为可点击链接，不会发起存储写入。嵌入 `ModuleFrame` 时，宿主可拦截 `open-url` 事件（`detail.url`）并打开链接；未拦截或独立网页中保留链接的默认导航。
 
+## 固定路径首页与可选 Bridge
+
+Release 的 `home.html` 内置首页程序、导航、默认 CSS 和网页宿主能力。同一文件原样复制为网站 `/settings/index.html`，或通过插件 Mock 映射到 `/settings/`；不替换 HTML 属性、标题或构建信息。
+
+| 相对路径 | 内容 | 行为 |
+| --- | --- | --- |
+| `./home.json` | 品牌、章节、图标和链接 | 必需，读取并校验 |
+| `./theme.css` | 品牌样式 | 可选，HEAD 返回 404 时使用默认样式 |
+| `./bridge.mjs` | 已有客户端原生接入 | 可选，HEAD 返回 404 时使用网页功能 |
+
+资源相对于首页 URL 解析。可选资源只有 HEAD 返回 200 才加载；其它状态、网络、加载、语法或初始化错误会显示错误。未提供 Bridge 时使用网页标题栏、返回、ActionMenu、Toast、确认框、系统主题与键盘避让，不导入适配模块、不加载 SDK，也不通过 User-Agent 自动启用 Bridge。
+
+首页 JSON 示例：
+
+```json
+{
+  "title": "Example",
+  "logo": "assets/logo.png",
+  "sections": [
+    {"title": "插件", "items": [
+      {"name": "Universal", "icon": {"src": "assets/Universal.png"}, "module": "Universal"},
+      {"name": "翻译器 API", "icon": {"text": "🔑"}, "module": "API_Translate", "pageModule": "API"}
+    ]},
+    {"title": "支持与帮助", "layout": "list", "items": [
+      {"name": "官方网站", "icon": {"text": "🏠"}, "href": "../", "target": "internal"},
+      {"name": "GitHub 组织", "icon": {"text": "🐙"}, "href": "https://github.com/Example", "target": "_blank"}
+    ]}
+  ],
+  "footer": ["设置保存在当前代理工具中。"]
+}
+```
+
+`title`、`sections` 必需，`logo`、`footer` 可选。章节包含 `title`、`items` 和可选 `layout`；默认 `grid` 上图标、下文字，小于 500px、500–699px、700px 以上分别为四、六、八列；`list` 纵向排列左图标、右文字与箭头。入口包含 `name`、唯一的 `icon.src` 或 `icon.text`、可选 `description`，并选择 `module` 或 `href`。模块名称唯一；`pageModule` 保留共享存储模块的面板别名。相对图片和链接以 JSON 地址解析，文字通过 `textContent` 渲染；入口版本与底部构建信息居中。必须通过 HTTP(S) 打开页面。
+
+链接可声明 `target`：`internal` 将 HTTP(S) 页面嵌入现有导航框架，保留标题和返回按钮；`_self` 替换当前整页；`_blank` 在点击时请求新窗口或标签，保留原设置页。省略时沿用原宿主行为，普通浏览器为整页跳转。内部页面不注入项目样式或设置接口，退出时释放 iframe；其导航不能替换顶层设置页。目标站点的 `X-Frame-Options` 或 CSP 可能禁止嵌入，GitHub 组织页和 Discussions 应使用 `_blank`。网页不能保证启动指定外部浏览器；WebView 的新页行为由宿主实现决定。
+
+初始化按 JSON、可选 CSS、可选 Bridge 的顺序进行，完成后创建首页与导航。项目 CSS 位于默认样式之后，并通过现有 CSS 输入传给模块页。Bridge 默认导出 `BridgeFactory`（类型来自既有 `@nsnanocat/preference-panes/browser`）：
+
+```js
+export default async function createBridge({ menu, back }) {
+    // 初始化项目自己的 SDK，再返回宿主能力。
+    // Initialize the project-owned SDK before returning host capabilities.
+    return { update(state) {}, confirm(message) {}, notice(detail) {}, openURL(url, target) {}, destroy() {} };
+}
+```
+
+`update` 接收 `{title, actions, busy, canGoBack}`；`confirm` 返回 boolean 或 Promise<boolean>；`notice` 接收 `{kind, message}`。`menu` 是共用 ActionMenu，`back` 沿现有联合历史返回。Bridge 只覆盖宿主能力，不覆盖首页生成、表单或存储；它负责官方 SDK、原生监听器和晚到响应。通用程序负责探测、导航、菜单和事件转发，退出后取消请求与监听器，保留浏览器往返缓存恢复。
+
+首页非内部链接调用 `openURL(url, target)`，传入 JSON 中的 `_self` 或 `_blank`，省略的值仍为 `undefined`。`internal` 始终使用共用导航，不交给 Bridge。宿主处理显式 `_blank` 时应保留当前设置页；不支持或原生调用失败时抛出或拒绝，不能悄悄改为整页跳转。模块设置项继续使用原有 `openURL(url)` 调用。
+
+首页源码为 `home.html`、`home.mjs`、`home.d.mts`，首页与设置页共用 `styles.css` 和同一套样式安装逻辑。整页样式只作用于框架 HTML，嵌入面板不会改写外层网页；项目 CSS 在默认样式之后覆盖。首页构建只交付内联 `home.html`，不发布独立首页 JS/CSS 或额外运行时包入口。首页与 Bridge 类型从既有 `/browser` 导出。项目构建将本地预览标记、时间和提交号追加到生成 JSON 的 `footer`，保持共用 HTML 字节不变。网页控件保持 iOS 15 兼容。
+
+BoxJS app 可声明 `cachePath: "@DualSubs.Composite.Caches"`，必须属于相同存储根的模块 Caches 子树；未声明时仍使用当前模块 Caches。查看与清空遵循该路径，共享缓存确认框会说明其它模块受影响。整体重置默认只删除当前模块数据。多个面板共享模块存储时，app 可声明 `resetPaths` 完整路径数组；路径必须位于该模块 Settings 下并覆盖本页面字段。重置逐项删除这些子树，保留其它页面设置和缓存；请求失败会明确报错。
+
+索引字段允许 `Languages[0]` 或 `Languages.0`；同一个数组须声明连续索引及各项默认值。写入或单项恢复会保存完整数组，保留其余项和已有额外元素，不改变固定存储 API 的请求格式。
+
 ## 宿主集成
 
 ```js
@@ -85,7 +142,7 @@ container.append(frame.element);
 await frame.load();
 ```
 
-`ModuleFrame` 接受 `{ signal?: AbortSignal; headers?: HeadersInit }`。`X-PreferencePanes-JSON` 与 `X-PreferencePanes-CSS` 只用于校验并写入 iframe 数据属性，不作为网络请求 Header；静态 HTML 仍以普通 GET 获取并原样设置为 `iframe.srcdoc`。宿主通过 `change`、`confirm`、`notice`、`open-url` 事件同步标题、操作菜单、确认框、提示和链接跳转，不读取或改写 iframe 内部 DOM。项目主页、Bilibili JSBridge、原生导航和视觉样式仍由宿主负责。
+`ModuleFrame` 接受 `{ signal?: AbortSignal; headers?: HeadersInit }`。`X-PreferencePanes-JSON` 与 `X-PreferencePanes-CSS` 只用于校验并写入 iframe 数据属性，不作为网络请求 Header；静态 HTML 仍以普通 GET 获取并原样设置为 `iframe.srcdoc`。宿主通过 `change`、`confirm`、`notice`、`open-url` 事件同步标题、操作菜单、确认框、提示和链接跳转，不读取或改写 iframe 内部 DOM。项目入口内容、Bilibili JSBridge、原生导航和品牌覆盖仍由宿主负责。
 
 ## 构建与验证
 
@@ -96,7 +153,7 @@ npm run apifox:check
 npm pack --dry-run
 ```
 
-构建生成 `dist/api.js`、`dist/preference-panes.mjs` 和 `dist/module/index.html`、`index.mjs`、`navigation.mjs`。包不提供 `web.js`，也不提供按模块生成 HTML/CSS 的公开 `build()`。
+构建生成 `dist/home.html`、`dist/api.js`、`dist/preference-panes.mjs` 和 `dist/module/index.html`、`index.mjs`、`navigation.mjs`。包不提供 `web.js`，也不提供按模块生成 HTML/CSS 的公开 `build()`。
 
 ### 内置演示
 

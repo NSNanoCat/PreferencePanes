@@ -6,7 +6,7 @@
 
 PreferencePanes 的 `api.js` 只通过固定 `/api/get|set|delete` 操作本地存储。它不请求网络、不解析 BoxJS、不建立字段目录，也不解释控件、选项、默认值或展示元数据。
 
-PreferencePanes Release 独立发布通用模块 HTML、`index.mjs` 和 `navigation.mjs`，消费方必须逐文件映射，不执行页面响应脚本。静态模块页可声明调用方指定的 BoxJS JSON 与项目 stylesheet 资源；浏览器取得 BoxJS 后负责规范化、界面生成、字段和值校验。
+PreferencePanes Release 独立发布内联程序和默认 CSS 的首页模板 `home.html`、通用模块 HTML、`index.mjs`、`navigation.mjs`，消费方必须逐文件映射，不执行页面响应脚本。首页 HTML 原样复用，固定读取 `./home.json`；可选 `./theme.css` 和 `./bridge.mjs` 通过 HEAD 探测，404 使用内置功能，200 加载，其它状态与加载失败显示错误。构建信息属于 JSON `footer`，不替换 HTML。静态模块页可声明调用方指定的 BoxJS JSON 与项目 stylesheet 资源；浏览器取得 BoxJS 后负责规范化、界面生成、字段和值校验。
 
 ## 接口
 
@@ -81,6 +81,6 @@ BoxJS 控件、选项、默认值、字段重叠、已存值和待写入值都�
 
 ## 安装与发布
 
-一个宿主只映射一次 `index.html`、`index.mjs`、`navigation.mjs`，并安装一次 `api.js`。三个页面文件分别覆盖规范路径；`api.js` 只覆盖固定 `/api/get|set|delete`。
+一个宿主按需要只映射一次 `index.html`、`index.mjs`、`navigation.mjs`，并安装一次 `api.js`。页面文件分别覆盖规范路径；`api.js` 只覆盖固定 `/api/get|set|delete`。
 
-每个业务模块提供自己的 `/api/{module}`。Biliverse 中由 Enhanced 唯一映射通用前端并安装固定存储 API；Global、Redirect、ADBlock 只携带各自 BoxJS API Mock。Release 分别发布三个静态页面文件和 `api.js`，不再生成或发布 `web.js`。
+每个业务模块提供自己的 `/api/{module}`。Biliverse 中由 Enhanced 唯一映射通用前端并安装固定存储 API；Global、Redirect、ADBlock 只携带各自 BoxJS API Mock。Release 分别发布首页模板、模块页面资源和 `api.js`，不再生成或发布 `web.js`。

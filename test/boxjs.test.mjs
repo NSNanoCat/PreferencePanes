@@ -128,3 +128,18 @@ test("URL settings normalize as read-only string links and reject executable sch
         assert.throws(() => normalizeBoxJs([{ id: "@Example.Module.Settings.categories", name: "打开分类", type: "url", val: value }], "Module"), /Invalid BoxJS val/);
     }
 });
+
+test("indexed fields require contiguous defaults and cache paths cannot leave their storage root", () => {
+    const field = { id: "@Root.Module.Settings.Languages[0]", type: "text", name: "语言", val: "AUTO" };
+    assert.throws(() => normalizeBoxJs([{ ...field, id: "@Root.Module.Settings.Languages[1]" }]), /contiguous indices/);
+    assert.throws(() => normalizeBoxJs([{ ...field, val: undefined }]), /contiguous indices/);
+    assert.throws(() => normalizeBoxJs([field, { ...field, id: "@Root.Module.Settings.Languages.note" }]), /mix array entries/);
+    assert.throws(() => normalizeBoxJs([{ ...field, id: "@Root.Module.Settings.Languages[0].mode" }]), /Invalid key path/);
+    for (const cachePath of ["@Other.Composite.Caches", "@Root.Module.Settings", "@Root.Composite.Caches.Playlists", "@Root.__proto__.Caches"]) assert.throws(() => normalizeBoxJs({ settings: [field], cachePath }), /cachePath|Invalid key path/);
+});
+
+test("scoped resets cannot leave the module Settings or omit rendered fields", () => {
+    const settings = [{ id: "@Root.API.Settings.GoogleCloud.Auth", name: "Key", type: "text", val: "" }];
+    for (const resetPaths of [[], "@Root.API.Settings.GoogleCloud", ["@Other.API.Settings.GoogleCloud"], ["@Root.API.Caches.GoogleCloud"], ["@Root.Other.Settings.GoogleCloud"], ["@Root.API.Settings.__proto__"], ["@Root.API.Settings.Microsoft"]])
+        assert.throws(() => normalizeBoxJs({ settings, resetPaths }), /resetPaths|Invalid key path/);
+});

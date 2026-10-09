@@ -11,7 +11,7 @@ test("public browser exposes only the generic BoxJS mount contract", async () =>
     assert.equal(typeof ActionMenu.prototype.open, "function");
     const browser = await readFile(new URL("../dist/preference-panes.mjs", import.meta.url), "utf8");
     assert.doesNotMatch(browser, /node:fs|node-fetch|\$persistentStore|@nsnanocat\/util/);
-    assert.doesNotMatch(browser, /pp-home|self-panel|pp-install|安装模块|data-module/);
+    assert.doesNotMatch(browser, /<main\b[^>]*\bpp-home|self-panel|pp-install|安装模块|data-module=/);
     const navigation = await readFile(new URL("../dist/module/navigation.mjs", import.meta.url), "utf8");
     assert.match(navigation, /\*,\*::before,\*::after\{box-sizing:border-box\}/);
     assert.match(navigation, /#sheet\{[^}]*width:100%;max-width:540px/);
@@ -28,6 +28,12 @@ test("public browser exposes only the generic BoxJS mount contract", async () =>
     assert.match(page, /preferencePanesJson/);
     assert.match(page, /preferencePanesStylesheet/);
     assert.doesNotMatch(page, /\/configs\//);
+    const home = await readFile(new URL("../dist/home.html", import.meta.url), "utf8");
+    assert.doesNotMatch(home, /__PREFERENCE_PANES_|data-preference-panes-(?:json|css|bridge)/);
+    assert.match(home, /<script type="module">[\s\S]*startHome\(\)/);
+    assert.doesNotMatch(home, /<script[^>]+src=|<link[^>]+stylesheet|biliBridge|hdslb\.com/);
+    assert.doesNotMatch(home, /(?:^|\n)import\s/);
+    for (const file of ["home.mjs", "home.css", "module/host.mjs"]) await assert.rejects(access(new URL(`../dist/${file}`, import.meta.url)), { code: "ENOENT" });
 });
 
 const hosts = [

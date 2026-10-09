@@ -1,6 +1,6 @@
 /* 通用默认样式只使用 pp 命名空间；项目可通过 CSS 输入覆盖变量和组件。
  * Generic defaults use only the pp namespace; projects may override variables and components through CSS input. */
-.pp-panel {
+:root {
     --pp-text: #18191c;
     --pp-background: #f6f7f8;
     --pp-surface: #fff;
@@ -9,6 +9,10 @@
     --pp-muted: #797f87;
     --pp-accent: #1677ff;
     --pp-warning: #9a6700;
+    --pp-host-height: 0px;
+    --pp-keyboard-height: 0px;
+}
+.pp-panel {
     font:
         15px / 1.5 -apple-system,
         BlinkMacSystemFont,
@@ -26,7 +30,7 @@
     overflow: hidden;
 }
 
-:root[data-theme="dark"] .pp-panel {
+:root[data-theme="dark"] {
     --pp-text: #f1f2f3;
     --pp-background: #0d0e0f;
     --pp-surface: #18191c;
@@ -145,6 +149,7 @@
     min-height: 36px;
     padding: 8px 10px;
     font: inherit;
+    font-size: 16px;
     color: var(--pp-text);
     background: var(--pp-field);
     border: 0;
@@ -262,7 +267,7 @@
     box-sizing: border-box;
     width: 28px;
     height: 28px;
-    border: 3px solid color-mix(in srgb, currentColor 25%, transparent);
+    border: 3px solid var(--pp-border, #8884);
     border-top-color: var(--pp-accent, AccentColor);
     border-radius: 50%;
     animation: pp-status-spin 0.8s linear infinite;
@@ -312,4 +317,241 @@
 .pp-panel :focus-visible {
     outline: 2px solid var(--pp-accent);
     outline-offset: -2px;
+}
+
+/* 首页沿用表单的分组与说明样式，入口按屏幕宽度自动换行。
+ * The landing page reuses form groups and descriptions, with entries wrapping by viewport width. */
+:root.pp-page {
+    color-scheme: light dark;
+}
+.pp-page body {
+    margin: 0;
+    font:
+        16px / 1.5 -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+    background: var(--pp-background, Canvas);
+    color: var(--pp-text, CanvasText);
+}
+[data-preference-panes-pages] {
+    position: relative;
+    min-height: calc(100vh - var(--pp-host-height));
+    background: inherit;
+}
+[data-preference-panes-module-page],
+[data-preference-panes-link-page] {
+    position: fixed;
+    inset: var(--pp-host-height) 0 0;
+    background: inherit;
+    z-index: 1;
+    box-shadow: -8px 0 24px #00000014;
+}
+[data-preference-panes-module-page] iframe,
+[data-preference-panes-link-page] iframe {
+    display: block;
+    border: 0;
+    width: 100%;
+    height: 100%;
+    background: inherit;
+}
+[data-module-message] {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 20px;
+    background: inherit;
+}
+[data-module-message][hidden] {
+    display: none;
+}
+.pp-host-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    align-items: center;
+    min-height: 44px;
+    padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
+    border-bottom: 1px solid var(--pp-border, #8884);
+    background: var(--pp-surface, Canvas);
+    color: var(--pp-accent, Highlight);
+    font-size: 17px;
+}
+.pp-host-title {
+    text-align: center;
+    color: var(--pp-text, CanvasText);
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.pp-host-back {
+    border: 0;
+    background: none;
+    color: inherit;
+    width: 44px;
+    height: 44px;
+    padding: 8px;
+    font:
+        32px / 1 -apple-system,
+        sans-serif;
+    cursor: pointer;
+}
+.pp-host-back[hidden] {
+    visibility: hidden;
+    display: block;
+}
+.pp-host-toast {
+    position: fixed;
+    z-index: 3;
+    bottom: calc(24px + env(safe-area-inset-bottom) + var(--pp-keyboard-height));
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: calc(100% - 48px);
+    padding: 10px 18px;
+    border-radius: 12px;
+    background: #222e;
+    color: #fff;
+    font-size: 14px;
+    text-align: center;
+}
+.pp-host-toast[hidden] {
+    display: none;
+}
+.pp-host-error {
+    margin: 24px;
+    padding: 16px;
+    border: 1px solid var(--pp-danger, #e45656);
+    border-radius: 12px;
+    font-size: 16px;
+    overflow-wrap: anywhere;
+}
+
+.pp-home {
+    max-width: 1000px;
+    margin: auto;
+    padding: 24px max(16px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+.pp-home-logo {
+    display: block;
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 24px;
+    object-fit: contain;
+}
+.pp-home-entries {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-around;
+    row-gap: 16px;
+    padding: 16px 0;
+    background: var(--pp-surface);
+}
+.pp-home-item {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 25%;
+    min-width: 0;
+    padding: 0 4px;
+    border: 0;
+    background: none;
+    color: var(--pp-text);
+    font:
+        12px / 1.5 -apple-system,
+        sans-serif;
+    cursor: pointer;
+    text-decoration: none;
+}
+@media (min-width: 500px) {
+    .pp-home-item {
+        width: calc(100% / 6);
+    }
+}
+@media (min-width: 700px) {
+    .pp-home-item {
+        width: 12.5%;
+    }
+}
+.pp-home-icon {
+    box-sizing: border-box;
+    width: 56px;
+    height: 56px;
+    padding: 8px;
+    border-radius: 50%;
+    background: var(--pp-field);
+    font-size: 32px;
+    line-height: 40px;
+}
+.pp-home-icon img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+.pp-home-name {
+    margin-top: 8px;
+}
+.pp-home-content {
+    min-width: 0;
+    width: 100%;
+}
+.pp-home-content > span {
+    display: block;
+}
+.pp-home-name,
+.pp-home-item [data-module-status] {
+    width: 100%;
+    overflow: hidden;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.pp-home-item [data-module-status] {
+    min-height: 20px;
+}
+.pp-home-item:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+.pp-home-entries[data-layout="list"] {
+    display: block;
+    padding: 0;
+}
+.pp-home-entries[data-layout="list"] .pp-home-item {
+    flex-direction: row;
+    gap: 12px;
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 15px;
+}
+.pp-home-entries[data-layout="list"] .pp-home-item + .pp-home-item {
+    border-top: 1px solid var(--pp-border);
+}
+.pp-home-entries[data-layout="list"] .pp-home-icon {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    padding: 4px;
+    font-size: 24px;
+    line-height: 32px;
+}
+.pp-home-entries[data-layout="list"] .pp-home-name {
+    margin-top: 0;
+    text-align: left;
+}
+.pp-home-arrow {
+    color: var(--pp-muted);
+    font-size: 24px;
+}
+.pp-home-footer {
+    margin-top: 16px;
+    text-align: center;
+    white-space: normal;
+}
+.pp-home-footer p {
+    margin: 8px 0 0;
 }

@@ -66,9 +66,9 @@ export class PreferencesClient {
     readSettings(): Promise<unknown>;
     /** 读取 Caches 子树 / Read the Caches subtree. */
     readCaches(): Promise<unknown>;
-    /** 删除 Caches / Delete Caches. */
+    /** 删除声明的 Caches 子树 / Delete the declared Caches subtree. */
     clearCaches(): Promise<void>;
-    /** 删除整个模块数据并恢复默认值 / Delete module data and restore defaults. */
+    /** 删除声明的设置路径，默认整个模块数据，并恢复默认值 / Delete declared setting paths, defaulting to module data, and restore defaults. */
     reset(): Promise<void>;
     /** 取消请求 / Cancel requests. */
     leave(): void;

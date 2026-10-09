@@ -1,7 +1,7 @@
 import { ActionMenu } from "./ActionMenu.mjs";
 import { validValue } from "./boxjs.mjs";
 import { PreferencesClient } from "./client.mjs";
-import { fieldControl, element as node, requestConfirmation, requestURLNavigation, resourceURL, settingRow, statusView } from "./components.mjs";
+import { fieldControl, element as node, requestConfirmation, requestURLNavigation, settingRow, statusView } from "./components.mjs";
 import { Navigation } from "./Navigation.mjs";
 
 /**
@@ -112,17 +112,17 @@ export class PreferencesPanel {
         const notify = event => {
             if (destroyed) return;
             let message;
-            switch (true) {
-                case event.kind === "error":
+            switch (event.kind === "error" ? "error" : event.operation) {
+                case "error":
                     message = `操作失败：${event.message}`;
                     break;
-                case event.operation === "delete":
+                case "delete":
                     message = "删除成功";
                     break;
-                case event.operation === "clearCaches":
+                case "clearCaches":
                     message = "Caches 已清空";
                     break;
-                case event.operation === "reset":
+                case "reset":
                     message = "设置已重置";
                     break;
                 default:
@@ -245,21 +245,6 @@ export class PreferencesPanel {
                     });
                 return queue;
             }
-            const metadata = definition.metadata;
-            if (metadata) {
-                const info = node("div", "pp-module-info");
-                const details = node("div", "pp-module-details");
-                for (const description of [metadata.author, metadata.desc ?? metadata.description, ...(metadata.descs ?? [])]) if (description) details.append(node("p", "pp-description", description));
-                if (metadata.repo) {
-                    const link = node("a", "pp-module-source", "项目主页");
-                    link.href = resourceURL(metadata.repo);
-                    link.target = "_blank";
-                    link.rel = "noopener noreferrer";
-                    details.append(link);
-                }
-                info.append(details);
-                view.append(info);
-            }
             for (const field of definition.fields) {
                 const match = /^\[([^\]]+)\]\s*(.*)$/.exec(field.name);
                 const group = match?.[1] ?? "通用";
@@ -300,8 +285,8 @@ export class PreferencesPanel {
                 let write;
                 let inputContainer = row;
                 let eventName = "change";
-                switch (true) {
-                    case field.control === "url": {
+                switch (field.control === "url" ? "url" : field.options ? (field.type === "array" ? "checkboxes" : "selects") : field.type) {
+                    case "url": {
                         const link = node("a", "pp-choice-link", "打开");
                         link.setAttribute("aria-label", field.name);
                         link.rel = "noopener noreferrer";
@@ -317,7 +302,7 @@ export class PreferencesPanel {
                         });
                         break;
                     }
-                    case Boolean(field.options) && field.type !== "array": {
+                    case "selects": {
                         const select = node("select", "");
                         select.setAttribute("aria-label", field.name);
                         field.options.forEach((option, index) => {
@@ -332,7 +317,7 @@ export class PreferencesPanel {
                         read = () => field.options[select.selectedIndex]?.key;
                         break;
                     }
-                    case field.type === "array" && Boolean(field.options): {
+                    case "checkboxes": {
                         const page = node("section", "pp-choice-page");
                         if (field.description) page.append(node("p", "pp-description", field.description));
                         const choices = node("div", "pp-rows");
@@ -376,7 +361,7 @@ export class PreferencesPanel {
                         };
                         break;
                     }
-                    case field.type === "boolean": {
+                    case "boolean": {
                         const toggle = node("input", "pp-switch");
                         toggle.type = "checkbox";
                         toggle.setAttribute("switch", "");
@@ -414,7 +399,12 @@ export class PreferencesPanel {
                             growingInputs.push(grow);
                         }
                         eventName = "input";
-                        if (!multiline) input.type = field.type === "number" ? "number" : "text";
+                        if (!multiline) {
+                            input.type = field.type === "number" ? "number" : "text";
+                            input.autocapitalize = "off";
+                            input.setAttribute("autocorrect", "off");
+                            input.spellcheck = false;
+                        }
                         write = value => {
                             input.value = field.type === "array" ? JSON.stringify(value ?? []) : (value ?? "");
                             grow();
@@ -517,7 +507,9 @@ export class PreferencesPanel {
             });
             handlers.set("clearCaches", async () => {
                 if (saving) return;
-                if (!(await requestConfirmation(window, `清空 ${active} 的全部 Caches？`)) || destroyed || saving) return;
+                const shared = definition.cachePath && definition.cachePath !== `@${definition.storageKey}.${active}.Caches`;
+                const message = shared ? `清空共享缓存 ${definition.cachePath}？使用该缓存的其它模块也会受影响。` : `清空 ${active} 的全部 Caches？`;
+                if (!(await requestConfirmation(window, message)) || destroyed || saving) return;
                 return perform(
                     () => client.clearCaches(),
                     () => {
@@ -527,7 +519,8 @@ export class PreferencesPanel {
             });
             handlers.set("reset", async () => {
                 if (saving) return;
-                if (!(await requestConfirmation(window, `重置 ${active} 的设置？这将删除该模块的 Settings、Caches 和其它持久化数据。`)) || destroyed || saving) return;
+                const message = definition.resetPaths ? `重置 ${definition.metadata?.name ?? active} 的设置？只删除本页面的设置，保留共享存储中的其它设置和缓存。` : `重置 ${active} 的设置？这将删除该模块的 Settings、Caches 和其它持久化数据。`;
+                if (!(await requestConfirmation(window, message)) || destroyed || saving) return;
                 return perform(() => client.reset(), controls);
             });
             navigation?.destroy();

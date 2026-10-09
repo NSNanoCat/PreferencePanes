@@ -15,3 +15,5 @@ export interface MountedPreferences {
  * @returns 模块视图 / Module view.
  */
 export function mount(boxjs: BoxJSInput): MountedPreferences;
+
+export type { HomeConfig, HomeIcon, HomeItem, HomeLinkTarget, HomeState, Bridge, BridgeOptions, BridgeFactory } from "./home.mjs";

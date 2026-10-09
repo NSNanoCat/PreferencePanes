@@ -14,6 +14,7 @@ export class PreferencesClient {
     #values = {};
     #warnings = {};
     #saving = false;
+    #arrays = new Map();
 
     /**
      * 创建从 BoxJS 定义读取和持久化设置的页面客户端。
@@ -40,13 +41,22 @@ export class PreferencesClient {
         if (!subtree || typeof subtree !== "object" || Array.isArray(subtree)) throw new TypeError("Expected a settings subtree object");
         const values = {};
         const warnings = {};
+        this.#arrays.clear();
         for (const field of this.#definition.fields) {
+            const indexed = /^(.*)\.(\d+)$/.exec(field.key);
+            if (indexed && !this.#arrays.has(indexed[1])) {
+                const storedArray = indexed[1]
+                    .split(".")
+                    .slice(this.#definition.settingsPath.length)
+                    .reduce((parent, part) => Object(parent)[part], subtree);
+                this.#arrays.set(indexed[1], Array.isArray(storedArray) ? [...storedArray] : []);
+            }
             const stored = field.key
                 .split(".")
                 .slice(this.#definition.settingsPath.length)
                 .reduce((parent, part) => Object(parent)[part], subtree);
             const resolved = resolveStoredValue(field, stored);
-            if (Object.hasOwn(resolved, "value")) values[field.key] = resolved.value;
+            if (Object.prototype.hasOwnProperty.call(resolved, "value")) values[field.key] = resolved.value;
             if (resolved.warning) warnings[field.key] = resolved.warning;
         }
         this.#values = values;
@@ -60,7 +70,7 @@ export class PreferencesClient {
      * @returns {import("./client.mjs").ModuleSnapshot} 会话快照 / Session snapshot.
      */
     snapshot() {
-        return structuredClone({ definition: this.#definition, values: this.#values, warnings: this.#warnings });
+        return JSON.parse(JSON.stringify({ definition: this.#definition, values: this.#values, warnings: this.#warnings }));
     }
 
     /**
@@ -79,22 +89,23 @@ export class PreferencesClient {
      * @returns {Promise<unknown>} Caches 内容或 undefined / Caches content or undefined.
      */
     async readCaches() {
-        const response = await this.#send("get", `@${this.#definition.storageKey}.${this.#module}.Caches`);
+        const response = await this.#send("get", this.#definition.cachePath ?? `@${this.#definition.storageKey}.${this.#module}.Caches`);
         return response.status === 404 ? undefined : response.json();
     }
 
     /**
-     * 删除当前模块的 Caches 子树。
-     * Delete the current module Caches subtree.
+     * 删除声明的缓存子树，默认当前模块 Caches。
+     * Delete the declared cache subtree, defaulting to the current module Caches.
      * @returns {Promise<void>} 操作完成 / Operation completion.
      */
     clearCaches() {
-        return this.#change("delete", `${this.#module}.Caches`, undefined, "clearCaches");
+        const path = this.#definition.cachePath?.slice(this.#definition.storageKey.length + 2) ?? `${this.#module}.Caches`;
+        return this.#change("delete", path, undefined, "clearCaches");
     }
 
     /**
-     * 删除当前模块数据并恢复页面默认值。
-     * Delete current module data and restore page defaults.
+     * 删除声明的设置子树，默认删除当前模块数据，并恢复页面默认值。
+     * Delete declared settings subtrees, defaulting to current module data, and restore page defaults.
      * @returns {Promise<void>} 操作完成 / Operation completion.
      */
     reset() {
@@ -175,30 +186,49 @@ export class PreferencesClient {
         if (this.#saving) throw new Error("A settings write is already in progress");
         this.#saving = true;
         try {
-            let field;
-            if (operation === "write" || operation === "delete") {
-                field = this.#definition.fields.find(candidate => candidate.key === key);
-                if (!field || (operation === "write" && !validValue(field, value))) throw new TypeError("Invalid setting value");
-            }
-            await this.#send(action, `@${this.#definition.storageKey}.${key}`, value);
             switch (operation) {
                 case "write":
-                    this.#values[key] = structuredClone(value);
-                    delete this.#warnings[key];
-                    break;
                 case "delete": {
-                    delete this.#values[key];
-                    delete this.#warnings[key];
-                    if (Object.hasOwn(field, "defaultValue")) this.#values[key] = structuredClone(field.defaultValue);
+                    const field = this.#definition.fields.find(candidate => candidate.key === key);
+                    if (!field || (operation === "write" && !validValue(field, value))) throw new TypeError("Invalid setting value");
+                    const indexed = /^(.*)\.(\d+)$/.exec(key);
+                    if (indexed) {
+                        const array = [...(this.#arrays.get(indexed[1]) ?? [])];
+                        for (const sibling of this.#definition.fields) {
+                            if (sibling.key.startsWith(`${indexed[1]}.`) && /^\d+$/.test(sibling.key.slice(indexed[1].length + 1))) {
+                                const index = Number(sibling.key.slice(indexed[1].length + 1));
+                                if (array[index] === undefined) array[index] = this.#values[sibling.key] ?? sibling.defaultValue;
+                            }
+                        }
+                        array[Number(indexed[2])] = operation === "delete" ? field.defaultValue : value;
+                        await this.#send("set", `@${this.#definition.storageKey}.${indexed[1]}`, array);
+                        this.#arrays.set(indexed[1], array);
+                    } else await this.#send(action, `@${this.#definition.storageKey}.${key}`, value);
+                    switch (operation) {
+                        case "write":
+                            this.#values[key] = JSON.parse(JSON.stringify(value));
+                            delete this.#warnings[key];
+                            break;
+                        case "delete":
+                            delete this.#values[key];
+                            delete this.#warnings[key];
+                            if (Object.prototype.hasOwnProperty.call(field, "defaultValue")) this.#values[key] = JSON.parse(JSON.stringify(field.defaultValue));
+                            break;
+                    }
                     break;
                 }
                 case "clearCaches":
+                    await this.#send(action, `@${this.#definition.storageKey}.${key}`, value);
                     break;
                 case "reset":
+                    if (this.#definition.resetPaths) {
+                        for (const path of this.#definition.resetPaths) await this.#send("delete", path);
+                    } else await this.#send(action, `@${this.#definition.storageKey}.${key}`, value);
+                    this.#arrays.clear();
                     this.#warnings = {};
                     for (const field of this.#definition.fields) {
                         delete this.#values[field.key];
-                        if (Object.hasOwn(field, "defaultValue")) this.#values[field.key] = structuredClone(field.defaultValue);
+                        if (Object.prototype.hasOwnProperty.call(field, "defaultValue")) this.#values[field.key] = JSON.parse(JSON.stringify(field.defaultValue));
                     }
                     break;
             }

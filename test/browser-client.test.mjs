@@ -1,11 +1,151 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
+import vm from "node:vm";
 import { normalizeBoxJs } from "../src/browser/boxjs.mjs";
 import { PreferencesClient } from "../src/browser/client.mjs";
 import { config } from "./fixtures/module.mjs";
 
 const definition = normalizeBoxJs(config, "Module");
 const settings = { Home: { enabled: false, mode: "b" }, items: ["a", "b"], note: "", count: "2" };
+
+test("browser persistence works without APIs unavailable in iOS 15.0", () => {
+    const result = spawnSync(
+        process.execPath,
+        [
+            "--input-type=module",
+            "-e",
+            `import assert from "node:assert/strict";
+import { normalizeBoxJs } from "./src/browser/boxjs.mjs";
+import { PreferencesClient } from "./src/browser/client.mjs";
+Object.hasOwn = undefined;
+globalThis.structuredClone = undefined;
+const definition = normalizeBoxJs([
+    { id: "@Root.Module.Settings.Languages[0]", name: "Source", type: "text", val: "AUTO" },
+    { id: "@Root.Module.Settings.Languages[1]", name: "Target", type: "text", val: "ZH" },
+]);
+const writes = [];
+const client = new PreferencesClient({ definition, fetch: async (_url, options) => {
+    if (_url.endsWith("/get")) return new Response(null, { status: 404 });
+    writes.push([...new URLSearchParams(options.body)][0]);
+    return new Response("{}", { status: 200 });
+} });
+await client.open();
+await client.set("Module.Settings.Languages.1", "JA");
+await client.remove("Module.Settings.Languages.1");
+assert.deepEqual(writes, [["@Root.Module.Settings.Languages", '["AUTO","JA"]'], ["@Root.Module.Settings.Languages", '["AUTO","ZH"]']]);
+await client.reset();
+assert.equal(client.snapshot().values["Module.Settings.Languages.1"], "ZH");`,
+        ],
+        { cwd: new URL("..", import.meta.url), encoding: "utf8" },
+    );
+    assert.equal(result.status, 0, result.stderr);
+});
+
+test("indexed languages round-trip through the real API; shared cache and module resets stay scoped", async () => {
+    const definition = normalizeBoxJs({
+        cachePath: "@DualSubs.Composite.Caches",
+        settings: [
+            {
+                id: "@DualSubs.Universal.Settings.Languages[0]",
+                name: "源语言",
+                type: "selects",
+                val: "AUTO",
+                items: [
+                    { key: "AUTO", label: "自动" },
+                    { key: "EN", label: "英语" },
+                ],
+            },
+            {
+                id: "@DualSubs.Universal.Settings.Languages[1]",
+                name: "目标语言",
+                type: "selects",
+                val: "ZH",
+                items: [
+                    { key: "ZH", label: "中文" },
+                    { key: "JA", label: "日语" },
+                ],
+            },
+        ],
+    });
+    const source = await readFile(new URL("../dist/api.js", import.meta.url), "utf8");
+    const storage = new Map([["DualSubs", JSON.stringify({ Composite: { Caches: { playlist: [1] }, Settings: { untouched: true } }, Other: { keep: true } })]]);
+    const fetch = (path, options) =>
+        new Promise(resolve => {
+            vm.runInNewContext(source, {
+                $environment: { "surge-version": "test" },
+                $persistentStore: {
+                    read: key => storage.get(key),
+                    write: (value, key) => {
+                        storage.set(key, value);
+                        return true;
+                    },
+                },
+                $request: { url: `https://example.test${path}`, ...options },
+                $script: { startTime: Date.now() / 1000 },
+                $done: ({ response }) => resolve(new Response(response.body, { status: response.status, headers: response.headers })),
+                console: { log() {}, error() {} },
+            });
+        });
+    const client = new PreferencesClient({ definition, fetch });
+    await client.open();
+    await client.set("Universal.Settings.Languages.0", "EN");
+    assert.deepEqual(JSON.parse(storage.get("DualSubs")).Universal.Settings.Languages, ["EN", "ZH"]);
+    await client.set("Universal.Settings.Languages.1", "JA");
+    assert.deepEqual(JSON.parse(storage.get("DualSubs")).Universal.Settings.Languages, ["EN", "JA"]);
+    const refreshed = new PreferencesClient({ definition, fetch });
+    assert.equal((await refreshed.open()).values["Universal.Settings.Languages.1"], "JA");
+    await refreshed.remove("Universal.Settings.Languages.0");
+    assert.deepEqual(JSON.parse(storage.get("DualSubs")).Universal.Settings.Languages, ["AUTO", "JA"]);
+    assert.deepEqual(await refreshed.readCaches(), { playlist: [1] });
+    await refreshed.reset();
+    assert.deepEqual(JSON.parse(storage.get("DualSubs")), { Composite: { Caches: { playlist: [1] }, Settings: { untouched: true } }, Other: { keep: true } });
+    await refreshed.set("Universal.Settings.Languages.1", "JA");
+    assert.deepEqual(JSON.parse(storage.get("DualSubs")).Universal.Settings.Languages, ["AUTO", "JA"]);
+    await refreshed.clearCaches();
+    assert.deepEqual(JSON.parse(storage.get("DualSubs")), { Composite: { Settings: { untouched: true } }, Other: { keep: true }, Universal: { Settings: { Languages: ["AUTO", "JA"] } } });
+    const root = JSON.parse(storage.get("DualSubs"));
+    root.API = { Settings: { GoogleCloud: { Auth: "key" }, Microsoft: { Auth: "token" }, NeteaseMusic: { Password: "password" }, URL: "https://example.test/subtitles.vtt" }, Caches: { keep: true } };
+    storage.set("DualSubs", JSON.stringify(root));
+    const api = new PreferencesClient({
+        definition: normalizeBoxJs({
+            settings: [
+                { id: "@DualSubs.API.Settings.GoogleCloud.Auth", name: "Key", type: "text", val: "" },
+                { id: "@DualSubs.API.Settings.Microsoft.Auth", name: "Token", type: "text", val: "" },
+            ],
+            resetPaths: ["@DualSubs.API.Settings.GoogleCloud", "@DualSubs.API.Settings.Microsoft"],
+        }),
+        fetch,
+    });
+    await api.open();
+    await api.reset();
+    assert.deepEqual(JSON.parse(storage.get("DualSubs")).API, { Settings: { NeteaseMusic: { Password: "password" }, URL: "https://example.test/subtitles.vtt" }, Caches: { keep: true } });
+    assert.equal(api.snapshot().values["API.Settings.GoogleCloud.Auth"], "");
+});
+
+test("indexed writes preserve existing siblings and undisplayed entries; failures leave the snapshot unchanged", async () => {
+    const definition = normalizeBoxJs([
+        { id: "@Root.Module.Settings.Languages[0]", name: "源", type: "text", val: "AUTO" },
+        { id: "@Root.Module.Settings.Languages[1]", name: "目标", type: "text", val: "ZH" },
+    ]);
+    const calls = [];
+    let fail = false;
+    const client = new PreferencesClient({
+        definition,
+        fetch: async (_url, options) => {
+            calls.push(options);
+            return new Response(calls.length === 1 ? JSON.stringify({ Languages: ["EN", true, "extra"] }) : "{}", { status: fail ? 500 : 200 });
+        },
+    });
+    await client.open();
+    await client.set("Module.Settings.Languages.0", "FR");
+    assert.deepEqual([...new URLSearchParams(calls[1].body)], [["@Root.Module.Settings.Languages", '["FR",true,"extra"]']]);
+    const before = client.snapshot();
+    fail = true;
+    await assert.rejects(client.remove("Module.Settings.Languages.1"), /HTTP 500/);
+    assert.deepEqual(client.snapshot(), before);
+});
 
 test("browser client reads Settings once, normalizes stored values and then mutates its snapshot", async () => {
     const calls = [];

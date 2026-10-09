@@ -17,7 +17,7 @@ function resources() {
         async load(id) {
             switch (id) {
                 case "#styles":
-                    return `export default ${JSON.stringify(await readFile(new URL("./src/browser/panel.css", import.meta.url), "utf8"))};`;
+                    return `export default ${JSON.stringify(await readFile(new URL("./src/browser/styles.css", import.meta.url), "utf8"))};`;
                 default:
                     return null;
             }
@@ -33,6 +33,21 @@ function resources() {
 export default [
     { input: "src/browser/mount.mjs", output: { file: "dist/preference-panes.mjs", format: "es" } },
     { input: "src/browser/Navigation.mjs", output: { file: "dist/module/navigation.mjs", format: "es" } },
+    {
+        input: "src/browser/home.mjs",
+        output: { dir: "dist", entryFileNames: "home.mjs", format: "es" },
+        plugins: [
+            {
+                name: "home-shell",
+                async generateBundle(_options, bundle) {
+                    const html = await readFile(new URL("./src/browser/home.html", import.meta.url), "utf8");
+                    const code = bundle["home.mjs"].code.replace(/<\/script/gi, "<\\/script");
+                    this.emitFile({ type: "asset", fileName: "home.html", source: html.replace("__PREFERENCE_PANES_HOME_SCRIPT__", () => code) });
+                    delete bundle["home.mjs"];
+                },
+            },
+        ],
+    },
     { input: "src/api.mjs", output: { file: "dist/api.js", format: "iife" } },
     {
         input: "src/browser/index.mjs",

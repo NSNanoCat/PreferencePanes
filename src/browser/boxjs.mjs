@@ -17,6 +17,7 @@ export function normalizeBoxJs(config, module) {
         if (!app || !Array.isArray(app.settings)) throw new TypeError("Expected BoxJS settings array");
         for (const entry of app.settings) {
             if (typeof entry.id !== "string") throw new TypeError("BoxJS settings require string IDs");
+            entry.id = entry.id.replace(/\[(0|[1-9]\d*)\]$/, ".$1");
             if (!entry.id.startsWith("@")) {
                 if (Array.isArray(document)) throw new TypeError("BoxJS settings require @root.path IDs");
                 continue;
@@ -58,7 +59,7 @@ export function normalizeBoxJs(config, module) {
         };
         if (type === "select" && !["string", "number", "boolean"].includes(field.type)) throw new TypeError(`Select requires a scalar val: ${entry.id}`);
         if (entry.items) field.options = entry.items.map(item => ({ key: item.key, label: item.label }));
-        if (Object.hasOwn(entry, "val")) field.defaultValue = normalizeStoredValue(field, entry.val);
+        if (Object.prototype.hasOwnProperty.call(entry, "val")) field.defaultValue = normalizeStoredValue(field, entry.val);
         if (
             typeof field.name !== "string" ||
             (field.placeholder !== undefined && typeof field.placeholder !== "string") ||
@@ -68,18 +69,42 @@ export function normalizeBoxJs(config, module) {
         )
             throw new TypeError(`Invalid or overlapping BoxJS field: ${entry.id}`);
         if (field.options && (new Set(field.options.map(item => item.key)).size !== field.options.length || field.options.some(item => !scalar(item.key) || typeof item.label !== "string"))) throw new TypeError(`Invalid options: ${entry.id}`);
-        if (Object.hasOwn(field, "defaultValue") && !validValue(field, field.defaultValue)) throw new TypeError(`Invalid BoxJS val: ${entry.id}`);
-        if (field.control === "url" && !Object.hasOwn(field, "defaultValue")) throw new TypeError(`URL BoxJS settings require a val: ${entry.id}`);
+        if (Object.prototype.hasOwnProperty.call(field, "defaultValue") && !validValue(field, field.defaultValue)) throw new TypeError(`Invalid BoxJS val: ${entry.id}`);
+        if (field.control === "url" && !Object.prototype.hasOwnProperty.call(field, "defaultValue")) throw new TypeError(`URL BoxJS settings require a val: ${entry.id}`);
         fields.push(field);
     }
     if (!fields.length) throw new TypeError(`No BoxJS settings for module: ${target.module}`);
-    const common = fields[0].key.split(".").slice(0, -1);
+    for (const field of fields) {
+        const indexed = /^(.*)\.(\d+)$/.exec(field.key);
+        if (!indexed) continue;
+        const siblings = fields.filter(candidate => candidate.key.startsWith(`${indexed[1]}.`) && /^\d+$/.test(candidate.key.slice(indexed[1].length + 1)));
+        if (fields.some(candidate => candidate.key.startsWith(`${indexed[1]}.`) && !siblings.includes(candidate))) throw new TypeError(`Indexed settings cannot mix array entries and named children: ${indexed[1]}`);
+        if (siblings.some(candidate => !Object.prototype.hasOwnProperty.call(candidate, "defaultValue")) || !siblings.some(candidate => candidate.key === `${indexed[1]}.${siblings.length - 1}`) || siblings.some(candidate => Number(candidate.key.slice(indexed[1].length + 1)) >= siblings.length))
+            throw new TypeError(`Indexed settings require contiguous indices and defaults: ${indexed[1]}`);
+    }
+    const owner = target.owners.size === 1 ? [...target.owners][0] : undefined;
+    const cachePath = owner?.cachePath ?? `@${target.storageKey}.${target.module}.Caches`;
+    if (typeof cachePath !== "string" || !cachePath.startsWith(`@${target.storageKey}.`)) throw new TypeError("cachePath must use the module storage root");
+    const cacheParts = validatePathParts(cachePath.slice(target.storageKey.length + 2).split("."));
+    if (cacheParts.length !== 2 || cacheParts[1] !== "Caches") throw new TypeError("cachePath must identify a module Caches subtree");
+    if (owner?.resetPaths !== undefined) {
+        if (!Array.isArray(owner.resetPaths) || !owner.resetPaths.length) throw new TypeError("resetPaths must be a nonempty array");
+        for (const path of owner.resetPaths) {
+            if (typeof path !== "string" || !path.startsWith(`@${target.storageKey}.${target.module}.Settings.`)) throw new TypeError("resetPaths must stay in this module's Settings");
+            validatePathParts(path.slice(target.storageKey.length + 2).split("."));
+        }
+        if (fields.some(field => !owner.resetPaths.some(path => `@${target.storageKey}.${field.key}` === path || `@${target.storageKey}.${field.key}`.startsWith(`${path}.`)))) throw new TypeError("resetPaths must cover the page settings");
+    }
+    const firstIndexed = /^(.*)\.(\d+)$/.exec(fields[0].key);
+    const common = (firstIndexed ? firstIndexed[1] : fields[0].key).split(".").slice(0, -1);
     for (const field of fields) while (!field.key.startsWith(`${common.join(".")}.`)) common.pop();
     return {
         module: target.module,
         storageKey: target.storageKey,
         fields,
         settingsPath: common,
+        ...(owner?.cachePath === undefined ? {} : { cachePath }),
+        ...(owner?.resetPaths === undefined ? {} : { resetPaths: [...owner.resetPaths] }),
         ...(Object.keys(metadata).length ? { metadata } : {}),
     };
 }
@@ -171,9 +196,14 @@ function scalar(value) {
  * @returns {boolean} 是否可由控件表示 / Whether the control can represent the value.
  */
 function validValueShape(field, value) {
-    if (field.type === "array") {
-        if (!Array.isArray(value) || value.some(item => !scalar(item)) || new Set(value).size !== value.length) return false;
-    } else if (typeof value !== field.type || !scalar(value)) return false;
+    switch (field.type) {
+        case "array":
+            if (!Array.isArray(value) || value.some(item => !scalar(item)) || new Set(value).size !== value.length) return false;
+            break;
+        default:
+            if (typeof value !== field.type || !scalar(value)) return false;
+            break;
+    }
     if (field.control === "url" && (!/^[a-z][a-z\d+.-]*:/i.test(value) || /^(?:javascript|data|vbscript):/i.test(value))) return false;
     return true;
 }
@@ -203,7 +233,7 @@ export function resolveStoredValue(field, stored) {
     if (value === undefined) return {};
     if (!validValueShape(field, value)) {
         return {
-            ...(Object.hasOwn(field, "defaultValue") ? { value: field.defaultValue } : {}),
+            ...(Object.prototype.hasOwnProperty.call(field, "defaultValue") ? { value: field.defaultValue } : {}),
             warning: { kind: "invalid-value", values: [stored] },
         };
     }
