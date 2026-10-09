@@ -1,5 +1,9 @@
 # PreferencePanes 发布流程
 
+## 1.3.0
+
+新增内置网页宿主与默认样式的通用首页 `home.html`。消费方原样部署模板，使用固定相对路径 `home.json`、可选 `theme.css` 和可选 `bridge.mjs` 定制内容、品牌和原生能力。BoxJS 新增数组索引字段、共享缓存路径与面板重置范围。
+
 ## 1.2.5
 
 删除代理侧 `web.js` 与内嵌页面资源表。模块 HTML、页面入口和导航组件改为 Release 中独立的 `index.html`、`index.mjs`、`navigation.mjs`，由消费方逐文件映射；`ModuleFrame` 在 iframe 本地传递 BoxJS/CSS 资源输入，只有固定存储接口继续执行 `api.js`。
@@ -50,6 +54,7 @@ npm pack --dry-run
 - `dist/api.js` 只提供通用 Storage 深路径读写，不包含网络 transport、`/configs/` 或模块路由。
 - 浏览器只请求页面声明的 BoxJS 资源；静态页面未声明时回退 `/api/{module}`，且不存在 `/api/{module}/{action}`。
 - `/settings/{module}`、`/settings/assets/index.mjs`、`/settings/assets/navigation.mjs` 分别映射 `index.html`、`index.mjs`、`navigation.mjs`，不存在 `web.js`。
+- 首页 `home.html` 内联程序与默认样式，固定读取 `home.json`；可选 CSS 和 Bridge 只有 HEAD 200 才加载，404 使用内置功能，缺少 Bridge 时不请求 SDK。
 - `ModuleFrame` 只用普通 GET 获取静态 HTML，并将合法 HTTP(S) BoxJS/CSS 资源地址写入 iframe 数据属性；`mount(boxjs, css)` 继续为类型错误。
 - 内置演示覆盖全部设置项，默认使用包内 CSS，并可切换示例 CSS 或导入 CSS。
 - 缺少 `X-PreferencePanes-Version` 的 HEAD 200 不会被判为已安装。
@@ -57,13 +62,13 @@ npm pack --dry-run
 
 ## 发布
 
-1. 将 `dev` 合入 `main`，确认 `main` 与发布提交一致。
+1. 以上一正式 tag 为基线更新 `CHANGELOG.md`，只记录最终用户可感知的变化；将 `dev` 合入 `main`，确认 `main` 与发布提交一致。
 2. 创建并推送当前版本标签。
 3. 等待 npm、GitHub Packages 和 Release Assets 工作流成功。
-4. 确认 GitHub Release 完整包含 `api.js`、`index.html`、`index.mjs` 与 `navigation.mjs`，且不存在 `web.js`。
+4. 确认 GitHub Release 正文与 `CHANGELOG.md` 一致，完整包含 `api.js`、`home.html`、`index.html`、`index.mjs` 与 `navigation.mjs`，且不存在 `web.js` 或独立首页 JS/CSS。
 5. 下载 registry 包与 Release 资产，复核版本、内容和 SHA-256。
 
-普通 main/dev 推送和手动 CI 只验证候选包，不发布。两个 registry 的版本取自 tag；正式版本使用 `latest`。
+普通 main/dev 推送和手动 CI 只验证候选包，不发布。两个 registry 的版本取自 tag；正式版本使用 `latest`。Release Assets 工作流同样由 tag 触发，正文直接读取根目录 `CHANGELOG.md`。
 
 ## 消费方顺序
 
