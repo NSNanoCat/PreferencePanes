@@ -12,6 +12,10 @@ function validateHome(config) {
     if (!config || typeof config.title !== "string" || !Array.isArray(config.sections)) throw new Error("首页 JSON 缺少 title 或 sections");
     if (config.logo !== undefined && typeof config.logo !== "string") throw new Error("首页 logo 必须是图片地址");
     if (config.logoText !== undefined && typeof config.logoText !== "string") throw new Error("首页 logoText 必须是文字");
+    if (config.logoHref !== undefined) {
+        if (typeof config.logoHref !== "string") throw new Error("首页 logoHref 必须是链接地址");
+        if (["javascript:", "data:", "vbscript:"].includes(new URL(config.logoHref, "https://preference-panes.invalid/").protocol)) throw new Error("首页 logoHref 的链接无效");
+    }
     if (config.footer !== undefined && (!Array.isArray(config.footer) || config.footer.some(text => typeof text !== "string"))) throw new Error("首页 footer 必须是文字数组");
     const modules = new Set();
     for (const section of config.sections) {
@@ -230,6 +234,7 @@ export async function startHome() {
             title: config.title,
             logo: config.logo ? new URL(config.logo, jsonURL).href : undefined,
             logoText: config.logoText,
+            logoHref: new URL(config.logoHref || "/", jsonURL).href,
             modules: new Map(config.sections.flatMap(section => section.items.filter(item => item.module).map(item => [item.module, item]))),
             links,
         });

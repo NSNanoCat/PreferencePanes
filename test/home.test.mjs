@@ -506,6 +506,7 @@ test("JSON generates mixed sections, resolves assets and links against its URL a
     f.config.title = "<b>Example</b>";
     f.config.logo = "assets/logo.png";
     f.config.logoText = "<b>Brand</b>";
+    f.config.logoHref = "../guide/";
     f.config.footer = ["<script>footer</script>"];
     f.config.sections[0].items[0].icon = { src: "assets/module.png" };
     f.config.sections.push({ title: "帮助", layout: "list", items: [{ name: "<b>官网</b>", icon: { text: "🏠" }, description: "使用说明", href: "../guide/" }] });
@@ -516,7 +517,15 @@ test("JSON generates mixed sections, resolves assets and links against its URL a
     });
     assert.equal(f.document.title, "<b>Example</b>");
     const header = f.document.body.children.find(node => node.className === "pp-host-header");
-    const [logo, title] = header.children[1].children;
+    const brandLink = header.children[1].children[0];
+    const [logo, title] = brandLink.children;
+    assert.equal(brandLink.tagName, "A");
+    assert.equal(brandLink.href, "https://example.test/guide/");
+    for (const modifiers of [{}, { metaKey: true }]) {
+        const click = Object.assign(new Event("click", { cancelable: true }), { button: 0, ...modifiers });
+        brandLink.dispatchEvent(click);
+        assert.equal(click.defaultPrevented, false);
+    }
     assert.equal(logo.children[0].src, "https://example.test/settings/assets/logo.png");
     assert.equal(logo.hidden, false);
     assert.equal(title.textContent, "<b>Brand</b>");
@@ -545,6 +554,7 @@ test("JSON generates mixed sections, resolves assets and links against its URL a
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(logo.hidden, true);
     assert.equal(title.textContent, "API");
+    assert.equal(brandLink.href, "https://example.test/guide/");
     f.navigation.back();
     assert.equal(logo.hidden, false);
     assert.equal(title.textContent, "<b>Brand</b>");
@@ -565,8 +575,10 @@ test("homepage navigation follows NavTitle fallback without substituting the doc
             Object.assign(f.config, brand);
             const destroy = await f.start();
             const header = f.document.body.children.find(node => node.className === "pp-host-header");
-            assert.equal(header.children[1].children[0].hidden, hidden);
-            assert.equal(header.children[1].children[1].textContent, text);
+            const link = header.children[1].children[0];
+            assert.equal(link.href, "https://example.test/");
+            assert.equal(link.children[0].hidden, hidden);
+            assert.equal(link.children[1].textContent, text);
             assert.equal(f.document.title, "Example");
             destroy();
         } finally {
@@ -600,12 +612,12 @@ test("link targets keep internal navigation and open new tabs synchronously with
     assert.equal(iframe.tagName, "IFRAME");
     assert.equal(iframe.src, "https://example.test/");
     assert.ok(!iframe.attributes.get("sandbox").includes("allow-top-navigation"));
-    assert.equal(header.children[1].children[1].textContent, "官网");
+    assert.equal(header.children[1].children[0].children[1].textContent, "官网");
     assert.equal(header.children[0].hidden, false);
     assert.deepEqual(f.menus[0].actions, []);
     header.children[0].children[0].onclick();
     assert.equal(f.navigation.current, "");
-    assert.equal(header.children[1].children[1].textContent, "Example");
+    assert.equal(header.children[1].children[0].children[1].textContent, "Example");
     blank.dispatchEvent(Object.assign(new Event("click", { cancelable: true }), { button: 0 }));
     assert.deepEqual(f.opened, [{ url: "https://github.com/Example", target: "_blank", features: "noopener,noreferrer" }]);
     assert.deepEqual(f.urls, []);
@@ -659,6 +671,8 @@ test("invalid external JSON rejects ambiguous navigation, duplicate modules and 
     const item = { name: "Module", icon: { text: "⚙️" }, module: "Module" };
     for (const config of [
         { title: "Example", logoText: {}, sections: [] },
+        { title: "Example", logoHref: {}, sections: [] },
+        { title: "Example", logoHref: "java\nscript:alert(1)", sections: [] },
         { title: "Example", sections: [{ title: "插件", layout: "unknown", items: [item] }] },
         { title: "Example", sections: [{ title: "插件", items: [item, item] }] },
         { title: "Example", sections: [{ title: "插件", items: [{ ...item, href: "/guide/" }] }] },

@@ -8,6 +8,8 @@ export interface HomeState {
     logo?: string;
     /** 首页导航文字 / Homepage navigation text. */
     logoText?: string;
+    /** 网页导航品牌链接 / Web navigation brand link. */
+    logoHref?: string;
     /** 可用菜单操作 / Available menu actions. */
     actions: MenuAction[];
     /** 操作是否正在执行 / Whether an operation is in progress. */
@@ -57,6 +59,8 @@ export interface HomeConfig {
     logo?: string;
     /** 网页导航文字，沿用 Rspress 命名 / Web navigation text, following Rspress naming. */
     logoText?: string;
+    /** 网页导航品牌链接，相对于 JSON 地址；默认网站首页 / Web navigation brand link, relative to the JSON URL; defaults to the site homepage. */
+    logoHref?: string;
     sections: { title: string; layout?: "grid" | "list"; items: HomeItem[] }[];
     footer?: string[];
 }

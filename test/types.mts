@@ -27,6 +27,7 @@ const home: HomeConfig = {
     title: "Example",
     logo: "assets/logo.png",
     logoText: "Example",
+    logoHref: "/",
     sections: [
         {
             title: "项目链接",

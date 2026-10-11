@@ -26,12 +26,15 @@ export function browserHost({ menu, back }) {
     title.className = "pp-host-title";
     const brand = document.createElement("div");
     brand.className = "pp-host-brand";
+    const brandLink = document.createElement("a");
+    brandLink.className = "pp-host-brand-link";
     const logo = document.createElement("span");
     logo.className = "pp-host-logo";
     const image = document.createElement("img");
-    image.alt = "";
+    image.alt = "logo";
     logo.append(image);
-    brand.append(logo, title);
+    brandLink.append(logo, title);
+    brand.append(brandLink);
     header.append(left, brand, menu.element);
     document.body.prepend(header);
     const toast = document.createElement("div");
@@ -66,6 +69,7 @@ export function browserHost({ menu, back }) {
     return {
         update(state) {
             title.textContent = state.logoText ?? state.title;
+            brandLink.href = state.logoHref ?? "/";
             logo.hidden = !state.logo;
             if (state.logo) image.src = state.logo;
             left.hidden = !state.canGoBack;
@@ -120,6 +124,7 @@ export class PageController {
     #title;
     #logo;
     #logoText;
+    #logoHref;
     #modules;
     #links;
     #session;
@@ -132,12 +137,13 @@ export class PageController {
      * @param {HTMLElement} home 首页节点 / Homepage node.
      * @param {object} options 宿主、菜单、品牌及入口 / Host, menu, brand and entries.
      */
-    constructor(container, home, { host, menu, title, logo, logoText, modules, links = [] }) {
+    constructor(container, home, { host, menu, title, logo, logoText, logoHref, modules, links = [] }) {
         this.#host = host;
         this.#menu = menu;
         this.#title = title;
         this.#logo = logo;
         this.#logoText = logoText || (logo ? "" : title);
+        this.#logoHref = logoHref;
         this.#modules = modules;
         this.#links = links;
         this.#navigation = new Navigation(container, home, (key, signal) => this.#view(key, signal));
@@ -225,7 +231,7 @@ export class PageController {
         };
         document.title = state.title;
         this.#menu.update(state.actions, state.busy);
-        Promise.resolve(this.#host.update({ ...state, logo: module ? undefined : this.#logo, logoText: module ? undefined : this.#logoText, canGoBack: this.#navigation.canGoBack })).catch(error => this.notice({ kind: "error", message: error.message }));
+        Promise.resolve(this.#host.update({ ...state, logo: module ? undefined : this.#logo, logoText: module ? undefined : this.#logoText, logoHref: this.#logoHref, canGoBack: this.#navigation.canGoBack })).catch(error => this.notice({ kind: "error", message: error.message }));
     }
 
     /**
