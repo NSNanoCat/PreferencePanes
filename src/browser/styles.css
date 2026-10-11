@@ -308,6 +308,8 @@
     padding: env(safe-area-inset-top) max(20px, env(safe-area-inset-right)) 0 max(20px, env(safe-area-inset-left));
     border-bottom: 1px solid transparent;
     background: transparent;
+    -webkit-backdrop-filter: blur(25px);
+    backdrop-filter: blur(25px);
     color: var(--pp-text);
     transition:
         background-color 200ms ease-in-out,
@@ -316,8 +318,6 @@
 .pp-host-header.pp-scrolled {
     background: rgba(255, 255, 255, 0.6);
     border-color: var(--pp-border);
-    -webkit-backdrop-filter: blur(25px);
-    backdrop-filter: blur(25px);
 }
 :root[data-theme="dark"] .pp-host-header.pp-scrolled {
     background: rgba(13, 14, 15, 0.6);
