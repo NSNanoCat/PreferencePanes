@@ -28,14 +28,14 @@ export class ActionMenu {
         this.element = document.createElement("span");
         const triggerRoot = this.element.attachShadow({ mode: "open" });
         triggerRoot.innerHTML = `<style>
-          :host{display:inline-flex;width:44px;height:44px;color:inherit}
+          :host{display:inline-flex;flex:none;width:37px;height:37px;color:inherit}
           :host([hidden]){display:none!important}
-          button{width:44px;height:44px;padding:8px;border-radius:4px;font:inherit;cursor:pointer;border:0;color:inherit;background:none}
+          button{box-sizing:border-box;width:37px;height:37px;padding:8px;border-radius:4px;font:inherit;cursor:pointer;border:0;color:inherit;background:none;transition:background-color .3s}
           button:hover{background:var(--pp-field,#8882)}
           button:disabled{opacity:.4;cursor:default}
           button:focus-visible{outline:2px solid currentColor;outline-offset:-3px}
-          svg{display:block;width:24px;height:24px;fill:currentColor}
-        </style><button type="button" aria-label="更多操作" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v2H4zm0 6h16v2H4zm0 6h16v2H4z"/></svg></button>`;
+          svg{display:block;width:21px;height:21px;fill:none}
+        </style><button type="button" aria-label="更多操作" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 21 21" aria-hidden="true"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.667" d="M3.645 5.225h13.333M3.645 10.225h13.333M3.645 15.225h13.333"/></svg></button>`;
         this.#button = triggerRoot.querySelector("button");
         this.#layer = document.createElement("span");
         const layerRoot = this.#layer.attachShadow({ mode: "open" });
