@@ -72,9 +72,8 @@ export function browserHost({ menu, back }) {
             brandLink.href = state.logoHref ?? "/";
             logo.hidden = !state.logo;
             if (state.logo) image.src = state.logo;
-            left.hidden = !state.canGoBack;
             menu.element.hidden = !state.actions.length;
-            button.disabled = state.busy;
+            button.disabled = state.busy || !state.canGoBack;
             scroll();
         },
         confirm: message => window.confirm(message),

@@ -387,7 +387,8 @@ test("browser chrome is unique and follows theme, keyboard, threshold and restor
     });
     const header = f.document.body.children.find(node => node.className === "pp-host-header");
     assert.equal(f.document.body.children.filter(node => node.className === "pp-host-header").length, 1);
-    assert.equal(header.children[0].hidden, true);
+    assert.notEqual(header.children[0].hidden, true);
+    assert.equal(header.children[0].children[0].disabled, true);
     f.theme.matches = true;
     f.theme.dispatchEvent(new Event("change"));
     assert.equal(f.root.dataset.theme, "dark");
@@ -402,9 +403,11 @@ test("browser chrome is unique and follows theme, keyboard, threshold and restor
     await new Promise(resolve => setImmediate(resolve));
     f.window.dispatchEvent(Object.assign(new Event("pageshow"), { persisted: true }));
     assert.equal(f.panels.length, 1);
-    assert.equal(header.children[0].hidden, false);
+    assert.notEqual(header.children[0].hidden, true);
+    assert.equal(header.children[0].children[0].disabled, false);
     header.children[0].children[0].onclick();
     assert.equal(f.navigation.current, "");
+    assert.notEqual(header.children[0].hidden, true);
     destroy();
     assert.equal(f.root.dataset.theme, undefined);
     assert.equal(f.menus[0].destroyed, true);
@@ -613,7 +616,8 @@ test("link targets keep internal navigation and open new tabs synchronously with
     assert.equal(iframe.src, "https://example.test/");
     assert.ok(!iframe.attributes.get("sandbox").includes("allow-top-navigation"));
     assert.equal(header.children[1].children[0].children[1].textContent, "官网");
-    assert.equal(header.children[0].hidden, false);
+    assert.notEqual(header.children[0].hidden, true);
+    assert.equal(header.children[0].children[0].disabled, false);
     assert.deepEqual(f.menus[0].actions, []);
     header.children[0].children[0].onclick();
     assert.equal(f.navigation.current, "");

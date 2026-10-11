@@ -247,6 +247,7 @@
  * The landing page reuses form groups and descriptions, with entries wrapping by viewport width. */
 :root.pp-page {
     color-scheme: light dark;
+    font-size: 16px;
 }
 .pp-page body {
     margin: 0;
@@ -297,6 +298,16 @@
     height: 100%;
     background: inherit;
 }
+/* 网页导航复用宿主官网已有字体；官网更换字体产物时须同步资源地址。
+ * The web navigation reuses the host site's existing font; update the URL when its font artifact changes. */
+@font-face {
+    font-family: "SF Pro Display";
+    font-style: normal;
+    font-weight: 700;
+    src:
+        local("SF Pro Display"),
+        url("/static/font/SFPRODISPLAYBOLD.21a7ca4497.woff2") format("woff2");
+}
 .pp-host-header {
     box-sizing: border-box;
     position: fixed;
@@ -311,6 +322,13 @@
     -webkit-backdrop-filter: blur(25px);
     backdrop-filter: blur(25px);
     color: var(--pp-text);
+    font-family: "SF Pro Display", "Inter var experimental", "Inter var", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+    line-height: 1.7;
+    font-synthesis: style;
+    text-rendering: optimizelegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
     transition:
         background-color 200ms ease-in-out,
         border-color 200ms ease-in-out;
@@ -337,7 +355,6 @@
     display: flex;
     align-items: center;
     flex: 1;
-    height: 36px;
     min-width: 0;
     margin-right: 8px;
 }
@@ -349,6 +366,8 @@
     max-width: 100%;
     color: inherit;
     text-decoration: none;
+    font-size: 1rem;
+    font-weight: 600;
     transition: opacity 0.3s;
 }
 .pp-host-brand-link:hover {
@@ -366,8 +385,6 @@
 .pp-host-title {
     min-width: 0;
     text-align: left;
-    font-size: 16px;
-    font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -389,9 +406,6 @@
 :root[data-theme="dark"] .pp-host-left::after {
     background-color: #5454547a;
 }
-.pp-host-left[hidden] {
-    display: none;
-}
 .pp-host-back {
     border: 0;
     border-radius: 18px;
@@ -402,6 +416,9 @@
     padding: 8px;
     cursor: pointer;
     transition: background-color 0.2s ease-in-out;
+}
+.pp-host-back:disabled {
+    cursor: default;
 }
 .pp-host-back svg {
     display: block;
