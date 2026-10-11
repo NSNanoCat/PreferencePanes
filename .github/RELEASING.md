@@ -1,6 +1,6 @@
 # PreferencePanes 发布流程
 
-## 待发布 1.3.x
+## 1.3.1
 
 首页、模块和字段子页统一在同一文档内渲染，替换模块 iframe 方案。首页仅通过 HEAD 探测，点击后读取 BoxJS 并挂载；字段子页复用会话。默认导航采用 `rp-nav` 的布局和滚动视觉规则，原生 Bridge 与品牌 CSS 保持项目维护。公开网页资产收敛为 `home.html` 和 `api.js`，旧模块网页资源与 ModuleFrame 已移除。
 
