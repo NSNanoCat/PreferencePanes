@@ -70,7 +70,7 @@ export class PreferencesClient {
     clearCaches(): Promise<void>;
     /** 删除声明的设置路径，默认整个模块数据，并恢复默认值 / Delete declared setting paths, defaulting to module data, and restore defaults. */
     reset(): Promise<void>;
-    /** 取消请求 / Cancel requests. */
+    /** 取消读取，已开始的写入继续完成 / Cancel reads while allowing started writes to finish. */
     leave(): void;
     /** 写入单个字段 / Write one field. */
     set(key: string, value: SettingsScalar | SettingsScalar[]): Promise<void>;

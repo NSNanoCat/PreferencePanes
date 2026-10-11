@@ -28,7 +28,7 @@
         },
         "./navigation": {
             "types": "./src/browser/Navigation.d.mts",
-            "import": "./dist/module/navigation.mjs"
+            "import": "./dist/navigation.mjs"
         }
     },
     "types": "src/index.d.ts",

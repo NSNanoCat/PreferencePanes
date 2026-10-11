@@ -1,7 +1,5 @@
 import { readFile } from "node:fs/promises";
 import { nodeResolve } from "@rollup/plugin-node-resolve";
-import { rollup } from "rollup";
-import pkg from "./package.json" with { type: "json" };
 
 /**
  * 页面样式由包自身编译，静态页面与浏览器包使用同一套产物。
@@ -32,7 +30,7 @@ function resources() {
  */
 export default [
     { input: "src/browser/mount.mjs", output: { file: "dist/preference-panes.mjs", format: "es" } },
-    { input: "src/browser/Navigation.mjs", output: { file: "dist/module/navigation.mjs", format: "es" } },
+    { input: "src/browser/Navigation.mjs", output: { file: "dist/navigation.mjs", format: "es" } },
     {
         input: "src/browser/home.mjs",
         output: { dir: "dist", entryFileNames: "home.mjs", format: "es" },
@@ -49,19 +47,6 @@ export default [
         ],
     },
     { input: "src/api.mjs", output: { file: "dist/api.js", format: "iife" } },
-    {
-        input: "src/browser/index.mjs",
-        output: { file: "dist/module/index.mjs", format: "es" },
-        plugins: [
-            {
-                name: "page-shell",
-                async generateBundle() {
-                    const html = await readFile(new URL("./src/browser/module.html", import.meta.url), "utf8");
-                    this.emitFile({ type: "asset", fileName: "index.html", source: html.replace("<!--__PREFERENCE_PANES_JSON__-->", "").replace("<!--__PREFERENCE_PANES_STYLESHEET__-->", "").replaceAll("__VERSION__", pkg.version) });
-                },
-            },
-        ],
-    },
 ].map(config => ({
     ...config,
     plugins: [nodeResolve({ browser: true }), resources(), ...(config.plugins ?? [])],

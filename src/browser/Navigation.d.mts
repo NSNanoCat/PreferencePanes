@@ -1,85 +1,4 @@
 /**
- * 静态 HTML 的模块 iframe 容器；页面资源输入写入 iframe 数据属性。
- * Static HTML module iframe whose resource inputs are written to iframe data attributes.
- * confirm 事件可 preventDefault 后通过 detail.resolve/reject 完成宿主确认。
- * Prevent default on confirm events and settle host dialogs through detail.resolve/reject.
- * notice 事件可 preventDefault 后交由宿主显示，模块不再创建网页 Toast。
- * Prevent default on notice events to display them in the host without a module web Toast.
- * open-url 事件可 preventDefault 后交由宿主打开 URL，模块不再执行链接默认导航。
- * Prevent default on open-url events to open the URL in the host instead of navigating the module.
- */
-export class ModuleFrame extends EventTarget {
-    /**
-     * 创建容器。
-     * Create a container.
-     * @param url 模块地址 / Module URL.
-     * @param options 静态页面请求与资源输入 / Static page request and resource inputs.
-     */
-    constructor(url: string | URL, options?: { signal?: AbortSignal; headers?: HeadersInit });
-    /**
-     * 宿主挂载节点。
-     * Host-mounted element.
-     */
-    readonly element: HTMLIFrameElement;
-    /**
-     * change 事件对应的导航状态。
-     * Navigation state exposed with change events.
-     */
-    readonly state: { title: string; module: string; busy: boolean; canGoBack: boolean; actions: MenuAction[] };
-    /**
-     * 获取原始 HTML。
-     * Fetch unmodified HTML.
-     * @returns 加载完成 / Load completion.
-     */
-    load(): Promise<void>;
-    /**
-     * 沿模块历史返回。
-     * Go back through module history.
-     * @returns 无返回值 / No return value.
-     */
-    back(): void;
-    /**
-     * 执行模块提供的菜单操作。
-     * Perform a module-provided menu action.
-     * @param id 操作标识 / Action identifier.
-     * @returns 无返回值 / No return value.
-     */
-    perform(id: string): void;
-    /**
-     * 取消请求与事件订阅。
-     * Cancel requests and subscriptions.
-     * @returns 无返回值 / No return value.
-     */
-    destroy(): void;
-}
-
-/**
- * 宿主确认事件的数据。
- * Host confirmation event detail.
- */
-export interface ConfirmationRequest {
-    /**
-     * 确认内容。
-     * Confirmation message.
-     */
-    message: string;
-    /**
-     * 返回选择。
-     * Return the user's choice.
-     * @param confirmed 是否确认 / Whether confirmed.
-     * @returns 无返回值 / No return value.
-     */
-    resolve(confirmed: boolean): void;
-    /**
-     * 返回失败。
-     * Return a failure.
-     * @param error 错误 / Error.
-     * @returns 无返回值 / No return value.
-     */
-    reject(error: Error): void;
-}
-
-/**
  * 操作结果通知。
  * Operation result notice.
  */
@@ -94,18 +13,6 @@ export interface Notice {
      * Formatted notice text.
      */
     message: string;
-}
-
-/**
- * 宿主 URL 导航请求。
- * Host URL navigation request.
- */
-export interface OpenURLRequest {
-    /**
-     * 完整目标地址。
-     * Absolute target URL.
-     */
-    url: string;
 }
 
 /**
@@ -131,8 +38,8 @@ export interface MenuAction {
 }
 
 /**
- * 共用三点菜单。
- * Shared overflow menu.
+ * 共用操作菜单。
+ * Shared action menu.
  */
 export class ActionMenu {
     /**
@@ -258,6 +165,8 @@ export class Navigation extends EventTarget {
      * @returns 无返回值 / No return value.
      */
     open(key: string): void;
+    /** 更新当前挂载视图，不增加历史 / Refresh the mounted view without adding history. */
+    refresh(): void;
     /**
      * 沿联合历史后退。
      * Go back through joint history.

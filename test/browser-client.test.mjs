@@ -316,3 +316,39 @@ test("a timed out request does not abort later API actions", async () => {
     await client.set("Module.Settings.count", 3);
     assert.equal(client.snapshot().values["Module.Settings.count"], 3);
 });
+
+test("leaving aborts active reads while started persistence writes finish", async () => {
+    let readSignal, writeSignal, complete;
+    let blockRead = false;
+    const notices = [];
+    const client = new PreferencesClient({
+        definition,
+        notify: event => notices.push(event),
+        fetch: async (url, options) => {
+            if (url.endsWith("/get")) {
+                readSignal = options.signal;
+                if (blockRead)
+                    await new Promise((_, reject) => {
+                        options.signal.addEventListener("abort", () => reject(new DOMException("Left page", "AbortError")), { once: true });
+                    });
+                return new Response(JSON.stringify(settings));
+            }
+            writeSignal = options.signal;
+            await new Promise(resolve => {
+                complete = resolve;
+            });
+            return new Response("{}");
+        },
+    });
+    await client.open();
+    blockRead = true;
+    const reading = assert.rejects(client.readSettings(), { name: "AbortError" });
+    const write = client.set("Module.Settings.Home.enabled", true);
+    client.leave();
+    assert.equal(readSignal.aborted, true);
+    assert.equal(writeSignal.aborted, false);
+    complete();
+    await Promise.all([write, reading]);
+    assert.equal(client.snapshot().values["Module.Settings.Home.enabled"], true);
+    assert.equal(notices.at(-1).kind, "success");
+});

@@ -1,10 +1,9 @@
 export { ActionMenu } from "./ActionMenu.mjs";
-export { ModuleFrame } from "./ModuleFrame.mjs";
 export { ModuleStatus, probeModule } from "./ModuleStatus.mjs";
 
 /**
- * 同一文档内的主页/子页导航；iframe 各自的实例通过浏览器联合历史协作。
- * Navigate home/detail views within a document; iframe instances cooperate through joint browser history.
+ * 同一文档内的首页、模块及字段子页导航。
+ * Navigate homepage, module and field views within one document.
  */
 export class Navigation extends EventTarget {
     #container;
@@ -16,7 +15,7 @@ export class Navigation extends EventTarget {
     #retiring;
     #controller;
     #animation;
-    #scroll = new WeakMap();
+    #scroll = new Map();
     #onHistory = () => this.#route();
     #onPageShow = event => {
         if (event.persisted) this.#route(true);
@@ -59,26 +58,35 @@ export class Navigation extends EventTarget {
     }
 
     /**
-     * 加入子页历史；使用文档自身 URL，避免 srcdoc 按宿主 base URL 跳转。
-     * Push a detail using the document URL, avoiding srcdoc navigation against the host base URL.
+     * 加入模块或字段子页历史，保留路由中的层级分隔符。
+     * Push a module or field view while retaining route hierarchy separators.
      * @param {string} key 子页键 / Detail key.
      * @returns {void} 无返回值 / No return value.
      */
     open(key) {
         if (key === this.#key) return;
         const url = new URL(this.#window.location.href);
-        url.hash = encodeURIComponent(key);
+        url.hash = key.split("/").map(encodeURIComponent).join("/");
         this.#window.history.pushState({ ...this.#window.history.state, preferencePanesRoute: key }, "", url.href);
         this.#route();
     }
 
     /**
-     * 沿浏览器联合历史返回，根页可退回宿主或上个文档。
-     * Go back through joint history, including a host or previous document from home.
+     * 沿文档历史返回，根页可退回上个文档。
+     * Go back through document history, including the previous document from home.
      * @returns {void} 无返回值 / No return value.
      */
     back() {
         if (this.canGoBack) this.#window.history.back();
+    }
+
+    /**
+     * 更新当前页的挂载视图，保留路由和滚动位置。
+     * Refresh the mounted view while retaining route and scroll position.
+     * @returns {void} 无返回值 / No return value.
+     */
+    refresh() {
+        this.#route(true);
     }
 
     /**
@@ -97,28 +105,42 @@ export class Navigation extends EventTarget {
             key = "";
         }
         if (!reload && key === this.#key) return;
+        if (key !== this.#key) this.#scroll.set(this.#key, (this.#view ?? this.#home).scrollTop);
         this.#controller?.abort();
         this.#controller = new AbortController();
         const next = key ? this.#create(key, this.#controller.signal) : undefined;
         if (!next) key = "";
         const history = this.#window.history;
-        // 直接打开子页时建立一次主页历史；刷新不重复堆叠。
-        // Seed home history once for direct details, without stacking entries on reload.
+        // 直接打开字段页时补齐首页和模块历史；刷新不重复堆叠。
+        // Seed homepage and module history for direct field links without stacking on reload.
         if (url.hash && history.state?.preferencePanesRoute !== key) {
             url.hash = "";
             history.replaceState({ ...history.state, preferencePanesRoute: "" }, "", url.href);
             if (key) {
-                url.hash = encodeURIComponent(key);
+                const module = key.split("/")[0];
+                if (key.includes("/") && module !== "$link") {
+                    url.hash = encodeURIComponent(module);
+                    history.pushState({ ...history.state, preferencePanesRoute: module }, "", url.href);
+                }
+                url.hash = key.split("/").map(encodeURIComponent).join("/");
                 history.pushState({ ...history.state, preferencePanesRoute: key }, "", url.href);
             }
         }
         const previous = this.#view;
+        if (previous === next && this.#key === key) {
+            if (previous && this.#scroll.has(key)) {
+                previous.scrollTop = this.#scroll.get(key);
+                this.#scroll.delete(key);
+            }
+            this.dispatchEvent(new Event("change"));
+            return;
+        }
+        const scroll = this.#scroll.get(key) ?? (key === this.#key ? (previous?.scrollTop ?? 0) : 0);
         const position = previous ? this.#window.getComputedStyle(previous).transform : "none";
         this.#animation?.cancel();
         this.#retiring?.remove();
         this.#retiring = previous;
         if (previous) {
-            this.#scroll.set(previous, previous.scrollTop);
             previous.inert = true;
         }
         this.#key = key;
@@ -127,7 +149,14 @@ export class Navigation extends EventTarget {
         if (next) {
             next.inert = false;
             this.#container.append(next);
-            next.scrollTop = this.#scroll.get(next) ?? 0;
+            next.scrollTop = scroll;
+            // 加载占位页可能无法滚到原位置；配置与控件就绪后的 refresh 再恢复一次。
+            // A loading placeholder may clamp scrolling; restore once more when config and controls refresh.
+            if (next.scrollTop === scroll) this.#scroll.delete(key);
+        }
+        if (!next) {
+            this.#home.scrollTop = this.#scroll.get("") ?? 0;
+            this.#scroll.delete("");
         }
         const moving = next ?? previous;
         if (moving) {

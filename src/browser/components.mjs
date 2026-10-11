@@ -37,18 +37,6 @@ export function fieldControl(control) {
 }
 
 /**
- * 元数据地址只允许 HTTP(S) 和相对地址。
- * Allow only HTTP(S) and relative metadata addresses.
- * @param {string} value 元数据地址 / Metadata address.
- * @returns {string} 完整地址 / Absolute address.
- */
-export function resourceURL(value) {
-    const url = new URL(value, document.baseURI);
-    if (!["http:", "https:"].includes(url.protocol)) throw new TypeError("Metadata URLs must use HTTP(S)");
-    return url.href;
-}
-
-/**
  * 创建覆盖可用内容区的通用读取状态，失败时可附加重试动作。
  * Create a shared status view that fills the available content area and may include retry.
  * @param {string} message 状态文本 / Status message.
@@ -69,36 +57,4 @@ export function statusView(message, retry) {
         view.append(button);
     }
     return view;
-}
-
-/**
- * 请求宿主确认；独立网页使用浏览器对话框。
- * Request confirmation from the host, using the browser dialog for standalone pages.
- * @param {Window} host 模块窗口 / Module window.
- * @param {string} message 确认内容 / Confirmation message.
- * @returns {Promise<boolean>} 用户是否确认 / Whether the user confirmed.
- */
-export function requestConfirmation(host, message) {
-    return new Promise((resolve, reject) => {
-        const frame = host.frameElement;
-        if (frame) {
-            const event = new frame.ownerDocument.defaultView.CustomEvent("preferencepanes:confirm", { cancelable: true, detail: { message, resolve, reject } });
-            if (!frame.dispatchEvent(event)) return;
-        }
-        resolve(host.confirm(message));
-    });
-}
-
-/**
- * 请求宿主打开 URL；未被接管时保留链接默认导航。
- * Request host URL navigation while preserving the link default when unhandled.
- * @param {Window} host 模块窗口 / Module window.
- * @param {string} url 完整目标地址 / Absolute target URL.
- * @returns {boolean} 宿主是否接管导航 / Whether the host accepted navigation ownership.
- */
-export function requestURLNavigation(host, url) {
-    const frame = host.frameElement;
-    if (!frame) return false;
-    const event = new frame.ownerDocument.defaultView.CustomEvent("preferencepanes:open-url", { cancelable: true, detail: { url } });
-    return !frame.dispatchEvent(event);
 }

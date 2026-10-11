@@ -1,5 +1,9 @@
 # PreferencePanes 发布流程
 
+## 待发布 1.3.x
+
+首页、模块和字段子页统一在同一文档内渲染，替换模块 iframe 方案。首页仅通过 HEAD 探测，点击后读取 BoxJS 并挂载；字段子页复用会话。默认导航采用 `rp-nav` 的布局和滚动视觉规则，原生 Bridge 与品牌 CSS 保持项目维护。公开网页资产收敛为 `home.html` 和 `api.js`，旧模块网页资源与 ModuleFrame 已移除。
+
 ## 1.3.0
 
 新增内置网页宿主与默认样式的通用首页 `home.html`。消费方原样部署模板，使用固定相对路径 `home.json`、可选 `theme.css` 和可选 `bridge.mjs` 定制内容、品牌和原生能力。BoxJS 新增数组索引字段、共享缓存路径与面板重置范围。
@@ -52,10 +56,10 @@ npm pack --dry-run
 
 - 根包没有运行时导出，browser 包只导出 `mount`。
 - `dist/api.js` 只提供通用 Storage 深路径读写，不包含网络 transport、`/configs/` 或模块路由。
-- 浏览器只请求页面声明的 BoxJS 资源；静态页面未声明时回退 `/api/{module}`，且不存在 `/api/{module}/{action}`。
-- `/settings/{module}`、`/settings/assets/index.mjs`、`/settings/assets/navigation.mjs` 分别映射 `index.html`、`index.mjs`、`navigation.mjs`，不存在 `web.js`。
+- 首页只通过 `HEAD /api/{module}` 探测，点击或直接打开模块后才 `GET /api/{module}`；字段子页复用会话，不存在 `/api/{module}/{action}`。
+- `/settings/` 使用内联 `home.html`；不存在模块 HTML、模块页面 JS、独立网页导航资源或 `web.js`。
 - 首页 `home.html` 内联程序与默认样式，固定读取 `home.json`；可选 CSS 和 Bridge 只有 HEAD 200 才加载，404 使用内置功能，缺少 Bridge 时不请求 SDK。
-- `ModuleFrame` 只用普通 GET 获取静态 HTML，并将合法 HTTP(S) BoxJS/CSS 资源地址写入 iframe 数据属性；`mount(boxjs, css)` 继续为类型错误。
+- 设置表单直接挂载在同一文档，只有外链的 `internal` 模式使用隔离 iframe；公开入口仍为 `mount(boxjs)`，额外参数继续为类型错误。
 - 内置演示覆盖全部设置项，默认使用包内 CSS，并可切换示例 CSS 或导入 CSS。
 - 缺少 `X-PreferencePanes-Version` 的 HEAD 200 不会被判为已安装。
 - Surge、Loon、Stash、Shadowrocket、Egern 与 Quantumult X VM 测试、浏览器客户端测试和导入预览全部通过。
@@ -65,14 +69,14 @@ npm pack --dry-run
 1. 以上一正式 tag 为基线更新 `CHANGELOG.md`，只记录最终用户可感知的变化；将 `dev` 合入 `main`，确认 `main` 与发布提交一致。
 2. 创建并推送当前版本标签。
 3. 等待 npm、GitHub Packages 和 Release Assets 工作流成功。
-4. 确认 GitHub Release 正文与 `CHANGELOG.md` 一致，完整包含 `api.js`、`home.html`、`index.html`、`index.mjs` 与 `navigation.mjs`，且不存在 `web.js` 或独立首页 JS/CSS。
+4. 确认 GitHub Release 正文与 `CHANGELOG.md` 一致，网页资产只有 `api.js` 与 `home.html`，不存在旧模块网页资源、`web.js` 或独立首页 JS/CSS。
 5. 下载 registry 包与 Release 资产，复核版本、内容和 SHA-256。
 
 普通 main/dev 推送和手动 CI 只验证候选包，不发布。两个 registry 的版本取自 tag；正式版本使用 `latest`。Release Assets 工作流同样由 tag 触发，正文直接读取根目录 `CHANGELOG.md`。
 
 ## 消费方顺序
 
-Biliverse 必须在对应 PreferencePanes 版本发布后更新 Enhanced 模板，逐文件映射三个静态页面资源，并保留唯一固定存储 `api.js`。四个业务模块分别将自己的 `/api/{module}` 直接 Mock 到同版 BoxJS；最后部署站点，并更新聚合仓库。
+Biliverse 必须在对应 PreferencePanes 1.3.x 发布后同步 Enhanced 模板与站点：首页映射共用 `home.html`，内容资源分别映射 JSON、CSS、Bridge 和图片，并保留唯一固定存储 `api.js`。DualSubs 站点部署同版首页，插件只保留 API 与配置 JSON。业务模块将自己的 `/api/{module}` 直接 Mock 到同版 BoxJS；API 面板别名使用各自配置地址，不再加载另一模块页面。
 
 业务 Release 使用整改后的 main 提交创建新 Tag 并发布完整资产。发布后下载所有资产复验，不只检查单个模板文件。
 

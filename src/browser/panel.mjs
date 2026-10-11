@@ -1,8 +1,6 @@
-import { ActionMenu } from "./ActionMenu.mjs";
 import { validValue } from "./boxjs.mjs";
 import { PreferencesClient } from "./client.mjs";
-import { fieldControl, element as node, requestConfirmation, requestURLNavigation, settingRow, statusView } from "./components.mjs";
-import { Navigation } from "./Navigation.mjs";
+import { fieldControl, element as node, settingRow, statusView } from "./components.mjs";
 
 /**
  * 将字段级存储诊断转换为简短提示。
@@ -21,20 +19,24 @@ function warningMessage(warning) {
 }
 
 /**
- * 管理模块表单、导航、操作队列和短暂通知。
- * Manage the module form, navigation, operation queue, and transient notifications.
+ * 管理模块表单、操作队列和设置会话。
+ * Manage the module form, operation queue and settings session.
  */
 export class PreferencesPanel {
     #release;
+    #view;
+    #state;
+    #perform;
 
     /**
      * 挂载 BoxJS 定义对应的模块表单。
      * Mount the module form described by a BoxJS definition.
      * @param {HTMLElement} root 包内挂载元素 / Internal mount element.
      * @param {import("../index.js").ModuleDefinition} definition 已规范化字段定义 / Normalized field definition.
+     * @param {import("./page.mjs").PageController} page 内部页面控制器 / Internal page controller.
      */
-    constructor(root, definition) {
-        this.#release = this.#mount(root, definition);
+    constructor(root, definition, page) {
+        this.#release = this.#mount(root, definition, page);
     }
 
     /**
@@ -42,13 +44,13 @@ export class PreferencesPanel {
      * Build panel DOM, interactions, and session, then return its release operation.
      * @param {HTMLElement} root 包内挂载元素 / Internal mount element.
      * @param {import("../index.js").ModuleDefinition} definition 已规范化字段定义 / Normalized field definition.
+     * @param {import("./page.mjs").PageController} page 内部页面控制器 / Internal page controller.
      * @returns {() => void} 释放操作 / Release operation.
      */
-    #mount(root, definition) {
+    #mount(root, definition, page) {
         const title = definition.metadata?.name ?? definition.module;
         const document = root.ownerDocument;
         const window = document.defaultView;
-        const frame = window.frameElement?.dataset.preferencePanes ? window.frameElement : undefined;
         const shell = node("div", "pp-panel");
         shell.dataset.module = definition.module;
         const handlers = new Map();
@@ -59,50 +61,25 @@ export class PreferencesPanel {
             { id: "reset", label: "重置设置", destructive: true },
         ];
         const viewport = node("div", "pp-viewport");
-        let back, heading, menu;
-        if (frame) shell.append(viewport);
-        else {
-            const header = node("header", "pp-header");
-            back = node("button", "pp-back", "‹");
-            back.setAttribute("aria-label", "返回");
-            back.type = "button";
-            heading = node("h1", "pp-title", title);
-            menu = new ActionMenu(id => runAction(id));
-            const trailing = node("span", "pp-nav-spacer");
-            trailing.append(menu.element);
-            header.append(back, heading, trailing);
-            shell.append(header, viewport);
-        }
-        let toast;
+        shell.append(viewport);
         root.append(shell);
-        // 嵌入模式向宿主发布导航状态，宿主不读取或修改模块内部 DOM。
-        // Embedded mode publishes navigation state without host reads or mutations of the module DOM.
+        const editors = new Map();
+        this.#view = key => {
+            const editor = editors.get(key);
+            editor?.load?.();
+            return editor?.node ?? root;
+        };
+        this.#state = key => ({ title: editors.get(key)?.title ?? title, actions: handlers.size ? menuItems : [], busy: saving });
+        this.#perform = id => {
+            if (!saving && handlers.has(id)) runAction(id);
+        };
         const publishNavigation = () => {
-            const actions = handlers.size ? menuItems : [];
-            if (frame)
-                frame.dispatchEvent(
-                    new frame.ownerDocument.defaultView.CustomEvent("preferencepanes:change", {
-                        detail: { title: currentTitle, module: definition.module, busy: saving, canGoBack, actions },
-                    }),
-                );
-            else {
-                heading.textContent = currentTitle;
-                back.disabled = !canGoBack;
-                menu.update(actions, saving);
-            }
+            if (!destroyed) page.update();
         };
-        const onAction = event => {
-            if (!saving && handlers.has(event.detail)) runAction(event.detail);
-        };
-        frame?.addEventListener("preferencepanes:action", onAction);
-        let timer,
-            navigation,
-            generation = 0,
+        let generation = 0,
             active = null,
             saving = false,
-            destroyed = false,
-            currentTitle = title,
-            canGoBack = window.history.length > 1;
+            destroyed = false;
         /**
          * 展示短暂通知，不刷新设置数据。
          * Display a transient notification without refreshing settings.
@@ -129,26 +106,12 @@ export class PreferencesPanel {
                     message = "修改成功";
                     break;
             }
-            // 宿主接管时不创建网页 Toast，也不运行其计时器。
-            // A host-owned notice creates no web Toast and starts no local timer.
-            if (frame && !frame.dispatchEvent(new frame.ownerDocument.defaultView.CustomEvent("preferencepanes:notice", { cancelable: true, detail: { kind: event.kind, message } }))) return;
-            if (!toast) {
-                toast = node("div", "pp-toast");
-                toast.setAttribute("role", "status");
-                shell.append(toast);
-            }
-            toast.textContent = message;
-            toast.dataset.kind = event.kind;
-            toast.hidden = false;
-            clearTimeout(timer);
-            timer = setTimeout(() => {
-                toast.hidden = true;
-            }, 2400);
+            page.notice({ kind: event.kind, message });
         };
         const client = new PreferencesClient({ definition, notify });
         /**
-         * 两种菜单入口共用异步错误处理，包含宿主确认框错误。
-         * Share async error handling between both menus, including host-dialog errors.
+         * 菜单操作统一处理异步错误，包含宿主确认框错误。
+         * Handle asynchronous action errors, including host-dialog errors.
          * @param {string} id 操作标识 / Action identifier.
          * @returns {Promise<void>} 操作已处理 / Action handled.
          */
@@ -168,8 +131,6 @@ export class PreferencesPanel {
         async function open(module) {
             const version = ++generation;
             active = module;
-            currentTitle = module;
-            canGoBack = window.history.length > 1;
             publishNavigation();
             viewport.replaceChildren(statusView("读取设置…"));
             try {
@@ -188,7 +149,6 @@ export class PreferencesPanel {
          */
         function controls() {
             const { definition, values } = client.snapshot();
-            currentTitle = definition.metadata?.name || active;
             const view = node("section", "pp-fields");
             /**
              * 挂载后执行的多行高度更新
@@ -196,23 +156,12 @@ export class PreferencesPanel {
              * @type {Array<() => void>}
              */
             const growingInputs = [];
-            const editors = new Map();
+            editors.clear();
             const summaries = [];
             const warningRefreshers = [];
             const groups = new Map();
             let queue = Promise.resolve(),
                 pendingWrites = 0;
-            /**
-             * 导航组件处理页面切换，表单只更新当前标题与返回按钮。
-             * Let navigation own transitions; the form only updates the title and back button.
-             * @returns {void} 无返回值 / No return value.
-             */
-            const updateNavigation = () => {
-                const editor = editors.get(navigation.current);
-                currentTitle = editor?.title ?? definition.metadata?.name ?? active;
-                canGoBack = !saving && navigation.canGoBack;
-                publishNavigation();
-            };
             /**
              * 串行执行模块操作，保持输入可编辑。
              * Serialize module actions while keeping inputs editable.
@@ -224,7 +173,6 @@ export class PreferencesPanel {
             function perform(action, success, failure = () => {}) {
                 pendingWrites++;
                 saving = true;
-                canGoBack = false;
                 publishNavigation();
                 queue = queue
                     .then(action)
@@ -239,8 +187,6 @@ export class PreferencesPanel {
                     .finally(() => {
                         pendingWrites--;
                         saving = pendingWrites > 0;
-                        if (destroyed && !saving) client.leave();
-                        canGoBack = !saving && navigation.canGoBack;
                         publishNavigation();
                     });
                 return queue;
@@ -294,7 +240,8 @@ export class PreferencesPanel {
                             link.href = value;
                         };
                         link.addEventListener("click", event => {
-                            if (requestURLNavigation(window, link.href)) event.preventDefault();
+                            event.preventDefault();
+                            page.openURL(link.href);
                         });
                         row.append(link);
                         row.addEventListener("click", event => {
@@ -318,12 +265,12 @@ export class PreferencesPanel {
                         break;
                     }
                     case "checkboxes": {
-                        const page = node("section", "pp-choice-page");
-                        if (field.description) page.append(node("p", "pp-description", field.description));
+                        const editor = node("section", "pp-panel pp-detail pp-choice-page");
+                        if (field.description) editor.append(node("p", "pp-description", field.description));
                         const choices = node("div", "pp-rows");
-                        page.append(choices);
+                        editor.append(choices);
                         inputContainer = choices;
-                        editors.set(field.key, { node: page, title: match?.[2] ?? field.name });
+                        editors.set(field.key, { node: editor, title: match?.[2] ?? field.name });
                         const summary = node("span", "pp-summary");
                         const link = node("button", "pp-choice-link");
                         link.type = "button";
@@ -340,7 +287,7 @@ export class PreferencesPanel {
                         };
                         summaries.push(refresh);
                         refresh();
-                        link.onclick = () => navigation.open(field.key);
+                        link.onclick = () => page.open(field.key);
                         row.addEventListener("click", event => {
                             if (!link.contains(event.target)) link.click();
                         });
@@ -458,12 +405,12 @@ export class PreferencesPanel {
                 if (eventName === "input") inputContainer.addEventListener("compositionend", event => event.target.dispatchEvent(new window.Event("input", { bubbles: true })));
                 groups.get(group).append(row);
             }
-            const settingsPage = node("section", "pp-settings-page");
+            const settingsPage = node("section", "pp-panel pp-detail pp-settings-page");
             const settingsOutput = node("pre", "pp-cache");
             settingsOutput.setAttribute("aria-label", "Settings 内容");
             settingsPage.append(settingsOutput);
-            editors.set("$settings", { node: settingsPage, title: "设置" });
-            handlers.set("viewSettings", () => {
+            const loadSettings = () => {
+                editors.get("$settings").load = undefined;
                 if (saving) return;
                 let value;
                 return perform(
@@ -477,17 +424,24 @@ export class PreferencesPanel {
                     },
                     () => {
                         settingsOutput.textContent = value === undefined ? "暂无设置" : JSON.stringify(value, null, 2);
-                        navigation.open("$settings");
+                    },
+                    () => {
+                        settingsOutput.textContent = "读取设置失败";
                     },
                 );
+            };
+            editors.set("$settings", { node: settingsPage, title: "设置", load: loadSettings });
+            handlers.set("viewSettings", () => {
+                loadSettings();
+                page.open("$settings");
             });
-            const cachePage = node("section", "pp-cache-page");
+            const cachePage = node("section", "pp-panel pp-detail pp-cache-page");
             const output = node("pre", "pp-cache");
-            output.textContent = "暂无缓存";
+            output.textContent = "正在读取缓存…";
             output.setAttribute("aria-label", "Caches 内容");
             cachePage.append(output);
-            editors.set("$caches", { node: cachePage, title: "缓存" });
-            handlers.set("viewCaches", () => {
+            const loadCaches = () => {
+                editors.get("$caches").load = undefined;
                 if (saving) return;
                 let value;
                 return perform(
@@ -501,15 +455,22 @@ export class PreferencesPanel {
                     },
                     () => {
                         output.textContent = value === undefined ? "暂无缓存" : JSON.stringify(value, null, 2);
-                        navigation.open("$caches");
+                    },
+                    () => {
+                        output.textContent = "读取缓存失败";
                     },
                 );
+            };
+            editors.set("$caches", { node: cachePage, title: "缓存", load: loadCaches });
+            handlers.set("viewCaches", () => {
+                loadCaches();
+                page.open("$caches");
             });
             handlers.set("clearCaches", async () => {
                 if (saving) return;
                 const shared = definition.cachePath && definition.cachePath !== `@${definition.storageKey}.${active}.Caches`;
                 const message = shared ? `清空共享缓存 ${definition.cachePath}？使用该缓存的其它模块也会受影响。` : `清空 ${active} 的全部 Caches？`;
-                if (!(await requestConfirmation(window, message)) || destroyed || saving) return;
+                if (!(await page.confirm(message)) || destroyed || saving) return;
                 return perform(
                     () => client.clearCaches(),
                     () => {
@@ -520,42 +481,57 @@ export class PreferencesPanel {
             handlers.set("reset", async () => {
                 if (saving) return;
                 const message = definition.resetPaths ? `重置 ${definition.metadata?.name ?? active} 的设置？只删除本页面的设置，保留共享存储中的其它设置和缓存。` : `重置 ${active} 的设置？这将删除该模块的 Settings、Caches 和其它持久化数据。`;
-                if (!(await requestConfirmation(window, message)) || destroyed || saving) return;
+                if (!(await page.confirm(message)) || destroyed || saving) return;
                 return perform(() => client.reset(), controls);
             });
-            navigation?.destroy();
-            navigation = new Navigation(viewport, view, key => editors.get(key)?.node);
-            navigation.addEventListener("change", updateNavigation);
+            viewport.replaceChildren(view);
             for (const grow of growingInputs) grow();
-            updateNavigation();
+            page.refresh();
         }
-        /**
-         * 已加载的表单交由导航组件返回；加载阶段可以返回先前文档。
-         * Loaded forms delegate back to navigation; loading views can return to the previous document.
-         * @returns {void} 无返回值 / No return value.
-         */
-        if (back)
-            back.onclick = () => {
-                if (saving) return;
-                if (navigation) navigation.back();
-                else window.history.back();
-            };
-        open(definition.module);
+        queueMicrotask(() => {
+            if (!destroyed) open(definition.module);
+        });
         return () => {
             destroyed = true;
-            menu?.destroy();
-            frame?.removeEventListener("preferencepanes:action", onAction);
-            navigation?.destroy();
             generation++;
-            if (active && !saving) client.leave();
-            clearTimeout(timer);
+            client.leave();
             shell.remove();
         };
     }
 
     /**
-     * 移除监听器、定时器、会话和挂载内容。
-     * Remove listeners, timers, session, and mounted content.
+     * 返回当前会话中的字段或操作页，不再读取配置。
+     * Return a field or action view from the current session without fetching configuration.
+     * @param {string} key 子页键 / Detail key.
+     * @returns {HTMLElement} 当前视图 / Current view.
+     */
+    view(key) {
+        return this.#view(key);
+    }
+
+    /**
+     * 提供当前页标题及菜单状态。
+     * Provide the current title and action state.
+     * @param {string} key 子页键 / Detail key.
+     * @returns {object} 页面状态 / Page state.
+     */
+    state(key) {
+        return this.#state(key);
+    }
+
+    /**
+     * 执行共用菜单中的操作。
+     * Perform an action from the shared menu.
+     * @param {string} id 操作标识 / Action identifier.
+     * @returns {void} 无返回值 / No return value.
+     */
+    perform(id) {
+        this.#perform(id);
+    }
+
+    /**
+     * 释放读取与视图；已开始的写入仍沿原队列完成。
+     * Release reads and views while allowing started writes to finish through the existing queue.
      * @returns {void} 无返回值 / No return value.
      */
     destroy() {

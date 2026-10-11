@@ -12,9 +12,7 @@ const specification = await readFile(new URL("Specification.md", import.meta.url
 const integration = await readFile(new URL("HostIntegration.md", import.meta.url), "utf8");
 const parameter = (name, description, required = false) => ({ id: `${name}#0`, name, description, type: "string", schema: { type: "string" }, required, enable: false, example: "" });
 const declarations = [
-    { id: "pp-page-get", method: "get", path: "/settings/{module}", name: "打开模块设置页面", group: "模块设置页面", page: true },
-    { id: "pp-index-get", method: "get", path: "/settings/assets/index.mjs", name: "加载模块设置入口", group: "通用页面资源", asset: true },
-    { id: "pp-navigation-get", method: "get", path: "/settings/assets/navigation.mjs", name: "加载通用页面导航组件", group: "通用页面资源", asset: true },
+    { id: "pp-home-get", method: "get", path: "/settings/", name: "打开单文档设置框架", group: "通用页面资源", page: true },
     { id: "pp-module-head", method: "head", path: "/api/{module}", name: "探测模块可用性与版本", group: "模块 API", moduleMock: true, probe: true },
     { id: "pp-module-get", method: "get", path: "/api/{module}", name: "读取模块 BoxJS", group: "模块 API", moduleMock: true, configuration: true },
     { id: "pp-store-get", method: "post", path: "/api/get", name: "读取完整存储路径", group: "通用存储 API", api: true, store: true },
@@ -31,7 +29,7 @@ const apis = declarations.map(entry => {
             ? "网页通过该 API 读取原始 BoxJS；业务模块模板直接 Mock 同版 JSON 与版本头。"
             : entry.asset
               ? "该资源由 PreferencePanes Release 独立发布，消费方按路径直接映射。"
-              : "通用模块页面直接映射 Release 的静态 index.html，可通过查询参数或 ModuleFrame 输入声明 BoxJS 与项目 stylesheet 资源；Web 侧完成规范化、校验和渲染。";
+              : "通用框架原样部署 Release 的 home.html，固定读取 home.json 和可选 theme.css、bridge.mjs；模块和字段在同一文档按需加载。";
     return {
         id: entry.id,
         name: entry.name,
@@ -48,7 +46,7 @@ const apis = declarations.map(entry => {
         sourceUrl: "https://github.com/NSNanoCat/PreferencePanes/blob/dev/apifox/Specification.md",
         parameters: {
             path: entry.path.includes("{module}") ? [parameter("module", "BoxJS 的模块段，动态填入", true)] : [],
-            query: entry.page ? [parameter("json", "可选 BoxJS JSON 地址；未指定时使用 /api/{module}，相对地址按模块页面 URL 解析，仅支持 HTTP(S)"), parameter("css", "可选 stylesheet 地址；相对地址按模块页面 URL 解析，仅支持 HTTP(S)")] : [],
+            query: [],
             header: [],
             cookie: [],
         },

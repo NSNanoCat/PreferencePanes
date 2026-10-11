@@ -5,6 +5,21 @@ import test from "node:test";
 async function fixture(override, { cssFailure = false, jsonStatus = 200, cssStatus = cssFailure ? 200 : 404, bridgeStatus = override ? 200 : 404, probeFailure } = {}) {
     class Element extends EventTarget {
         tagName = "SPAN";
+        scrollTop = 0;
+        inert = false;
+        classList = {
+            toggle: (name, force) => {
+                const classes = new Set(this.className?.split(" "));
+                if (force) classes.add(name);
+                else classes.delete(name);
+                this.className = [...classes].join(" ");
+            },
+        };
+        animate() {
+            const animation = { cancel() {} };
+            queueMicrotask(() => animation.onfinish?.());
+            return animation;
+        }
         attributes = new Map();
         children = [];
         dataset = {};
@@ -80,7 +95,8 @@ async function fixture(override, { cssFailure = false, jsonStatus = 200, cssStat
         matchMedia: () => theme,
         innerHeight: 800,
         visualViewport: Object.assign(new EventTarget(), { scale: 1, height: 500, offsetTop: 0 }),
-        location: { assign: url => urls.push(url) },
+        location: Object.assign(new URL("https://example.test/settings/"), { assign: url => urls.push(url) }),
+        getComputedStyle: () => ({ transform: "none" }),
         open: (url, target, features) => opened.push({ url, target, features }),
         confirm: () => false,
     });
@@ -92,7 +108,7 @@ async function fixture(override, { cssFailure = false, jsonStatus = 200, cssStat
     page.append(message);
     const template = { content: { firstElementChild: page } };
     const root = new Element();
-    const document = {
+    const document = Object.assign(new EventTarget(), {
         baseURI: "https://example.test/settings/",
         title: "Example",
         documentElement: root,
@@ -106,11 +122,36 @@ async function fixture(override, { cssFailure = false, jsonStatus = 200, cssStat
         },
         querySelectorAll: () => [],
         querySelector: selector => ({ "[data-preference-panes-pages]": container, "[data-preference-panes-home]": home, "template[data-preference-panes-module]": template })[selector],
+    });
+    document.defaultView = window;
+    const entries = [{ url: window.location.href, state: null }];
+    let historyIndex = 0;
+    window.history = {
+        get length() {
+            return entries.length;
+        },
+        get state() {
+            return entries[historyIndex].state;
+        },
+        pushState(state, _, url) {
+            entries.splice(++historyIndex, entries.length, { url, state });
+            window.location.href = url;
+        },
+        replaceState(state, _, url) {
+            entries[historyIndex] = { url, state };
+            window.location.href = url;
+        },
+        back() {
+            historyIndex--;
+            window.location.href = entries[historyIndex].url;
+            window.dispatchEvent(new Event("popstate"));
+        },
     };
-    home.ownerDocument = document;
+    home.ownerDocument = container.ownerDocument = document;
     document.head.querySelector = selector => document.head.children.find(node => (selector.startsWith("style") ? "preferencePanesDefaults" in node.dataset : node.tagName === "LINK"));
     const menus = [];
-    const frames = [];
+    const panels = [];
+    let currentPage;
     const urls = [];
     const opened = [];
     let navigation;
@@ -129,82 +170,78 @@ async function fixture(override, { cssFailure = false, jsonStatus = 200, cssStat
             this.element.remove();
         }
     }
-    class Navigation extends EventTarget {
-        current = "";
-        get canGoBack() {
-            return Boolean(this.current);
+    class PreferencesPanel {
+        constructor(root, definition, page) {
+            this.root = root;
+            this.definition = definition;
+            this.page = page;
+            this.views = new Map();
+            panels.push(this);
         }
-        constructor(_container, _home, create) {
-            super();
-            this.create = create;
-            navigation = this;
+        view(key) {
+            if (!key) return this.root;
+            if (!this.views.has(key)) this.views.set(key, document.createElement("section"));
+            return this.views.get(key);
         }
-        open(key) {
-            this.abort?.abort();
-            this.abort = new AbortController();
-            this.current = key;
-            this.view = this.create(key, this.abort.signal);
-            this.dispatchEvent(new Event("change"));
+        state(key) {
+            return { title: key || this.definition.module, actions: [{ id: "reset", label: "重置" }], busy: false };
         }
-        back() {
-            this.backs = (this.backs ?? 0) + 1;
-            this.abort?.abort();
-            this.current = "";
-            this.view = undefined;
-            this.dispatchEvent(new Event("change"));
+        async perform() {
+            if (await this.page.confirm("重置？")) this.page.notice({ kind: "success", message: "已保存" });
         }
         destroy() {
-            this.abort?.abort();
             this.destroyed = true;
-        }
-    }
-    class ModuleFrame extends EventTarget {
-        element = new Element();
-        state = { title: "Module", actions: [{ id: "reset", label: "重置" }], busy: false, canGoBack: true };
-        constructor(url, options) {
-            super();
-            this.url = url;
-            this.headers = options.headers;
-            this.signal = options.signal;
-            frames.push(this);
-        }
-        load() {
-            return Promise.resolve();
-        }
-        back() {
-            this.backs = (this.backs ?? 0) + 1;
-        }
-        perform(id) {
-            this.action = id;
         }
     }
     class ModuleStatus extends EventTarget {
         state = { status: "installed" };
-        check() {
+        check(url) {
+            fetch(url, { method: "HEAD" });
             this.dispatchEvent(new Event("change"));
         }
         destroy() {}
     }
     const config = { title: "Example", sections: [{ title: "插件", items: [{ name: "Module", icon: { text: "⚙️" }, module: "Module" }] }] };
     const requests = [];
-    const fetch = async (url, options) => {
+    let configDelay;
+    const fetch = async (url, options = {}) => {
         requests.push({ url: String(url), method: options.method ?? "GET", signal: options.signal });
-        const name = new URL(url).pathname.split("/").at(-1);
+        const path = new URL(url, document.baseURI).pathname;
+        const name = path.split("/").at(-1);
+        if (path.startsWith("/api/")) {
+            if (options.method === "HEAD") return { ok: true, status: 200 };
+            if (configDelay) await configDelay;
+            return { ok: true, status: 200, json: async () => ({ settings: [{ id: `@Root.API.Settings.enabled`, name: "启用", type: "boolean", val: true }] }) };
+        }
         if (name === probeFailure) throw new Error("Network probe failed");
         const status = name === "theme.css" ? cssStatus : name === "bridge.mjs" ? bridgeStatus : jsonStatus;
         return { ok: status === 200, status, json: async () => config };
     };
+    const pageSource = (await readFile(new URL("../src/browser/page.mjs", import.meta.url), "utf8"))
+        .replace('import { PreferencesPanel } from "./panel.mjs";', "const { PreferencesPanel } = globalThis.__hostClasses;")
+        .replace(/from "(\.\/[^"]+)"/g, (_, path) => `from "${new URL(path, new URL("../src/browser/page.mjs", import.meta.url)).href}"`);
+    const pageURL = `data:text/javascript;base64,${Buffer.from(pageSource).toString("base64")}#${Math.random()}`;
     const descriptors = new Map();
-    for (const [name, value] of Object.entries({ document, window, fetch, __hostClasses: { ActionMenu, Navigation, ModuleFrame, ModuleStatus }, __homeModuleURL: override })) {
+    for (const [name, value] of Object.entries({ document, window, fetch, __hostClasses: { ActionMenu, ModuleStatus, PreferencesPanel }, __homeModuleURL: override })) {
         descriptors.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
         Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
     }
+    const actual = await import(pageURL);
+    globalThis.__hostClasses.PageController = class extends actual.PageController {
+        constructor(...args) {
+            super(...args);
+            navigation = this.navigation;
+            currentPage = this;
+        }
+    };
+    globalThis.__hostClasses.browserHost = actual.browserHost;
     const stylesSource = (await readFile(new URL("../src/browser/styles.mjs", import.meta.url), "utf8")).replace('import defaults from "#styles";', 'const defaults = "default styles";');
     const stylesURL = `data:text/javascript;base64,${Buffer.from(stylesSource).toString("base64")}`;
     const source = (await readFile(new URL("../src/browser/home.mjs", import.meta.url), "utf8"))
         .replace('from "./styles.mjs"', `from "${stylesURL}"`)
         .replace("import(bridgeURL.href)", "import(globalThis.__homeModuleURL)")
-        .replace(/import \{ ActionMenu, ModuleFrame, ModuleStatus, Navigation \} from .*?;/, "const { ActionMenu, ModuleFrame, ModuleStatus, Navigation } = globalThis.__hostClasses;");
+        .replace(/import \{ ActionMenu, ModuleStatus \} from .*?;/, "const { ActionMenu, ModuleStatus } = globalThis.__hostClasses;")
+        .replace(/import \{ browserHost, PageController \} from .*?;/, "const { browserHost, PageController } = globalThis.__hostClasses;");
     const { startHome } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}#${Math.random()}`);
     return {
         start: startHome,
@@ -216,7 +253,14 @@ async function fixture(override, { cssFailure = false, jsonStatus = 200, cssStat
         root,
         theme,
         menus,
-        frames,
+        panels,
+        container,
+        get page() {
+            return currentPage;
+        },
+        delayConfig(promise) {
+            configDelay = promise;
+        },
         urls,
         opened,
         get button() {
@@ -267,73 +311,111 @@ test("host installs shared defaults before optional CSS and only removes styles 
     }
 });
 
-test("independent panel entries keep their configuration endpoint while using the shared storage module", async t => {
-    const page = await fixture();
-    page.config.sections[0].items[0].module = "API_Translate";
-    page.config.sections[0].items[0].pageModule = "API";
-    const destroy = await page.start();
+test("home probes only HEAD, config loads on click and field routes reuse the same session", async t => {
+    const f = await fixture();
+    f.config.sections[0].items[0].module = "API_Translate";
+    const destroy = await f.start();
     t.after(() => {
         destroy();
-        page.restore();
-    });
-    page.navigation.open("API_Translate");
-    assert.equal(page.frames[0].url, "/settings/API");
-    assert.equal(page.frames[0].headers["X-PreferencePanes-JSON"], "/api/API_Translate");
-});
-
-test("default browser host renders once and forwards back, theme, notices and confirmation cancellation", async () => {
-    const f = await fixture();
-    try {
-        const destroy = await f.start();
-        assert.equal(f.document.body.children.filter(node => node.className === "pp-host-header").length, 1);
-        assert.equal(f.root.dataset.theme, "light");
-        f.theme.matches = true;
-        f.theme.dispatchEvent(new Event("change"));
-        assert.equal(f.root.dataset.theme, "dark");
-        assert.equal(f.root.style.values.get("--pp-keyboard-height"), "300px");
-        f.navigation.open("Module");
-        const frame = f.frames[0];
-        const header = f.document.body.children.find(node => node.className === "pp-host-header");
-        header.children[0].onclick();
-        assert.equal(frame.backs, 1);
-        let confirmed;
-        frame.dispatchEvent(
-            new CustomEvent("confirm", {
-                cancelable: true,
-                detail: {
-                    message: "重置？",
-                    resolve: value => {
-                        confirmed = value;
-                    },
-                    reject: assert.fail,
-                },
-            }),
-        );
-        await new Promise(resolve => setImmediate(resolve));
-        assert.equal(confirmed, false);
-        frame.dispatchEvent(new CustomEvent("notice", { cancelable: true, detail: { kind: "success", message: "已保存" } }));
-        assert.equal(f.document.body.children.find(node => node.className === "pp-host-toast").textContent, "已保存");
-        f.window.dispatchEvent(Object.assign(new Event("pagehide"), { persisted: true }));
-        assert.equal(f.navigation.destroyed, undefined);
-        destroy();
-        f.theme.matches = false;
-        f.theme.dispatchEvent(new Event("change"));
-        assert.equal(f.root.dataset.theme, undefined);
-        assert.equal(f.menus[0].destroyed, true);
-        assert.equal(
-            f.document.body.children.some(node => node.className === "pp-host-header" || node.className === "pp-host-toast"),
-            false,
-        );
-    } finally {
         f.restore();
-    }
+    });
+    assert.deepEqual(
+        f.requests.filter(request => request.url.startsWith("/api/")).map(request => request.method),
+        ["HEAD"],
+    );
+    f.navigation.open("API_Translate");
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(f.panels.length, 1);
+    assert.equal(f.panels[0].definition.module, "API");
+    f.navigation.open("API_Translate/API.Settings.items");
+    f.navigation.refresh();
+    assert.equal(f.panels.length, 1);
+    assert.equal(f.requests.filter(request => request.url === "/api/API_Translate" && request.method === "GET").length, 1);
+    f.navigation.back();
+    assert.equal(f.panels[0].destroyed, undefined);
+    f.navigation.back();
+    assert.equal(f.panels[0].destroyed, true);
 });
 
-test("override initialization precedes navigation and late confirmation is discarded after departure", async () => {
-    const module = "data:text/javascript," + encodeURIComponent("export default async options => { globalThis.__hostOverride.options = options; await globalThis.__hostOverride.ready; return globalThis.__hostOverride.host; }");
+test("supplied BoxJS waits for the module route before publishing its session", async t => {
+    const f = await fixture();
+    f.config.sections[0].items[0].boxjs = { settings: [{ id: "@Root.Module.Settings.enabled", name: "启用", type: "boolean", val: true }] };
+    const destroy = await f.start();
+    t.after(() => {
+        destroy();
+        f.restore();
+    });
+    f.navigation.open("Module");
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(f.panels.length, 1);
+    assert.equal(f.panels[0].destroyed, undefined);
+    assert.equal(f.document.title, "Module");
+    assert.equal(f.requests.filter(request => request.url === "/api/Module" && request.method === "GET").length, 0);
+    f.navigation.open("Module/Module.Settings.items");
+    assert.equal(f.panels.length, 1);
+});
+
+test("leaving a module aborts configuration reads and ignores late JSON", async t => {
+    const f = await fixture();
+    let release;
+    f.delayConfig(
+        new Promise(resolve => {
+            release = resolve;
+        }),
+    );
+    const destroy = await f.start();
+    t.after(() => {
+        destroy();
+        f.restore();
+    });
+    f.navigation.open("Module");
+    await new Promise(resolve => setImmediate(resolve));
+    const request = f.requests.at(-1);
+    f.navigation.back();
+    assert.equal(request.signal.aborted, true);
+    release();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(f.panels.length, 0);
+});
+
+test("browser chrome is unique and follows theme, keyboard, threshold and restored routes", async t => {
+    const f = await fixture();
+    const destroy = await f.start();
+    t.after(() => {
+        destroy();
+        f.restore();
+    });
+    const header = f.document.body.children.find(node => node.className === "pp-host-header");
+    assert.equal(f.document.body.children.filter(node => node.className === "pp-host-header").length, 1);
+    f.theme.matches = true;
+    f.theme.dispatchEvent(new Event("change"));
+    assert.equal(f.root.dataset.theme, "dark");
+    assert.equal(f.root.style.values.get("--pp-keyboard-height"), "300px");
+    f.home.scrollTop = 99;
+    f.document.dispatchEvent(new Event("scroll"));
+    assert.equal(header.className.includes("pp-scrolled"), false);
+    f.home.scrollTop = 100;
+    f.document.dispatchEvent(new Event("scroll"));
+    assert.equal(header.className.includes("pp-scrolled"), true);
+    f.navigation.open("Module");
+    await new Promise(resolve => setImmediate(resolve));
+    f.window.dispatchEvent(Object.assign(new Event("pageshow"), { persisted: true }));
+    assert.equal(f.panels.length, 1);
+    header.children[0].onclick();
+    assert.equal(f.navigation.current, "");
+    destroy();
+    assert.equal(f.root.dataset.theme, undefined);
+    assert.equal(f.menus[0].destroyed, true);
+    assert.equal(
+        f.document.body.children.some(node => node.className?.includes("pp-host-header") || node.className === "pp-host-toast"),
+        false,
+    );
+});
+
+test("override initializes before navigation and confirmation resolves false after departure", async t => {
+    const module = `data:text/javascript,${encodeURIComponent("export default async options => { globalThis.__hostOverride.options = options; await globalThis.__hostOverride.ready; return globalThis.__hostOverride.host; }")}`;
     const f = await fixture(module);
-    let initialize;
-    let confirm;
+    let initialize, confirm;
     let destroyed = 0;
     globalThis.__hostOverride = {
         ready: new Promise(resolve => {
@@ -352,39 +434,23 @@ test("override initialization precedes navigation and late confirmation is disca
             },
         },
     };
-    try {
-        const started = f.start();
-        await new Promise(resolve => setImmediate(resolve));
-        assert.equal(f.navigation, undefined);
-        initialize();
-        const destroy = await started;
-        assert.equal(
-            f.document.body.children.some(node => node.className === "pp-host-header" || node.className === "pp-host-toast"),
-            false,
-        );
-        f.navigation.open("Module");
-        let resolved = false;
-        f.frames[0].dispatchEvent(
-            new CustomEvent("confirm", {
-                cancelable: true,
-                detail: {
-                    message: "重置？",
-                    resolve: () => {
-                        resolved = true;
-                    },
-                    reject: assert.fail,
-                },
-            }),
-        );
-        await new Promise(resolve => setImmediate(resolve));
-        destroy();
-        confirm(true);
-        await new Promise(resolve => setImmediate(resolve));
-        assert.equal(resolved, false);
-        assert.equal(destroyed, 1);
-    } finally {
-        f.restore();
-    }
+    t.after(() => f.restore());
+    const started = f.start();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(f.navigation, undefined);
+    initialize();
+    const destroy = await started;
+    assert.equal(
+        f.document.body.children.some(node => node.className === "pp-host-header"),
+        false,
+    );
+    f.navigation.open("Module");
+    await new Promise(resolve => setImmediate(resolve));
+    const pending = f.page.confirm("重置？");
+    destroy();
+    confirm(true);
+    assert.equal(await pending, false);
+    assert.equal(destroyed, 1);
 });
 
 test("configured override load and initialization failures display an error without browser fallback", async () => {
@@ -491,7 +557,7 @@ test("link targets keep internal navigation and open new tabs synchronously with
     f.navigation.back();
     internal.dispatchEvent(Object.assign(new Event("click", { cancelable: true }), { button: 0 }));
     const header = f.document.body.children.find(node => node.className === "pp-host-header");
-    const iframe = f.navigation.view.children[0];
+    const iframe = f.container.children.at(-1).children[0];
     assert.equal(iframe.tagName, "IFRAME");
     assert.equal(iframe.src, "https://example.test/");
     assert.ok(!iframe.attributes.get("sandbox").includes("allow-top-navigation"));
@@ -500,7 +566,6 @@ test("link targets keep internal navigation and open new tabs synchronously with
     assert.deepEqual(f.menus[0].actions, []);
     header.children[0].onclick();
     assert.equal(f.navigation.current, "");
-    assert.equal(f.frames[0].backs, undefined);
     assert.equal(header.children[1].textContent, "Example");
     blank.dispatchEvent(Object.assign(new Event("click", { cancelable: true }), { button: 0 }));
     assert.deepEqual(f.opened, [{ url: "https://github.com/Example", target: "_blank", features: "noopener,noreferrer" }]);
@@ -510,7 +575,7 @@ test("link targets keep internal navigation and open new tabs synchronously with
     assert.deepEqual(f.urls, ["https://example.test/guide/"]);
 });
 
-test("missing Bridge never accesses a native SDK and project CSS follows defaults and reaches module frames", async t => {
+test("missing Bridge never accesses a native SDK and project CSS remains in the same document", async t => {
     const f = await fixture(undefined, { cssStatus: 200 });
     Object.defineProperty(f.window, "biliBridge", { get: () => assert.fail("An undeclared Bridge must not be accessed") });
     const destroy = await f.start();
@@ -520,7 +585,7 @@ test("missing Bridge never accesses a native SDK and project CSS follows default
     });
     assert.deepEqual(
         f.requests.map(request => request.url),
-        ["https://example.test/settings/home.json", "https://example.test/settings/theme.css", "https://example.test/settings/bridge.mjs"],
+        ["https://example.test/settings/home.json", "https://example.test/settings/theme.css", "https://example.test/settings/bridge.mjs", "/api/Module"],
     );
     const sheet = f.document.head.children.find(node => node.tagName === "LINK");
     assert.equal(sheet.href, "https://example.test/settings/theme.css");
@@ -530,7 +595,8 @@ test("missing Bridge never accesses a native SDK and project CSS follows default
         false,
     );
     f.navigation.open("Module");
-    assert.equal(f.frames[0].headers["X-PreferencePanes-CSS"], sheet.href);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(f.document.head.children.at(-1), sheet);
     destroy();
     assert.equal(f.requests[0].signal.aborted, true);
     assert.equal(f.document.head.children.length, 0);
@@ -559,7 +625,6 @@ test("invalid external JSON rejects ambiguous navigation, duplicate modules and 
         { title: "Example", sections: [{ title: "插件", items: [{ ...item, module: 123, href: "/guide/" }] }] },
         { title: "Example", sections: [{ title: "插件", items: [{ ...item, module: undefined, href: "javascript:alert(1)" }] }] },
         { title: "Example", sections: [{ title: "插件", items: [{ ...item, module: undefined, href: "java\nscript:alert(1)" }] }] },
-        { title: "Example", sections: [{ title: "插件", items: [{ ...item, pageModule: 123 }] }] },
         { title: "Example", sections: [{ title: "插件", items: [{ ...item, icon: { text: "⚙️", src: 123 } }] }] },
         { title: "Example", sections: [{ title: "插件", items: [{ ...item, icon: { text: "⚙️", src: "icon.png" } }] }] },
         { title: "Example", sections: [{ title: "插件", items: [{ ...item, target: "internal" }] }] },
@@ -588,6 +653,7 @@ test("fixed optional paths accept only missing resources as defaults and reject 
                 ["https://example.test/settings/home.json", "GET"],
                 ["https://example.test/settings/theme.css", "HEAD"],
                 ["https://example.test/settings/bridge.mjs", "HEAD"],
+                ["/api/Module", "HEAD"],
             ],
         );
         assert.equal(

@@ -111,19 +111,78 @@ test("navigation retains home and scroll, aborts leaving loads and releases only
     assert.equal(signals.length, 2);
 });
 
-test("direct srcdoc fragments seed one root entry and recreate cleanly without growing history", () => {
-    const { window, node, animations } = environment("about:srcdoc#field");
+test("direct module fragments seed one root entry and recreate cleanly without growing history", () => {
+    const { window, node, animations } = environment("https://example.org/settings/#Module");
     const container = node(),
         home = node();
     let navigation = new Navigation(container, home, () => node());
     assert.equal(window.history.length, 2);
-    assert.equal(navigation.current, "field");
+    assert.equal(navigation.current, "Module");
     navigation.destroy();
     navigation = new Navigation(container, home, () => node());
     assert.equal(window.history.length, 2);
     navigation.back();
     animations.at(-1).onfinish();
-    assert.equal(window.location.href, "about:srcdoc");
+    assert.equal(window.location.href, "https://example.org/settings/");
     assert.equal(navigation.current, "");
+    navigation.destroy();
+});
+
+test("direct field routes seed the module parent and retain scroll by route after recreation", () => {
+    const { window, node, animations } = environment("https://example.org/settings/#Module/items");
+    const container = node(),
+        home = node();
+    const navigation = new Navigation(container, home, () => node());
+    assert.equal(window.history.length, 3);
+    assert.equal(navigation.current, "Module/items");
+    container.children.at(-1).scrollTop = 140;
+    navigation.back();
+    assert.equal(navigation.current, "Module");
+    animations.at(-1).onfinish();
+    navigation.open("Module/items");
+    assert.equal(window.location.hash, "#Module/items");
+    assert.equal(container.children.at(-1).scrollTop, 140);
+    navigation.refresh();
+    assert.equal(window.history.length, 3);
+    assert.equal(container.children.at(-1).scrollTop, 140);
+    navigation.destroy();
+});
+
+test("async module reload restores scroll after its loading placeholder stops clamping the position", () => {
+    const { node, animations } = environment();
+    const container = node(),
+        home = node();
+    let detail,
+        limit = 0,
+        value = 0;
+    const navigation = new Navigation(container, home, () => {
+        if (!detail) {
+            detail = node();
+            Object.defineProperty(detail, "scrollTop", {
+                get: () => value,
+                set: next => {
+                    value = Math.min(next, limit);
+                },
+            });
+        }
+        return detail;
+    });
+    navigation.open("Module");
+    animations.at(-1).onfinish();
+    limit = 500;
+    navigation.refresh();
+    detail.scrollTop = 230;
+    navigation.back();
+    animations.at(-1).onfinish();
+    detail = undefined;
+    value = limit = 0;
+    navigation.open("Module");
+    assert.equal(detail.scrollTop, 0);
+    limit = 500;
+    navigation.refresh();
+    assert.equal(detail.scrollTop, 230);
+    detail.scrollTop = 80;
+    navigation.refresh();
+    assert.equal(detail.scrollTop, 80);
     navigation.destroy();
 });

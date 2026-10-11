@@ -1,60 +1,23 @@
-# 调用方集成：模块容器与页面导航
+# 调用方集成：单文档设置框架
 
-PreferencePanes 提供内置程序与默认 CSS 的 `home.html` 首页模板，不绑定客户端 SDK。HTML 原样复用，固定读取相对路径 `./home.json`，通过 HEAD 探测可选 `./theme.css` 和 `./bridge.mjs`；通用设置页仍只把 BoxJS JSON 交给 `mount(boxjs)`。
+PreferencePanes 的 `home.html` 内置程序、默认 CSS、网页导航和菜单，原样部署到 `/settings/`。首页、模块和字段子页在同一文档渲染；不再提供模块 HTML、页面 JS 或 ModuleFrame。
 
-## 项目主页
+## 内容与宿主
 
-`ModuleStatus` 只向模块 API 发送 HEAD。业务模块模板直接返回状态与 `X-PreferencePanes-Version`；只有状态为 200 且版本头非空时才判定已安装。
+项目提供必需的 `./home.json`，可选的 `./theme.css`、`./bridge.mjs` 和 JSON 引用的图片。资源相对于首页 URL 解析；CSS 和 Bridge 通过 HEAD 探测，404 使用默认功能，200 加载，其它状态或加载、初始化失败显示错误。项目样式位于默认样式之后。未提供 Bridge 时不导入 SDK、不按 User-Agent 自动启用原生接入。
 
-```html
-<button id="module" disabled>
-    <img src="/settings/assets/Enhanced.png" alt="">
-    <span>Enhanced</span>
-    <span id="status">检测中</span>
-</button>
-<script type="module">
-    import { ModuleStatus } from "@nsnanocat/preference-panes/navigation";
-    const status = new ModuleStatus(document.querySelector("#status"));
-    status.addEventListener("change", () => module.disabled = status.state.status !== "installed");
-    status.check("/api/Enhanced");
-</script>
-```
+Bridge 默认导出工厂，接收 `{menu, back}`，返回 `{update, confirm, notice, openURL, destroy}`；类型来自 `@nsnanocat/preference-panes/browser`。项目自行加载官方 SDK，维护原生标题、MORE、主题和键盘协议；框架只保留一套宿主能力。`update` 接收 `{title, actions, busy, canGoBack}`，`confirm` 返回 boolean 或 Promise<boolean>，`notice` 接收 `{kind, message}`。
 
-主页不读取设置、不下载 BoxJS，也不推断模块清单。
+## 按需加载与导航
 
-## 模块页面
+首页仅 `HEAD /api/{module}`；状态为 200 且版本头非空时显示已安装。点击后才 `GET /api/{module}` 读取原始 BoxJS，随后 `POST /api/get` 读取设置。实际模块和存储根由 JSON 字段 ID 推导，API 别名直接使用自己的配置地址，无需 pageModule。
 
-`ModuleFrame` 只打开映射到静态 `index.html` 的规范 `/settings/{module}` 页面并标记模块身份。调用方可用现有 Header 选项声明 BoxJS 与项目 stylesheet 资源；这些值经校验后写入 iframe dataset，不会作为网络 Header 发送。未提供 JSON 输入时页面默认读取同源 `/api/{module}`。页面不直接访问 `/configs/**`，除非调用方明确将该地址作为 JSON 资源输入。
+路由依次为 `/settings/`、`#Module`、`#Module/<view>`。字段子页保留会话，切换模块或返回首页结束会话。刷新、前进后退、滚动恢复和浏览器页面缓存使用同一导航。退出取消配置和设置读取，忽略迟到的配置、确认和通知；已经开始的持久化写入继续完成。
 
-```js
-const frame = new ModuleFrame(`/settings/${module}`, {
-    signal,
-    headers: {
-        "X-PreferencePanes-JSON": "https://example.org/Module.boxjs.json",
-        "X-PreferencePanes-CSS": "https://example.org/theme.css",
-    },
-});
-container.append(frame.element);
-await frame.load();
-```
+公开浏览器入口仍为 `mount(boxjs)`，没有容器、宿主、导航或菜单参数。它复用内部页面控制器，返回 `destroy()` 生命周期句柄。
 
-`ModuleFrame` 的选项类型是 `{ signal?: AbortSignal; headers?: HeadersInit }`。它只发送不带自定义 Header 的 GET，将静态 HTML 原样交给 `srcdoc`，并把合法 HTTP(S) BoxJS/CSS 地址写入 iframe dataset。`frame.state` 提供 `title`、`module`、`busy`、`canGoBack` 和 `actions`。宿主从状态生成导航，不访问 iframe 内部 DOM。
+## 外链与代理集成
 
-## 导航与原生 WebView
+首页 JSON 链接可指定 `internal`、`_self` 或 `_blank`。只有 `internal` 外部网站使用隔离 iframe，保留宿主导航与返回；它不注入表单或项目样式，也不能替换顶层页面。其余链接调用 `openURL(url, target)`；模块 URL 字段仍调用 `openURL(url)`。
 
-`ActionMenu` 可复用模块公开的操作列表：
-
-```js
-const menu = new ActionMenu(id => frame.perform(id));
-frame.addEventListener("change", () => menu.update(frame.state.actions, frame.state.busy));
-nativeMoreButton.onclick = () => menu.open();
-```
-
-- `confirm` 事件可由宿主 `preventDefault()` 后通过 `detail.resolve(boolean)` 或 `reject(error)` 完成；未接管时使用浏览器确认。
-- `notice` 事件包含 `{kind, message}`。宿主接管后负责提示；模块不再创建重复 Toast。
-- 保存成功只更新当前页面快照；重新进入模块时重新读取 BoxJS 和 Settings。
-- 通用前端与固定存储 API 规则由一个宿主模块分别提供；业务模块只安装自己的 `/api/{module}` BoxJS Mock。
-
-客户端 Bridge 属于项目页面，固定提供在 `./bridge.mjs`。可选 CSS 与 Bridge 的 HEAD 返回 404 时使用内置功能，返回 200 时才加载；其它状态、网络、加载、语法或初始化失败均显示错误。缺少 Bridge 时不加载 SDK，也不按 User-Agent 自动启用原生接入。Bridge 默认导出异步工厂，接收 `{menu, back}` 并返回 `{update, confirm, notice, openURL, destroy}`；类型从既有 `/browser` 导出。初始化 JSON、CSS、Bridge 后才创建首页与导航。工厂自行加载官方 SDK，不把客户端 Bridge、User-Agent、主题值或原生菜单协议加入 PreferencePanes。JSON 结构和两种章节布局见 README。构建信息只追加到生成 JSON 的 `footer`，不改写共用 HTML。
-
-首页链接可通过 JSON `target` 指定 `internal`、`_self` 或 `_blank`。内部 HTTP(S) 页面由通用导航嵌入，保留宿主标题栏与返回；其余方式调用 `openURL(url, target)`。显式新页请求失败时应显示错误并保留原页。模块设置项仍调用原有单参数 `openURL(url)`，不改变表单、存储或业务请求协议。
+网页框架可直接部署 GitHub Pages；代理模块仅安装固定 `/api/get|set|delete` 的 `api.js` 和各自 `/api/{module}` 配置 Mock。Biliverse Enhanced 仍可唯一映射共用 `home.html`、品牌 JSON/CSS/Bridge/图片，其它插件提供自己的配置。请求地址必须区别于 Mock 的远程文件地址，避免资源循环。

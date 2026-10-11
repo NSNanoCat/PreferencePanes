@@ -26,6 +26,3 @@ jobs:
           files: |
             dist/api.js
             dist/home.html
-            dist/module/index.html
-            dist/module/index.mjs
-            dist/module/navigation.mjs

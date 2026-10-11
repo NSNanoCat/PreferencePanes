@@ -6,13 +6,13 @@ import vm from "node:vm";
 test("public browser exposes only the generic BoxJS mount contract", async () => {
     assert.deepEqual(Object.keys(await import("../src/index.mjs")), []);
     assert.deepEqual(Object.keys(await import("../dist/preference-panes.mjs")), ["mount"]);
-    assert.deepEqual(Object.keys(await import("@nsnanocat/preference-panes/navigation")), ["ActionMenu", "ModuleFrame", "ModuleStatus", "Navigation", "probeModule"]);
+    assert.deepEqual(Object.keys(await import("@nsnanocat/preference-panes/navigation")), ["ActionMenu", "ModuleStatus", "Navigation", "probeModule"]);
     const { ActionMenu } = await import("@nsnanocat/preference-panes/navigation");
     assert.equal(typeof ActionMenu.prototype.open, "function");
     const browser = await readFile(new URL("../dist/preference-panes.mjs", import.meta.url), "utf8");
     assert.doesNotMatch(browser, /node:fs|node-fetch|\$persistentStore|@nsnanocat\/util/);
     assert.doesNotMatch(browser, /<main\b[^>]*\bpp-home|self-panel|pp-install|安装模块|data-module=/);
-    const navigation = await readFile(new URL("../dist/module/navigation.mjs", import.meta.url), "utf8");
+    const navigation = await readFile(new URL("../dist/navigation.mjs", import.meta.url), "utf8");
     assert.match(navigation, /\*,\*::before,\*::after\{box-sizing:border-box\}/);
     assert.match(navigation, /#sheet\{[^}]*width:100%;max-width:540px/);
     for (const file of ["preference-panes.request.js", "settings/home.css", "settings/assets/app.mjs"]) await assert.rejects(access(new URL(`../dist/${file}`, import.meta.url)), { code: "ENOENT" });
@@ -21,13 +21,7 @@ test("public browser exposes only the generic BoxJS mount contract", async () =>
         assert.doesNotMatch(source, /ModuleModel|configURL|X-PreferencePanes-JSON|settings\/assets\/app\.mjs/);
     }
     await assert.rejects(access(new URL("../dist/web.js", import.meta.url)), { code: "ENOENT" });
-    const module = await readFile(new URL("../dist/module/index.html", import.meta.url), "utf8");
-    assert.match(module, /settings\/assets\/index\.mjs/);
-    const page = await readFile(new URL("../dist/module/index.mjs", import.meta.url), "utf8");
-    assert.match(page, /\/api\//);
-    assert.match(page, /preferencePanesJson/);
-    assert.match(page, /preferencePanesStylesheet/);
-    assert.doesNotMatch(page, /\/configs\//);
+    await assert.rejects(access(new URL("../dist/module", import.meta.url)), { code: "ENOENT" });
     const home = await readFile(new URL("../dist/home.html", import.meta.url), "utf8");
     assert.doesNotMatch(home, /__PREFERENCE_PANES_|data-preference-panes-(?:json|css|bridge)/);
     assert.match(home, /<script type="module">[\s\S]*startHome\(\)/);

@@ -44,7 +44,7 @@ export type HomeIcon = { src: string; text?: never } | { text: string; src?: nev
 /** 外链打开方式：带导航的内部框架、当前页面或新页面 / Link opening mode: an internal frame with navigation, the current page or a new page. */
 export type HomeLinkTarget = "internal" | "_self" | "_blank";
 /** 首页模块或链接入口 / Homepage module or link entry. */
-export type HomeItem = { name: string; icon: HomeIcon; description?: string } & ({ module: string; pageModule?: string; href?: never; target?: never } | { href: string; target?: HomeLinkTarget; module?: never; pageModule?: never });
+export type HomeItem = { name: string; icon: HomeIcon; description?: string } & ({ module: string; href?: never; target?: never } | { href: string; target?: HomeLinkTarget; module?: never });
 /** 运行时导入的首页配置 / Runtime-imported homepage configuration. */
 export interface HomeConfig {
     title: string;

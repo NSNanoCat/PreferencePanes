@@ -10,9 +10,7 @@ const script = await readFile(new URL("./importer.mjs", import.meta.url), "utf8"
 const example = JSON.parse(await readFile(new URL("./Module.boxjs.json", import.meta.url), "utf8"));
 const exampleCSS = await readFile(new URL("./theme.css", import.meta.url), "utf8");
 const api = await readFile(new URL("../dist/api.js", import.meta.url), "utf8");
-const modulePage = await readFile(new URL("../dist/module/index.html", import.meta.url), "utf8");
-const moduleScript = await readFile(new URL("../dist/module/index.mjs", import.meta.url), "utf8");
-const navigationScript = await readFile(new URL("../dist/module/navigation.mjs", import.meta.url), "utf8");
+const home = await readFile(new URL("../dist/home.html", import.meta.url), "utf8");
 let configuration;
 let moduleName;
 let stylesheet;
@@ -35,17 +33,25 @@ function configurePreview(boxjs, cssMode, css, storedRoot) {
     moduleName = definition.module;
     stylesheet = cssMode === "example" ? exampleCSS : cssMode === "import" ? css : undefined;
     if (storedRoot !== undefined) store.set(definition.storageKey, JSON.stringify(storedRoot));
-    const query = new URLSearchParams({ json: "/preview/boxjs.json" });
-    if (stylesheet !== undefined) query.set("css", "/preview/style.css");
-    return { url: `/settings/${moduleName}?${query}`, module: moduleName };
+    return { url: `/settings/#${moduleName}`, module: moduleName };
 }
 
 const server = http.createServer(async (request, reply) => {
     try {
         const url = new URL(request.url, `http://${request.headers.host}`);
-        if (["/", "/settings/", "/settings"].includes(url.pathname)) {
+        if (["/"].includes(url.pathname)) {
             reply.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
             reply.end(importer);
+            return;
+        }
+        if (["/settings/", "/settings"].includes(url.pathname)) {
+            reply.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+            reply.end(home);
+            return;
+        }
+        if (url.pathname === "/settings/home.json") {
+            reply.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+            reply.end(JSON.stringify({ title: "PreferencePanes", sections: [{ title: "预览", items: configuration ? [{ name: moduleName, module: moduleName, icon: { text: "⚙️" } }] : [] }] }));
             return;
         }
         if (url.pathname === "/importer.mjs") {
@@ -85,24 +91,14 @@ const server = http.createServer(async (request, reply) => {
             }
             return;
         }
-        if (configuration && url.pathname === "/preview/boxjs.json" && ["HEAD", "GET"].includes(request.method)) {
+        if (configuration && url.pathname === `/api/${moduleName}` && ["HEAD", "GET"].includes(request.method)) {
             reply.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-PreferencePanes-Version": "preview" });
             reply.end(request.method === "HEAD" ? "" : JSON.stringify(configuration));
             return;
         }
-        if (stylesheet !== undefined && url.pathname === "/preview/style.css" && ["HEAD", "GET"].includes(request.method)) {
+        if (stylesheet !== undefined && url.pathname === "/settings/theme.css" && ["HEAD", "GET"].includes(request.method)) {
             reply.writeHead(200, { "Content-Type": "text/css; charset=utf-8", "Cache-Control": "no-store" });
             reply.end(request.method === "HEAD" ? "" : stylesheet);
-            return;
-        }
-        if (/^\/settings\/[a-zA-Z0-9_-]+\/?$/.test(url.pathname)) {
-            reply.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
-            reply.end(modulePage);
-            return;
-        }
-        if (url.pathname === "/settings/assets/index.mjs" || url.pathname === "/settings/assets/navigation.mjs") {
-            reply.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-store" });
-            reply.end(url.pathname.endsWith("navigation.mjs") ? navigationScript : moduleScript);
             return;
         }
         if (!url.pathname.startsWith("/api/")) {

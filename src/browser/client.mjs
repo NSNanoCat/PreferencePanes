@@ -113,8 +113,8 @@ export class PreferencesClient {
     }
 
     /**
-     * 终止当前页面仍在进行的请求。
-     * Abort requests still owned by the current page.
+     * 终止当前页面的读取；已开始的持久化写入继续完成。
+     * Abort reads owned by the current page while allowing started persistence writes to finish.
      * @returns {void} 无返回值 / No return value.
      */
     leave() {
@@ -153,8 +153,10 @@ export class PreferencesClient {
     async #send(action, path, value) {
         const controller = new AbortController();
         const abort = () => controller.abort();
-        if (this.#session.signal.aborted) abort();
-        this.#session.signal.addEventListener("abort", abort, { once: true });
+        if (action === "get") {
+            if (this.#session.signal.aborted) abort();
+            this.#session.signal.addEventListener("abort", abort, { once: true });
+        }
         const timer = setTimeout(abort, this.#timeout);
         try {
             const response = await this.#request(`/api/${action}`, {

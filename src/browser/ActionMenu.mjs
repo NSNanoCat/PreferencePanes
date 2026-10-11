@@ -1,6 +1,6 @@
 /**
- * 独立页面的三点按钮和底部操作菜单；嵌入页面由宿主提供对应界面。
- * Overflow trigger and bottom action sheet for standalone pages; embedded pages use host-provided chrome.
+ * 共用菜单按钮和底部操作菜单；原生宿主可通过 MORE 调用。
+ * Shared menu trigger and bottom action sheet; native hosts may invoke it through MORE.
  */
 export class ActionMenu {
     #button;
@@ -30,11 +30,12 @@ export class ActionMenu {
         triggerRoot.innerHTML = `<style>
           :host{display:inline-flex;width:44px;height:44px;color:inherit}
           :host([hidden]){display:none!important}
-          button{width:44px;height:44px;padding:10px;font:inherit;cursor:pointer;border:0;color:inherit;background:none}
+          button{width:44px;height:44px;padding:8px;border-radius:4px;font:inherit;cursor:pointer;border:0;color:inherit;background:none}
+          button:hover{background:var(--pp-field,#8882)}
           button:disabled{opacity:.4;cursor:default}
           button:focus-visible{outline:2px solid currentColor;outline-offset:-3px}
           svg{display:block;width:24px;height:24px;fill:currentColor}
-        </style><button type="button" aria-label="更多操作" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="20" cy="12" r="2"/></svg></button>`;
+        </style><button type="button" aria-label="更多操作" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v2H4zm0 6h16v2H4zm0 6h16v2H4z"/></svg></button>`;
         this.#button = triggerRoot.querySelector("button");
         this.#layer = document.createElement("span");
         const layerRoot = this.#layer.attachShadow({ mode: "open" });
