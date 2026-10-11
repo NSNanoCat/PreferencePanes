@@ -304,7 +304,6 @@
     z-index: 2;
     display: flex;
     align-items: center;
-    gap: 8px;
     height: calc(64px + env(safe-area-inset-top));
     padding: env(safe-area-inset-top) max(20px, env(safe-area-inset-right)) 0 max(20px, env(safe-area-inset-left));
     border-bottom: 1px solid transparent;
@@ -339,6 +338,7 @@
     align-items: center;
     flex: 1;
     min-width: 0;
+    margin-right: 8px;
 }
 .pp-host-logo {
     flex: none;
@@ -358,30 +358,50 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.pp-host-back {
+.pp-host-left {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex: none;
+}
+.pp-host-left::after {
+    content: "";
+    display: inline-block;
+    width: 1px;
+    height: 24px;
+    margin: 0 16px;
+    background-color: #0000001f;
+}
+:root[data-theme="dark"] .pp-host-left::after {
+    background-color: #5454547a;
+}
+.pp-host-left[hidden] {
+    display: none;
+}
+.pp-host-back {
     border: 0;
-    border-radius: 4px;
+    border-radius: 18px;
     background: none;
     color: inherit;
-    width: 44px;
-    height: 44px;
+    width: 36px;
+    height: 36px;
     padding: 8px;
     cursor: pointer;
+    transition: background-color 0.2s ease-in-out;
 }
 .pp-host-back svg {
     display: block;
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
     fill: none;
     stroke: currentColor;
     stroke-width: 2;
 }
 .pp-host-back:hover {
-    background: var(--pp-field);
+    background: #f1f1f1;
 }
-.pp-host-back[hidden] {
-    display: none;
+:root[data-theme="dark"] .pp-host-back:hover {
+    background: #343a46;
 }
 .pp-host-toast {
     position: fixed;

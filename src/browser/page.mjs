@@ -19,6 +19,9 @@ export function browserHost({ menu, back }) {
     button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>';
     button.setAttribute("aria-label", "返回");
     button.onclick = back;
+    const left = document.createElement("span");
+    left.className = "pp-host-left";
+    left.append(button);
     const title = document.createElement("span");
     title.className = "pp-host-title";
     const brand = document.createElement("div");
@@ -29,7 +32,7 @@ export function browserHost({ menu, back }) {
     image.alt = "";
     logo.append(image);
     brand.append(logo, title);
-    header.append(button, brand, menu.element);
+    header.append(left, brand, menu.element);
     document.body.prepend(header);
     const toast = document.createElement("div");
     toast.className = "pp-host-toast";
@@ -65,7 +68,7 @@ export function browserHost({ menu, back }) {
             title.textContent = state.logoText ?? state.title;
             logo.hidden = !state.logo;
             if (state.logo) image.src = state.logo;
-            button.hidden = !state.canGoBack;
+            left.hidden = !state.canGoBack;
             menu.element.hidden = !state.actions.length;
             button.disabled = state.busy;
             scroll();

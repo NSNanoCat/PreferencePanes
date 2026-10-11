@@ -387,6 +387,7 @@ test("browser chrome is unique and follows theme, keyboard, threshold and restor
     });
     const header = f.document.body.children.find(node => node.className === "pp-host-header");
     assert.equal(f.document.body.children.filter(node => node.className === "pp-host-header").length, 1);
+    assert.equal(header.children[0].hidden, true);
     f.theme.matches = true;
     f.theme.dispatchEvent(new Event("change"));
     assert.equal(f.root.dataset.theme, "dark");
@@ -401,7 +402,8 @@ test("browser chrome is unique and follows theme, keyboard, threshold and restor
     await new Promise(resolve => setImmediate(resolve));
     f.window.dispatchEvent(Object.assign(new Event("pageshow"), { persisted: true }));
     assert.equal(f.panels.length, 1);
-    header.children[0].onclick();
+    assert.equal(header.children[0].hidden, false);
+    header.children[0].children[0].onclick();
     assert.equal(f.navigation.current, "");
     destroy();
     assert.equal(f.root.dataset.theme, undefined);
@@ -601,7 +603,7 @@ test("link targets keep internal navigation and open new tabs synchronously with
     assert.equal(header.children[1].children[1].textContent, "官网");
     assert.equal(header.children[0].hidden, false);
     assert.deepEqual(f.menus[0].actions, []);
-    header.children[0].onclick();
+    header.children[0].children[0].onclick();
     assert.equal(f.navigation.current, "");
     assert.equal(header.children[1].children[1].textContent, "Example");
     blank.dispatchEvent(Object.assign(new Event("click", { cancelable: true }), { button: 0 }));
