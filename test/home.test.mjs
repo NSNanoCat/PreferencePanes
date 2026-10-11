@@ -503,6 +503,7 @@ test("JSON generates mixed sections, resolves assets and links against its URL a
     const f = await fixture();
     f.config.title = "<b>Example</b>";
     f.config.logo = "assets/logo.png";
+    f.config.logoText = "<b>Brand</b>";
     f.config.footer = ["<script>footer</script>"];
     f.config.sections[0].items[0].icon = { src: "assets/module.png" };
     f.config.sections.push({ title: "帮助", layout: "list", items: [{ name: "<b>官网</b>", icon: { text: "🏠" }, description: "使用说明", href: "../guide/" }] });
@@ -512,9 +513,17 @@ test("JSON generates mixed sections, resolves assets and links against its URL a
         f.restore();
     });
     assert.equal(f.document.title, "<b>Example</b>");
-    assert.equal(f.home.children[0].src, "https://example.test/settings/assets/logo.png");
-    const grid = f.home.children[1].children[1];
-    const list = f.home.children[2].children[1];
+    const header = f.document.body.children.find(node => node.className === "pp-host-header");
+    const [logo, title] = header.children[1].children;
+    assert.equal(logo.children[0].src, "https://example.test/settings/assets/logo.png");
+    assert.equal(logo.hidden, false);
+    assert.equal(title.textContent, "<b>Brand</b>");
+    assert.equal(
+        f.home.children.some(node => node.tagName === "IMG"),
+        false,
+    );
+    const grid = f.home.children[0].children[1];
+    const list = f.home.children[1].children[1];
     assert.equal(grid.dataset.layout, "grid");
     assert.equal(list.dataset.layout, "list");
     assert.equal(f.button.children[0].children[0].src, "https://example.test/settings/assets/module.png");
@@ -530,10 +539,38 @@ test("JSON generates mixed sections, resolves assets and links against its URL a
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(click.defaultPrevented, true);
     assert.deepEqual(f.urls, ["https://example.test/guide/"]);
+    f.navigation.open("Module");
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(logo.hidden, true);
+    assert.equal(title.textContent, "API");
+    f.navigation.back();
+    assert.equal(logo.hidden, false);
+    assert.equal(title.textContent, "<b>Brand</b>");
     destroy();
     link.dispatchEvent(Object.assign(new Event("click"), { button: 0 }));
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(f.urls.length, 1);
+});
+
+test("homepage navigation follows NavTitle fallback without substituting the document title", async () => {
+    for (const [brand, text, hidden] of [
+        [{}, "Example", true],
+        [{ logo: "logo.png" }, "", false],
+        [{ logoText: "Brand" }, "Brand", true],
+    ]) {
+        const f = await fixture();
+        try {
+            Object.assign(f.config, brand);
+            const destroy = await f.start();
+            const header = f.document.body.children.find(node => node.className === "pp-host-header");
+            assert.equal(header.children[1].children[0].hidden, hidden);
+            assert.equal(header.children[1].children[1].textContent, text);
+            assert.equal(f.document.title, "Example");
+            destroy();
+        } finally {
+            f.restore();
+        }
+    }
 });
 
 test("link targets keep internal navigation and open new tabs synchronously without replacing settings", async t => {
@@ -561,12 +598,12 @@ test("link targets keep internal navigation and open new tabs synchronously with
     assert.equal(iframe.tagName, "IFRAME");
     assert.equal(iframe.src, "https://example.test/");
     assert.ok(!iframe.attributes.get("sandbox").includes("allow-top-navigation"));
-    assert.equal(header.children[1].textContent, "官网");
+    assert.equal(header.children[1].children[1].textContent, "官网");
     assert.equal(header.children[0].hidden, false);
     assert.deepEqual(f.menus[0].actions, []);
     header.children[0].onclick();
     assert.equal(f.navigation.current, "");
-    assert.equal(header.children[1].textContent, "Example");
+    assert.equal(header.children[1].children[1].textContent, "Example");
     blank.dispatchEvent(Object.assign(new Event("click", { cancelable: true }), { button: 0 }));
     assert.deepEqual(f.opened, [{ url: "https://github.com/Example", target: "_blank", features: "noopener,noreferrer" }]);
     assert.deepEqual(f.urls, []);
@@ -619,6 +656,7 @@ test("required JSON and available CSS failures stop initialization and display t
 test("invalid external JSON rejects ambiguous navigation, duplicate modules and executable links before navigation starts", async () => {
     const item = { name: "Module", icon: { text: "⚙️" }, module: "Module" };
     for (const config of [
+        { title: "Example", logoText: {}, sections: [] },
         { title: "Example", sections: [{ title: "插件", layout: "unknown", items: [item] }] },
         { title: "Example", sections: [{ title: "插件", items: [item, item] }] },
         { title: "Example", sections: [{ title: "插件", items: [{ ...item, href: "/guide/" }] }] },

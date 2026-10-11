@@ -80,6 +80,7 @@ Release 的 `home.html` 内置首页程序、导航、默认 CSS 和网页宿主
 {
   "title": "Example",
   "logo": "assets/logo.png",
+  "logoText": "Example",
   "sections": [
     {"title": "插件", "items": [
       {"name": "Universal", "icon": {"src": "assets/Universal.png"}, "module": "Universal"},
@@ -94,7 +95,9 @@ Release 的 `home.html` 内置首页程序、导航、默认 CSS 和网页宿主
 }
 ```
 
-`title`、`sections` 必需，`logo`、`footer` 可选。章节包含 `title`、`items` 和可选 `layout`；默认 `grid` 上图标、下文字，小于 500px、500–699px、700px 以上分别为四、六、八列；`list` 纵向排列左图标、右文字与箭头。入口包含 `name`、唯一的 `icon.src` 或 `icon.text`、可选 `description`，并选择 `module` 或 `href`。模块名称唯一；API 面板使用各自 `module` 配置地址；实际存储模块由 BoxJS 字段 ID 推导。相对图片和链接以 JSON 地址解析，文字通过 `textContent` 渲染；入口版本与底部构建信息居中。必须通过 HTTP(S) 打开页面。
+`title`、`sections` 必需，`logo`、`logoText`、`footer` 可选。章节包含 `title`、`items` 和可选 `layout`；默认 `grid` 上图标、下文字，小于 500px、500–699px、700px 以上分别为四、六、八列；`list` 纵向排列左图标、右文字与箭头。入口包含 `name`、唯一的 `icon.src` 或 `icon.text`、可选 `description`，并选择 `module` 或 `href`。模块名称唯一；API 面板使用各自 `module` 配置地址；实际存储模块由 BoxJS 字段 ID 推导。相对图片和链接以 JSON 地址解析，文字通过 `textContent` 渲染；入口版本与底部构建信息居中。必须通过 HTTP(S) 打开页面。
+
+导航名称沿用 Rspress 的 `title`、`logo`、`logoText`：`logo` 和 `logoText` 分别在首页导航栏显示品牌图片和文字；两者均未提供时显示 `title`。`title` 同时用于文档和原生导航标题。模块及子页显示当前设置标题。
 
 链接可声明 `target`：`internal` 将 HTTP(S) 页面嵌入现有导航框架，保留标题和返回按钮；`_self` 替换当前整页；`_blank` 在点击时请求新窗口或标签，保留原设置页。省略时沿用原宿主行为，普通浏览器为整页跳转。内部页面不注入项目样式或设置接口，退出时释放 iframe；其导航不能替换顶层设置页。目标站点的 `X-Frame-Options` 或 CSP 可能禁止嵌入，GitHub 组织页和 Discussions 应使用 `_blank`。网页不能保证启动指定外部浏览器；WebView 的新页行为由宿主实现决定。
 

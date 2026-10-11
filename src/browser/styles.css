@@ -334,8 +334,22 @@
         transition: none;
     }
 }
-.pp-host-title {
+.pp-host-brand {
+    display: flex;
+    align-items: center;
     flex: 1;
+    min-width: 0;
+}
+.pp-host-logo {
+    flex: none;
+    min-width: 2rem;
+    margin-right: 0.25rem;
+}
+.pp-host-logo img {
+    display: block;
+    height: 1.6rem;
+}
+.pp-host-title {
     min-width: 0;
     text-align: left;
     font-size: 16px;
@@ -399,13 +413,6 @@
     max-width: 1000px;
     margin: auto;
     padding: calc(24px + var(--pp-host-height)) max(16px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
-}
-.pp-home-logo {
-    display: block;
-    width: 64px;
-    height: 64px;
-    margin: 0 auto 24px;
-    object-fit: contain;
 }
 .pp-home-entries {
     display: flex;

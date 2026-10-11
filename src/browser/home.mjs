@@ -11,6 +11,7 @@ import { installDefaultStyles } from "./styles.mjs";
 function validateHome(config) {
     if (!config || typeof config.title !== "string" || !Array.isArray(config.sections)) throw new Error("首页 JSON 缺少 title 或 sections");
     if (config.logo !== undefined && typeof config.logo !== "string") throw new Error("首页 logo 必须是图片地址");
+    if (config.logoText !== undefined && typeof config.logoText !== "string") throw new Error("首页 logoText 必须是文字");
     if (config.footer !== undefined && (!Array.isArray(config.footer) || config.footer.some(text => typeof text !== "string"))) throw new Error("首页 footer 必须是文字数组");
     const modules = new Set();
     for (const section of config.sections) {
@@ -43,13 +44,6 @@ function validateHome(config) {
 function renderHome(config, url, home) {
     const document = home.ownerDocument;
     home.replaceChildren();
-    if (config.logo) {
-        const logo = document.createElement("img");
-        logo.className = "pp-home-logo";
-        logo.src = new URL(config.logo, url).href;
-        logo.alt = config.title;
-        home.append(logo);
-    }
     for (const section of config.sections) {
         const group = document.createElement("section");
         group.className = "pp-group";
@@ -234,6 +228,8 @@ export async function startHome() {
             host,
             menu,
             title: config.title,
+            logo: config.logo ? new URL(config.logo, jsonURL).href : undefined,
+            logoText: config.logoText,
             modules: new Map(config.sections.flatMap(section => section.items.filter(item => item.module).map(item => [item.module, item]))),
             links,
         });

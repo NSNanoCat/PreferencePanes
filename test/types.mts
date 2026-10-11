@@ -25,6 +25,8 @@ const factory: BridgeFactory = async ({ menu, back }) => ({
 void factory;
 const home: HomeConfig = {
     title: "Example",
+    logo: "assets/logo.png",
+    logoText: "Example",
     sections: [
         {
             title: "项目链接",

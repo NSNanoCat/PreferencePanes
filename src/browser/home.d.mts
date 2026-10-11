@@ -4,6 +4,10 @@ import type { ActionMenu, MenuAction, Notice } from "./Navigation.mjs";
 export interface HomeState {
     /** 当前标题 / Current title. */
     title: string;
+    /** 首页导航图片 / Homepage navigation image. */
+    logo?: string;
+    /** 首页导航文字 / Homepage navigation text. */
+    logoText?: string;
     /** 可用菜单操作 / Available menu actions. */
     actions: MenuAction[];
     /** 操作是否正在执行 / Whether an operation is in progress. */
@@ -47,8 +51,12 @@ export type HomeLinkTarget = "internal" | "_self" | "_blank";
 export type HomeItem = { name: string; icon: HomeIcon; description?: string } & ({ module: string; href?: never; target?: never } | { href: string; target?: HomeLinkTarget; module?: never });
 /** 运行时导入的首页配置 / Runtime-imported homepage configuration. */
 export interface HomeConfig {
+    /** 文档和原生导航标题；未提供品牌时也是网页导航文字 / Document and native navigation title; also the web navigation text when no brand is supplied. */
     title: string;
+    /** 网页导航图片，相对于 JSON 地址 / Web navigation image, relative to the JSON URL. */
     logo?: string;
+    /** 网页导航文字，沿用 Rspress 命名 / Web navigation text, following Rspress naming. */
+    logoText?: string;
     sections: { title: string; layout?: "grid" | "list"; items: HomeItem[] }[];
     footer?: string[];
 }
