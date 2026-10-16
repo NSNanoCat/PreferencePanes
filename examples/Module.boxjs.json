@@ -11,14 +11,16 @@
             "name": "[基础] 运行模式",
             "type": "selects",
             "val": "auto",
+            "desc": "默认选项带有“默认”标记，不随当前选择变化。",
             "items": [{ "key": "auto", "label": "自动" }, { "key": "manual", "label": "手动" }]
         },
         {
             "id": "@Example.Module.Settings.items",
             "name": "[基础] 多选项目",
             "type": "checkboxes",
-            "val": ["first"],
-            "items": [{ "key": "first", "label": "第一项" }, { "key": "second", "label": "第二项" }]
+            "val": ["first", "third"],
+            "desc": "默认包含第一项和第三项，每项旁显示“默认”标签。",
+            "items": [{ "key": "first", "label": "第一项" }, { "key": "second", "label": "第二项" }, { "key": "third", "label": "第三项" }]
         },
         {
             "id": "@Example.Module.Settings.displayName",

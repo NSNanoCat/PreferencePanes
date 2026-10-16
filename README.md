@@ -60,6 +60,8 @@ await fetch("/api/set", {
 
 页面初始化时只执行一次 `POST /api/get` 读取 Settings 子树。外部存储中的历史值不会阻断页面加载：当前选项表未定义的值会保留并在对应设置项下提示，无法由控件表示的值会回退到默认值并显示警告；用户的新写入仍执行严格校验。写入成功后仅更新当前页面快照；查看 Settings/Caches 时按需读取，清空和重置通过 `/api/delete` 完成。
 
+选择控件按 BoxJS `val` 标记默认选项，与当前已存值或勾选状态无关：系统原生下拉在默认选项文字后显示“（默认）”，多选列表在默认包含的各选项旁显示小号“默认”标签。标记仅用于展示，不改变选项值或写入内容。
+
 设置项支持 `type: "url"` 作为只读跳转入口。它的 `val` 必须是带 scheme 的地址，例如 `bilibili://main/top_category`；面板将其渲染为可点击链接，不会发起存储写入。链接统一交由当前宿主的 `openURL(url)` 处理。
 
 ## 固定路径首页与可选 Bridge
@@ -149,7 +151,7 @@ npm pack --dry-run
 npm run preview
 ```
 
-预览入口会自动加载 `examples/Module.boxjs.json`，覆盖 `boolean`、`selects`、`checkboxes`、`text`、`textarea`、`number` 和 `url` 全部受支持控件。顶端 CSS 选择器默认使用包内置 CSS，也可切换 `examples/theme.css` 或导入本地 CSS 文件。预览服务器直接提供正式构建的 `home.html`，通过固定 `home.json`、`theme.css` 和 `/api/{module}` 提供所选资源，并使用固定存储 API 与独立内存存储，不维护演示专用渲染器。
+预览入口会自动加载 `examples/Module.boxjs.json`，覆盖 `boolean`、`selects`、`checkboxes`、`text`、`textarea`、`number` 和 `url` 全部受支持控件，并展示单选及多选的默认选项标记。顶端 CSS 选择器默认使用包内置 CSS，也可切换 `examples/theme.css` 或导入本地 CSS 文件。预览服务器直接提供正式构建的 `home.html`，通过固定 `home.json`、`theme.css` 和 `/api/{module}` 提供所选资源，并使用固定存储 API 与独立内存存储，不维护演示专用渲染器。
 
 内置存储会提供已移除选项和格式错误值，用于直接核对字段级黄色警告及非阻断加载；URL 字段还会携带同路径旧存储值，验证只读链接始终使用 BoxJS `val`。测试台同时保留上传其它 BoxJS JSON 并生成隔离预览的能力。
 

@@ -170,7 +170,24 @@
 }
 .pp-choice {
     justify-content: space-between;
+    gap: 12px;
     cursor: pointer;
+}
+.pp-choice-name {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+.pp-default-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--pp-field);
+    color: var(--pp-muted);
+    font-size: 11px;
+    line-height: 16px;
+    vertical-align: middle;
+    white-space: nowrap;
 }
 .pp-choice input {
     width: 20px;

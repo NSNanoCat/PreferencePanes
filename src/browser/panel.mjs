@@ -253,7 +253,7 @@ export class PreferencesPanel {
                         const select = node("select", "");
                         select.setAttribute("aria-label", field.name);
                         field.options.forEach((option, index) => {
-                            const item = node("option", "", option.label);
+                            const item = node("option", "", option.key === field.defaultValue ? `${option.label}（默认）` : option.label);
                             item.value = String(index);
                             select.append(item);
                         });
@@ -294,7 +294,9 @@ export class PreferencesPanel {
                         const inputs = field.options.map(option => {
                             const label = settingRow("label");
                             label.classList.add("pp-choice");
-                            label.textContent = option.label;
+                            const name = node("span", "pp-choice-name", option.label);
+                            if (field.defaultValue?.includes(option.key)) name.append(node("span", "pp-default-badge", "默认"));
+                            label.append(name);
                             const input = node("input", "");
                             input.type = "checkbox";
                             input.setAttribute("aria-label", option.label);
